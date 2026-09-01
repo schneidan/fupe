@@ -1,0 +1,59 @@
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { IsEnum, IsObject, IsOptional, IsString, IsUrl } from 'class-validator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AuthUser } from '../auth/auth.service';
+import { EditsService, ProposedEditData } from './edits.service';
+
+class SubmitEditBody {
+  @IsString()
+  target_node_id!: string;
+
+  @IsObject()
+  proposed_data!: ProposedEditData;
+
+  @IsOptional()
+  @IsUrl()
+  citation_url?: string;
+}
+
+class ReviewEditBody {
+  @IsEnum(['APPROVED', 'REJECTED'])
+  decision!: 'APPROVED' | 'REJECTED';
+}
+
+@Controller('edits')
+@UseGuards(JwtAuthGuard)
+export class EditsController {
+  constructor(private readonly editsService: EditsService) {}
+
+  @Post()
+  submit(@Req() req: { user: AuthUser }, @Body() body: SubmitEditBody) {
+    return this.editsService.submitEdit(req.user, body);
+  }
+
+  @Get('queue')
+  listQueue(@Req() req: { user: AuthUser }) {
+    if (req.user.trust_score <= 50) {
+      return { edits: [] };
+    }
+    return this.editsService.listPending();
+  }
+
+  @Patch(':id/review')
+  review(
+    @Req() req: { user: AuthUser },
+    @Param('id') id: string,
+    @Body() { decision }: ReviewEditBody,
+  ) {
+    return this.editsService.reviewEdit(req.user, id, decision);
+  }
+}

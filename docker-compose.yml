@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: apache/age:latest
+    container_name: fupe-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: fupe
+      POSTGRES_PASSWORD: fupe_dev
+      POSTGRES_DB: fupe
+    volumes:
+      # PG 18+ images require mounting at /var/lib/postgresql (not .../data)
+      - fupe_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fupe -d fupe"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  fupe_pgdata:

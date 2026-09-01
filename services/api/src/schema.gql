@@ -1,0 +1,54 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type Entity {
+  id: String!
+  name: String!
+  type: EntityType!
+}
+
+enum EntityType {
+  BRAND
+  PARENT_CORP
+  PE_FIRM
+  SUBSIDIARY
+  VC_FIRM
+}
+
+type OwnershipResult {
+  entity: Entity!
+  isPeBacked: Boolean!
+  owners: [Entity!]!
+  peFirms: [Entity!]!
+}
+
+type Product {
+  category: String!
+  gtin: String!
+  name: String!
+}
+
+type ProductOwnershipResult {
+  isPeBacked: Boolean!
+  manufacturer: Entity
+  owners: [Entity!]!
+  peFirms: [Entity!]!
+  product: Product!
+}
+
+type Query {
+  """Get ownership chain for an entity"""
+  ownershipChain(entityId: String!): OwnershipResult
+
+  """Lookup product by GTIN and resolve ownership"""
+  productByGtin(gtin: String!): ProductOwnershipResult
+
+  """Fuzzy text search across entities and products"""
+  searchEntities(limit: Int! = 20, query: String!): SearchResult!
+}
+
+type SearchResult {
+  count: Float!
+  entities: [Entity!]!
+}

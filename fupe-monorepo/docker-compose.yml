@@ -1,0 +1,18 @@
+services:
+  postgres-age:
+    image: apache/age:latest
+    container_name: fupe_postgres_age
+    restart: always
+    environment:
+      POSTGRES_USER: fupe_user
+      POSTGRES_PASSWORD: fupe_dev_password
+      POSTGRES_DB: fupe_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - age_data:/var/lib/postgresql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+
+volumes:
+  age_data:
