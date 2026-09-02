@@ -5,13 +5,14 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { IsEnum, IsObject, IsOptional, IsString, IsUrl } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthUser } from '../auth/auth.service';
-import { EditsService, ProposedEditData } from './edits.service';
+import { EditStatus, EditsService, ProposedEditData } from './edits.service';
 
 class SubmitEditBody {
   @IsString()
@@ -30,6 +31,12 @@ class ReviewEditBody {
   decision!: 'APPROVED' | 'REJECTED';
 }
 
+class ListMineQuery {
+  @IsOptional()
+  @IsEnum(['PENDING', 'APPROVED', 'REJECTED'])
+  status?: EditStatus;
+}
+
 @Controller('edits')
 @UseGuards(JwtAuthGuard)
 export class EditsController {
@@ -38,6 +45,14 @@ export class EditsController {
   @Post()
   submit(@Req() req: { user: AuthUser }, @Body() body: SubmitEditBody) {
     return this.editsService.submitEdit(req.user, body);
+  }
+
+  @Get('mine')
+  listMine(
+    @Req() req: { user: AuthUser },
+    @Query() { status }: ListMineQuery,
+  ) {
+    return this.editsService.listMine(req.user.id, status);
   }
 
   @Get('queue')

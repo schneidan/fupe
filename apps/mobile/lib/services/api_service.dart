@@ -104,4 +104,103 @@ class ApiService {
       jsonDecode(response.body) as Map<String, dynamic>,
     );
   }
+
+  Future<Map<String, dynamic>> submitEdit({
+    required String token,
+    required String targetNodeId,
+    required Map<String, dynamic> proposedData,
+    required String citationUrl,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/v1/edits'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'target_node_id': targetNodeId,
+        'proposed_data': proposedData,
+        'citation_url': citationUrl,
+      }),
+    );
+    return _parseJsonMap(response);
+  }
+
+  Future<List<QueueEdit>> listMyEdits({
+    required String token,
+    String? status,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/edits/mine').replace(
+      queryParameters: {
+        if (status != null && status.isNotEmpty) 'status': status,
+      },
+    );
+    final response = await http.get(
+      uri,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final data = _parseJsonMap(response);
+    final edits = data['edits'] as List<dynamic>? ?? [];
+    return edits
+        .map((e) => QueueEdit.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Map<String, dynamic> _parseJsonMap(http.Response response) {
+    final body = jsonDecode(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final msg = body is Map ? body['message'] : null;
+      throw ApiException(
+        msg is String
+            ? msg
+            : (msg is List ? msg.join(', ') : 'Request failed (${response.statusCode})'),
+      );
+    }
+    return body as Map<String, dynamic>;
+  }
+}
+
+class QueueEdit {
+  QueueEdit({
+    required this.id,
+    required this.targetNodeId,
+    required this.proposedData,
+    required this.citationUrl,
+    required this.status,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String targetNodeId;
+  final Map<String, dynamic> proposedData;
+  final String? citationUrl;
+  final String status;
+  final DateTime createdAt;
+
+  factory QueueEdit.fromJson(Map<String, dynamic> json) {
+    return QueueEdit(
+      id: json['id'] as String,
+      targetNodeId: json['target_node_id'] as String,
+      proposedData: Map<String, dynamic>.from(
+        json['proposed_data'] as Map? ?? {},
+      ),
+      citationUrl: json['citation_url'] as String?,
+      status: json['status'] as String? ?? 'PENDING',
+      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
+          DateTime.now(),
+    );
+  }
+
+  String get summary {
+    final ownership = proposedData['ownership'] as Map?;
+    final newParent = proposedData['new_parent'] as Map?;
+    if (ownership != null && ownership['parent_id'] != null) {
+      final pct = ownership['percentage'];
+      return 'Link parent ${ownership['parent_id']}${pct != null ? ' ($pct%)' : ''}';
+    }
+    if (newParent != null) {
+      return 'New parent “${newParent['name']}”';
+    }
+    return 'Edit';
+  }
 }

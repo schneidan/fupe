@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { OwnershipChain } from '@/components/OwnershipChain';
 import { CitationsList } from '@/components/CitationsList';
+import { SuggestEditLink } from '@/components/SuggestEditLink';
 import { getEntity, type EntityDetail } from '@/lib/api';
 import { resultPath } from '@/lib/slug';
 
@@ -65,6 +66,7 @@ export function EntityDetailView({ slug }: { slug: string }) {
 
       <OwnershipChain chain={entity.ownership_chain} />
       <CitationsList citations={entity.citations} />
+      <SuggestEditLink entityId={entity.id} name={entity.name} />
 
       {entity.updated_at && (
         <p className="text-xs text-fupe-accentDim">

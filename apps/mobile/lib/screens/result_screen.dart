@@ -9,6 +9,7 @@ import '../widgets/citations_list.dart';
 import '../widgets/did_you_know.dart';
 import '../widgets/ownership_chain.dart';
 import '../widgets/verdict_hero.dart';
+import 'suggest_edit_screen.dart';
 
 class ResultScreen extends StatefulWidget {
   const ResultScreen({
@@ -130,6 +131,22 @@ class _ResultScreenState extends State<ResultScreen> {
         CitationsList(citations: result.citations),
         const SizedBox(height: 16),
         DidYouKnow(result: result),
+        if (result.entityId != null) ...[
+          const SizedBox(height: 24),
+          OutlinedButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SuggestEditScreen(
+                    entityId: result.entityId,
+                    entityName: result.matchedItem,
+                  ),
+                ),
+              );
+            },
+            child: const Text('Suggest an edit'),
+          ),
+        ],
         const SizedBox(height: 32),
         OutlinedButton(
           onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),

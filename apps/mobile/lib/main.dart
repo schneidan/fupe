@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'navigation/deep_links.dart';
 import 'screens/shell_screen.dart';
 import 'services/api_service.dart';
+import 'services/auth_service.dart';
 import 'theme/fupe_theme.dart';
 
 String _defaultApiBaseUrl() {
@@ -27,12 +28,15 @@ void main() {
     'API_URL',
     defaultValue: '',
   );
+  final baseUrl = apiUrl.isNotEmpty ? apiUrl : _defaultApiBaseUrl();
+  final auth = AuthService(baseUrl: baseUrl)..load();
 
   runApp(
-    Provider(
-      create: (_) => ApiService(
-        baseUrl: apiUrl.isNotEmpty ? apiUrl : _defaultApiBaseUrl(),
-      ),
+    MultiProvider(
+      providers: [
+        Provider(create: (_) => ApiService(baseUrl: baseUrl)),
+        ChangeNotifierProvider.value(value: auth),
+      ],
       child: const FupeApp(),
     ),
   );

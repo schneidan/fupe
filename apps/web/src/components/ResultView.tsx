@@ -8,6 +8,7 @@ import { VerdictHero } from '@/components/VerdictHero';
 import { OwnershipChain } from '@/components/OwnershipChain';
 import { CitationsList } from '@/components/CitationsList';
 import { DidYouKnow } from '@/components/DidYouKnow';
+import { SuggestEditLink } from '@/components/SuggestEditLink';
 import { lookup, type LookupResult } from '@/lib/api';
 import { resultPath, slugToQuery, toSlug } from '@/lib/slug';
 
@@ -101,6 +102,10 @@ export function ResultView({ slug }: ResultViewProps) {
       <VerdictHero result={result} />
       <OwnershipChain chain={result.ownership_chain} />
       <CitationsList citations={result.citations} />
+      <SuggestEditLink
+        entityId={result.entity_id}
+        name={result.matched_item}
+      />
       <DidYouKnow result={result} />
       <div className="border-t border-fupe-border pt-8">
         <p className="mb-4 text-center text-sm text-fupe-muted">

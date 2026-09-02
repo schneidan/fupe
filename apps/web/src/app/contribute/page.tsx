@@ -1,4 +1,9 @@
 import Link from 'next/link';
+import { ContributeHub } from '@/components/ContributeHub';
+
+export const metadata = {
+  title: 'Contribute',
+};
 
 export default function ContributePage() {
   return (
@@ -10,19 +15,12 @@ export default function ContributePage() {
         ← FUPE
       </Link>
       <h1 className="text-2xl font-bold text-fupe-text">Contribute</h1>
-      <p className="mt-4 text-fupe-muted">
-        Community edits (with citations) are supported via the API today. A
-        contributor UI is on the roadmap — register an account and submit edits
-        through{' '}
-        <code className="rounded bg-fupe-elevated px-1 text-fupe-accent">
-          POST /api/v1/edits
-        </code>
-        .
+      <p className="mt-3 text-fupe-muted">
+        Help fill gaps the ingest pipeline misses. Suggest ownership parents
+        with a public citation — new accounts go to a review queue; high-trust
+        editors auto-commit.
       </p>
-      <p className="mt-4 text-sm text-fupe-muted">
-        PE/VC ownership claims require a valid source URL. High-trust users
-        auto-commit; others go to a moderation queue.
-      </p>
+      <ContributeHub />
     </main>
   );
 }

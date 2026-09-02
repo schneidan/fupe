@@ -15,7 +15,8 @@ export type EditStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface ProposedEditData {
   entity?: { name?: string; type?: EntityType };
-  ownership?: { parent_id: string; percentage?: number };
+  /** parent_id required when linking an existing parent; optional when only supplying percentage for new_parent */
+  ownership?: { parent_id?: string; percentage?: number };
   new_parent?: { name: string; type: EntityType };
 }
 
@@ -64,7 +65,26 @@ export class EditsService {
        WHERE eq.status = 'PENDING'
        ORDER BY eq.created_at ASC`,
     );
-    return rows;
+    return { edits: rows };
+  }
+
+  async listMine(userId: string, status?: EditStatus) {
+    const params: unknown[] = [userId];
+    let statusClause = '';
+    if (status) {
+      params.push(status);
+      statusClause = `AND status = $2`;
+    }
+
+    const { rows } = await this.pool.query(
+      `SELECT id, target_node_id, proposed_data, citation_url, status,
+              reviewer_id, reviewed_at, created_at
+       FROM public.edits_queue
+       WHERE user_id = $1 ${statusClause}
+       ORDER BY created_at DESC`,
+      params,
+    );
+    return { edits: rows };
   }
 
   async reviewEdit(
