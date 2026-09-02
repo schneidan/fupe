@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { listEntities, type EntitySummary } from '@/lib/api';
@@ -13,10 +14,21 @@ const ENTITY_TYPES = [
   { value: 'VC_FIRM', label: 'VC firm' },
 ];
 
+const COUNTRIES = [
+  { value: '', label: 'All countries' },
+  { value: 'US', label: 'United States' },
+  { value: 'GB', label: 'United Kingdom' },
+  { value: 'CA', label: 'Canada' },
+  { value: 'DE', label: 'Germany' },
+  { value: 'FR', label: 'France' },
+];
+
 export function BrowseDirectory() {
+  const searchParams = useSearchParams();
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
-  const [peOnly, setPeOnly] = useState(false);
+  const [country, setCountry] = useState('');
+  const [peOnly, setPeOnly] = useState(searchParams.get('pe_only') === 'true');
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<EntitySummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -32,6 +44,7 @@ export function BrowseDirectory() {
       const data = await listEntities({
         q: q.trim() || undefined,
         type: type || undefined,
+        country: country || undefined,
         pe_only: peOnly || undefined,
         page,
         limit,
@@ -43,7 +56,7 @@ export function BrowseDirectory() {
     } finally {
       setLoading(false);
     }
-  }, [q, type, peOnly, page]);
+  }, [q, type, country, peOnly, page]);
 
   useEffect(() => {
     load();
@@ -75,6 +88,21 @@ export function BrowseDirectory() {
             className="rounded-lg border border-fupe-border bg-fupe-elevated px-3 py-2 text-sm text-fupe-text outline-none focus:border-fupe-muted"
           >
             {ENTITY_TYPES.map((opt) => (
+              <option key={opt.value || 'all'} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={country}
+            onChange={(e) => {
+              setCountry(e.target.value);
+              setPage(1);
+            }}
+            className="rounded-lg border border-fupe-border bg-fupe-elevated px-3 py-2 text-sm text-fupe-text outline-none focus:border-fupe-muted"
+          >
+            {COUNTRIES.map((opt) => (
               <option key={opt.value || 'all'} value={opt.value}>
                 {opt.label}
               </option>

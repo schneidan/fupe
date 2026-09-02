@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { BrowseDirectory } from '@/components/BrowseDirectory';
 
 export default function BrowsePage() {
@@ -15,7 +16,13 @@ export default function BrowsePage() {
         Search brands, subsidiaries, and PE firms in our graph.
       </p>
       <div className="mt-8">
-        <BrowseDirectory />
+        <Suspense
+          fallback={
+            <p className="text-center text-fupe-muted">Loading directory…</p>
+          }
+        >
+          <BrowseDirectory />
+        </Suspense>
       </div>
     </main>
   );
