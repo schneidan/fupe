@@ -1,68 +1,135 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import 'package:provider/provider.dart';
 
-class ResultScreen extends StatelessWidget {
+import '../models/lookup_result.dart';
+import '../services/api_service.dart';
+import '../theme/fupe_theme.dart';
+import '../widgets/citations_list.dart';
+import '../widgets/did_you_know.dart';
+import '../widgets/ownership_chain.dart';
+import '../widgets/verdict_hero.dart';
+
+class ResultScreen extends StatefulWidget {
   const ResultScreen({
     super.key,
-    required this.gtin,
-    required this.result,
-  });
+    this.query,
+    this.result,
+  }) : assert(query != null || result != null);
 
-  final String gtin;
-  final OwnershipResult? result;
+  final String? query;
+  final LookupResult? result;
+
+  @override
+  State<ResultScreen> createState() => _ResultScreenState();
+}
+
+class _ResultScreenState extends State<ResultScreen> {
+  LookupResult? _result;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.result != null) {
+      _result = widget.result;
+      _loading = false;
+    } else {
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    final api = context.read<ApiService>();
+    try {
+      final result = await api.lookupText(widget.query!);
+      if (!mounted) return;
+      setState(() {
+        _result = result;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('ApiException: ', '');
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (result == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Not Found')),
-        body: Center(child: Text('No data for GTIN $gtin')),
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text('FUPE'),
+      ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: FupeColors.muted),
+            const SizedBox(height: 16),
+            Text(
+              'Tracing ownership for "${widget.query}"…',
+              style: const TextStyle(color: FupeColors.muted),
+            ),
+          ],
+        ),
       );
     }
 
-    final product = result!.product;
-    final isPe = result!.isPeBacked;
-
-    return Scaffold(
-      appBar: AppBar(title: Text(product?['name'] as String? ?? gtin)),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (isPe)
-            Card(
-              color: Colors.red.shade50,
-              child: const ListTile(
-                leading: Icon(Icons.warning_amber, color: Colors.red),
-                title: Text('PE Backed', style: TextStyle(fontWeight: FontWeight.bold)),
+    if (_error != null || _result == null) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _error ?? 'Not found',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 18,
+                color: FupeColors.verdictYes,
               ),
             ),
-          if (product != null)
-            ListTile(
-              title: Text(product['name'] as String? ?? ''),
-              subtitle: Text('GTIN: ${product['gtin']}'),
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Try again'),
             ),
-          if (result!.manufacturer != null)
-            ListTile(
-              title: const Text('Manufacturer'),
-              subtitle: Text(result!.manufacturer!['name'] as String? ?? ''),
-            ),
-          if (result!.owners.isNotEmpty) ...[
-            const Divider(),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text('Ownership Chain', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            ...result!.owners.map((o) {
-              final owner = o as Map<String, dynamic>;
-              return ListTile(
-                dense: true,
-                title: Text(owner['name'] as String? ?? ''),
-                subtitle: Text(owner['type'] as String? ?? ''),
-              );
-            }),
           ],
-        ],
-      ),
+        ),
+      );
+    }
+
+    final result = _result!;
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        VerdictHero(result: result),
+        const SizedBox(height: 32),
+        OwnershipChain(chain: result.ownershipChain),
+        const SizedBox(height: 16),
+        CitationsList(citations: result.citations),
+        const SizedBox(height: 16),
+        DidYouKnow(result: result),
+        const SizedBox(height: 32),
+        OutlinedButton(
+          onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+          child: const Text('Search another'),
+        ),
+      ],
     );
   }
 }
