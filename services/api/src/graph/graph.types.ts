@@ -30,7 +30,7 @@ export interface EntitySummary {
 
 export interface EntityDetail extends EntitySummary {
   ownership_chain: ChainNode[];
-  citations: Array<{ title: string; url: string }>;
+  citations: CitationDto[];
   aliases?: string[];
   source?: string;
   updated_at?: string;
@@ -58,7 +58,16 @@ export interface CitationProperties {
   id: string;
   url: string;
   title: string;
+  retrieved_at?: string;
+  stale?: boolean | string;
 }
+
+export type CitationDto = {
+  title: string;
+  url: string;
+  retrieved_at?: string;
+  stale?: boolean;
+};
 
 export interface ChainNode {
   name: string;
@@ -71,7 +80,7 @@ export interface LookupResult {
   is_private_equity_owned: boolean;
   ultimate_parent: ChainNode | null;
   ownership_chain: ChainNode[];
-  citations: Array<{ title: string; url: string }>;
+  citations: CitationDto[];
   related?: RelatedEntities;
 }
 

@@ -13,7 +13,8 @@
     "db:migrate": "pnpm --filter @fupe/db migrate",
     "db:setup": "docker compose up -d postgres && pnpm db:migrate",
     "db:reset": "pnpm --filter @fupe/db reset",
-    "ingest": "pnpm --filter @fupe/ingest ingest"
+    "ingest": "pnpm --filter @fupe/ingest ingest",
+    "ingest:schedule": "pnpm --filter @fupe/ingest ingest:schedule"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

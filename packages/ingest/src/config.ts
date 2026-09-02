@@ -102,12 +102,14 @@ Sources:
   companies-house    UK Companies House (P1 — stub)
 
 Cron-friendly: each run upserts a page; advance --offset/--page until metadata.exhausted=true.
+Or use \`pnpm ingest --schedule\` (Phase 4.4) to advance persisted cursors automatically.
 Paid commercial databases are out of scope for now — open sources + community only.
 
 Examples:
   pnpm ingest --source wikidata --region US --limit 50 --offset 0
   pnpm ingest --source wikidata --region EU --offset 50 --limit 50
   pnpm ingest --source open-food-facts --region US --page 1 --limit 50 --dry-run
+  pnpm ingest --schedule --max-pages 3
 `);
   process.exit(code);
 }

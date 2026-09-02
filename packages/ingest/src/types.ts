@@ -82,6 +82,12 @@ export interface LoadStats {
   entitiesQueued: number;
 }
 
+export interface IngestCursorMeta {
+  nextOffset?: number;
+  nextPage?: number;
+  exhausted: boolean;
+}
+
 export interface IngestResult {
   source: SourceId;
   region?: string;
@@ -89,4 +95,6 @@ export interface IngestResult {
   runId?: string;
   stats: LoadStats;
   message: string;
+  /** Pagination hint from the source batch (for scheduler / cron). */
+  cursor?: IngestCursorMeta;
 }

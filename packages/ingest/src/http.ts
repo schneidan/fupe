@@ -20,7 +20,8 @@ export async function fetchJson<T>(
       });
 
       if (res.status === 503 || res.status === 429) {
-        const wait = attempt * 2500;
+        // Extra-polite backoff for shared APIs (OFF especially).
+        const wait = attempt * 8000;
         await new Promise((r) => setTimeout(r, wait));
         lastError = new Error(`HTTP ${res.status} for ${url}`);
         continue;
@@ -37,7 +38,7 @@ export async function fetchJson<T>(
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, attempt * 1000));
+        await new Promise((r) => setTimeout(r, attempt * 3000));
         continue;
       }
     }

@@ -1,7 +1,7 @@
 export {
   resolveEntityMatch,
-  AUTO_MERGE_THRESHOLD,
-  REVIEW_THRESHOLD,
+  REVIEW_SCORE_THRESHOLD,
+  REVIEW_JACCARD_THRESHOLD,
 } from './resolve';
 export type { MatchDecision } from './resolve';
 export { enqueueMatchReview } from './queue';

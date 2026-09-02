@@ -26,6 +26,29 @@ export async function runIngest(options: IngestOptions): Promise<IngestResult> {
   const recordCount =
     batch.entities.length + batch.edges.length + batch.products.length;
 
+  const cursorFromBatch = ():
+    | { nextOffset?: number; nextPage?: number; exhausted: boolean }
+    | undefined => {
+    if (
+      batch.metadata?.exhausted == null &&
+      batch.metadata?.nextOffset == null &&
+      batch.metadata?.nextPage == null
+    ) {
+      return undefined;
+    }
+    return {
+      nextOffset:
+        typeof batch.metadata?.nextOffset === 'number'
+          ? batch.metadata.nextOffset
+          : undefined,
+      nextPage:
+        typeof batch.metadata?.nextPage === 'number'
+          ? batch.metadata.nextPage
+          : undefined,
+      exhausted: Boolean(batch.metadata?.exhausted),
+    };
+  };
+
   if (options.dryRun) {
     return {
       source: options.source,
@@ -39,6 +62,7 @@ export async function runIngest(options: IngestOptions): Promise<IngestResult> {
         entitiesMatched: 0,
         entitiesQueued: 0,
       },
+      cursor: cursorFromBatch(),
       message: source.implemented
         ? `Dry run: would load ${recordCount} record(s) from ${options.source}`
         : `Dry run: ${options.source} scaffold OK (${String(batch.metadata?.note ?? 'stub')})`,
@@ -104,6 +128,7 @@ export async function runIngest(options: IngestOptions): Promise<IngestResult> {
           dryRun: false,
           runId,
           stats,
+          cursor: cursorFromBatch(),
           message: `Loaded ${processed} record(s) from ${options.source} (run ${runId}).${cursorHint}`,
         };
       } catch (err) {

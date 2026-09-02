@@ -8,39 +8,43 @@ ETL package for loading corporate ownership data into FUPE (PostgreSQL + Apache 
 src/
   sources/     fetch per provider (Wikidata + Open Food Facts live; others stubbed)
   normalize/   name / entity cleanup
+  match/       entity dedupe + review queue
   load/        MERGE Entity / edges / Citation + ingestion_runs audit
+  schedule/    cursor-backed cron runner + stale citation flagging
   pipeline.ts  fetch → load
-  cli.ts       `pnpm ingest` entrypoint
+  cli.ts       `pnpm ingest` / `pnpm ingest --schedule`
 ```
 
-## Can this run on cron?
-
-**Yes.** Each run is idempotent (`MERGE` upserts) and returns a cursor:
-
-| Source | Advance with | Stop when |
-|--------|--------------|-----------|
-| `wikidata` | `--offset` (+ `--limit`) | `metadata.exhausted` |
-| `open-food-facts` | `--page` (+ `--limit`) | `metadata.exhausted` |
-
-Typical backfill loop (shell):
+## Scheduled refresh (Phase 4.4)
 
 ```bash
-OFFSET=0
-while true; do
-  OUT=$(pnpm ingest --source wikidata --region US --limit 50 --offset $OFFSET)
-  echo "$OUT"
-  echo "$OUT" | grep -q 'exhausted\|Source page exhausted' && break
-  OFFSET=$((OFFSET + 50))
-  sleep 2   # be polite to Wikidata
-done
+pnpm db:migrate          # includes ingest_cursors
+pnpm ingest:schedule     # polite defaults for ~40min cron
+pnpm ingest --schedule --max-pages 1 --dry-run
 ```
 
-Phase **4.4** will add scheduled refresh + diff logging; until then, cron the CLI yourself.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--max-pages` | `2` | Pages per source/region per run |
+| `--page-size` / `--limit` | `25` | Records per page |
+| `--stale-months` | `6` | Flag citations older than this |
+| `--delay-ms` | `8000` | Pause between pages (be nice to Wikidata/OFF) |
+| `--dry-run` | off | Fetch only; no cursor/stale writes |
 
-## CLI
+Default jobs: Wikidata US + EU (offset), Open Food Facts US (page). Cursors live in `public.ingest_cursors`. When a source reports `exhausted`, the next run resets to the start for a refresh pass.
+
+Each page logs a diff (`Δentities`, `Δcitations`, matched/queued). After pages, citations with `retrieved_at` older than N months are marked `stale` (shown as “may be outdated” in web/mobile).
+
+Every-40-minutes cron (defaults are already polite — no flags needed):
 
 ```bash
-pnpm db:up   # Postgres required for non-dry-run
+*/40 * * * * cd /path/to/fupe && pnpm ingest:schedule
+```
+
+## Manual / backfill CLI
+
+```bash
+pnpm db:up
 
 pnpm ingest --source wikidata --region US --limit 25 --dry-run
 pnpm ingest --source wikidata --region US --limit 25 --offset 0
@@ -57,6 +61,12 @@ pnpm ingest --help
 | `--offset` | Wikidata SPARQL offset |
 | `--page` | Open Food Facts page (1-based) |
 | `--database-url` | Override `DATABASE_URL` |
+| `--schedule` | Run the cursor scheduler instead |
+
+| Source | Advance with | Stop when |
+|--------|--------------|-----------|
+| `wikidata` | `--offset` (+ `--limit`) | `metadata.exhausted` |
+| `open-food-facts` | `--page` (+ `--limit`) | `metadata.exhausted` |
 
 ## Sources (Phase 4.2)
 
@@ -73,16 +83,16 @@ Commercial databases (e.g. OpenCorporates) are **out of scope** for now — open
 
 On load, each entity is matched against the graph:
 
-1. `external_ids.wikidata` / `companies_house` exact
-2. Exact `id` / `slug`
-3. Fuzzy name (pg_trgm) + country overlap  
-   - score ≥ 0.78 → auto-merge onto existing id  
-   - 0.45–0.78 → insert new node **and** queue row in `ingest_match_queue` for human review
+1. `external_ids.wikidata` / `companies_house` exact → **auto-merge**
+2. Exact `id` / `slug` → **auto-merge**
+3. Equal normalized name key after stripping Inc./LLC/etc. → **auto-merge**
+4. Fuzzy name is **review-only** (trigram + Jaccard + discriminator checks)
 
 ## Programmatic
 
 ```ts
-import { runIngest } from '@fupe/ingest';
+import { runIngest, runSchedule } from '@fupe/ingest';
 
 await runIngest({ source: 'wikidata', region: 'US', limit: 50, offset: 0 });
+await runSchedule({ maxPages: 2, staleMonths: 6 });
 ```

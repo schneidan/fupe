@@ -5,6 +5,7 @@ import { GraphService } from '../database/graph.service';
 import { DATABASE_POOL } from '../database/database.constants';
 import {
   ChainNode,
+  CitationDto,
   CitationProperties,
   EntityDetail,
   EntityProperties,
@@ -18,6 +19,26 @@ import {
 } from './graph.types';
 
 const PE_TYPES = new Set([EntityType.PE_FIRM, EntityType.VC_FIRM]);
+const STALE_MONTHS_DEFAULT = 6;
+
+function isCitationStale(c: CitationProperties): boolean {
+  if (c.stale === true || c.stale === 'true') return true;
+  if (!c.retrieved_at) return false;
+  const retrieved = Date.parse(c.retrieved_at);
+  if (Number.isNaN(retrieved)) return false;
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - STALE_MONTHS_DEFAULT);
+  return retrieved < cutoff.getTime();
+}
+
+function toCitationDto(c: CitationProperties): CitationDto {
+  return {
+    title: c.title,
+    url: c.url,
+    retrieved_at: c.retrieved_at,
+    stale: isCitationStale(c),
+  };
+}
 const MAX_TRAVERSAL_DEPTH = 10;
 
 @Injectable()
@@ -334,7 +355,7 @@ export class GraphRepository {
     return {
       ...this.toEntitySummary(entity, peBackedSet.has(entity.id)),
       ownership_chain: chain,
-      citations: citations.map((c) => ({ title: c.title, url: c.url })),
+      citations: citations.map(toCitationDto),
       aliases: entity.aliases,
       source: entity.source,
       updated_at: entity.updated_at,
@@ -547,12 +568,17 @@ export class GraphRepository {
     entityId: string,
     citation: CitationProperties,
   ): Promise<void> {
+    const retrievedAt =
+      citation.retrieved_at ?? new Date().toISOString().slice(0, 10);
     await this.graph.runCypherWrite(
       `
         MATCH (e:Entity)
         WHERE e.id = $entityId
         MERGE (c:Citation {id: $id})
-        SET c.url = $url, c.title = $title
+        SET c.url = $url,
+            c.title = $title,
+            c.retrieved_at = $retrievedAt,
+            c.stale = false
         MERGE (e)-[:HAS_CITATION]->(c)
       `,
       {
@@ -560,6 +586,7 @@ export class GraphRepository {
         id: citation.id,
         url: citation.url,
         title: citation.title,
+        retrievedAt,
       },
     );
   }
@@ -580,7 +607,7 @@ export class GraphRepository {
       is_private_equity_owned: peOrVcInChain.length > 0,
       ultimate_parent: ultimateParent,
       ownership_chain: chain,
-      citations: citations.map((c) => ({ title: c.title, url: c.url })),
+      citations: citations.map(toCitationDto),
     };
 
     if (entityId) {

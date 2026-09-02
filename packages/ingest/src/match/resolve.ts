@@ -1,7 +1,10 @@
 import type { PoolClient } from 'pg';
 import {
+  hasConflictingDiscriminator,
+  nameTokens,
   normalizeNameKey,
   stripCorporateSuffix,
+  tokenJaccard,
   toSlug,
 } from '../normalize';
 import type { NormalizedEntity } from '../types';
@@ -22,10 +25,14 @@ export type MatchDecision =
     }
   | { kind: 'none' };
 
-/** Auto-merge at or above this similarity (with country check). */
-export const AUTO_MERGE_THRESHOLD = 0.78;
-/** Queue for human review between this and auto threshold. */
-export const REVIEW_THRESHOLD = 0.45;
+/**
+ * Fuzzy auto-merge is NOT score-only.
+ * We only auto-merge when normalized keys match (alias / Inc. variants).
+ * Mid-confidence fuzzy hits go to review only if token overlap is high
+ * and discriminators like org/com do not conflict.
+ */
+export const REVIEW_SCORE_THRESHOLD = 0.6;
+export const REVIEW_JACCARD_THRESHOLD = 0.75;
 
 interface CandidateRow {
   id: string;
@@ -103,6 +110,40 @@ async function findBySlugOrId(
   return rows[0] ?? null;
 }
 
+async function findByNormalizedKey(
+  client: PoolClient,
+  key: string,
+): Promise<CandidateRow[]> {
+  const { rows } = await client.query<CandidateRow>(
+    `
+      SELECT
+        properties::jsonb->>'id' AS id,
+        properties::jsonb->>'name' AS name,
+        properties::jsonb->>'slug' AS slug,
+        properties::jsonb->>'country_codes' AS country_codes,
+        properties::jsonb->>'external_ids' AS external_ids,
+        1.0::float8 AS score
+      FROM fupe_graph."Entity"
+      WHERE regexp_replace(
+          regexp_replace(lower(properties::jsonb->>'name'), '''', '', 'g'),
+          '[^a-z0-9]+', ' ', 'g'
+        ) = $1
+         OR regexp_replace(
+          regexp_replace(
+            regexp_replace(lower(properties::jsonb->>'name'), '''', '', 'g'),
+            '\\m(inc|llc|ltd|limited|corp|corporation|company|co|plc)\\M\\.?$',
+            '',
+            'gi'
+          ),
+          '[^a-z0-9]+', ' ', 'g'
+        ) = $1
+      LIMIT 5
+    `,
+    [key],
+  );
+  return rows;
+}
+
 async function findFuzzyByName(
   client: PoolClient,
   name: string,
@@ -125,18 +166,18 @@ async function findFuzzyByName(
       WHERE similarity(
         regexp_replace(lower(properties::jsonb->>'name'), '[^a-z0-9]+', ' ', 'g'),
         $1
-      ) > $2
+      ) >= $2
       ORDER BY score DESC
       LIMIT $3
     `,
-    [key, REVIEW_THRESHOLD, limit],
+    [key, REVIEW_SCORE_THRESHOLD, limit],
   );
   return rows;
 }
 
 /**
  * Resolve an incoming ingest entity against the existing graph.
- * Priority: external id → exact id/slug → fuzzy name (+ country).
+ * Priority: external id → exact id/slug → equal normalized key → cautious fuzzy review.
  */
 export async function resolveEntityMatch(
   client: PoolClient,
@@ -195,26 +236,42 @@ export async function resolveEntityMatch(
     }
   }
 
+  // Alias / "Inc." variants only — not "similar sounding" brands.
+  const incomingKey = normalizeNameKey(stripCorporateSuffix(entity.name));
+  const keyHits = await findByNormalizedKey(client, incomingKey);
+  for (const hit of keyHits) {
+    if (!countriesOverlap(entity.countryCodes, hit.country_codes)) continue;
+    return {
+      kind: 'auto',
+      entityId: hit.id,
+      score: 0.99,
+      reason: `normalized key "${incomingKey}"`,
+    };
+  }
+
+  const incomingTokens = nameTokens(entity.name);
   const fuzzy = await findFuzzyByName(client, entity.name);
   for (const candidate of fuzzy) {
     if (!countriesOverlap(entity.countryCodes, candidate.country_codes)) {
       continue;
     }
-    if (candidate.score >= AUTO_MERGE_THRESHOLD) {
-      return {
-        kind: 'auto',
-        entityId: candidate.id,
-        score: candidate.score,
-        reason: `fuzzy name "${candidate.name}" score=${candidate.score.toFixed(3)}`,
-      };
+
+    const candidateTokens = nameTokens(candidate.name);
+    if (hasConflictingDiscriminator(incomingTokens, candidateTokens)) {
+      continue; // e.g. wordpress.org vs wordpress.com
     }
-    if (candidate.score >= REVIEW_THRESHOLD) {
+
+    const jaccard = tokenJaccard(incomingTokens, candidateTokens);
+    if (
+      candidate.score >= REVIEW_SCORE_THRESHOLD &&
+      jaccard >= REVIEW_JACCARD_THRESHOLD
+    ) {
       return {
         kind: 'review',
         entityId: candidate.id,
         candidateName: candidate.name,
         score: candidate.score,
-        reason: `fuzzy name "${candidate.name}" score=${candidate.score.toFixed(3)}`,
+        reason: `fuzzy review "${candidate.name}" score=${candidate.score.toFixed(3)} jaccard=${jaccard.toFixed(3)}`,
       };
     }
   }

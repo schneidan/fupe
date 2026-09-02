@@ -13,15 +13,24 @@ class ChainNode {
 }
 
 class Citation {
-  Citation({required this.title, required this.url});
+  Citation({
+    required this.title,
+    required this.url,
+    this.retrievedAt,
+    this.stale = false,
+  });
 
   final String title;
   final String url;
+  final String? retrievedAt;
+  final bool stale;
 
   factory Citation.fromJson(Map<String, dynamic> json) {
     return Citation(
       title: json['title'] as String? ?? '',
       url: json['url'] as String? ?? '',
+      retrievedAt: json['retrieved_at'] as String?,
+      stale: json['stale'] as bool? ?? false,
     );
   }
 }

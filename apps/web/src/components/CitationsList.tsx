@@ -1,6 +1,8 @@
 interface Citation {
   title: string;
   url: string;
+  retrieved_at?: string;
+  stale?: boolean;
 }
 
 interface CitationsListProps {
@@ -32,15 +34,18 @@ export function CitationsList({ citations }: CitationsListProps) {
       </h2>
       <ul className="mt-3 space-y-2">
         {citations.map((c) => (
-          <li key={c.url}>
+          <li key={c.url} className="text-sm">
             <a
               href={c.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-fupe-text underline-offset-2 hover:underline"
+              className="text-fupe-text underline-offset-2 hover:underline"
             >
               {c.title}
             </a>
+            {c.stale ? (
+              <span className="ml-2 text-fupe-muted">(may be outdated)</span>
+            ) : null}
           </li>
         ))}
       </ul>

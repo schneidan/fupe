@@ -225,14 +225,24 @@ async function upsertProduct(
 async function upsertCitation(
   client: PoolClient,
   entityId: string,
-  citation: { id: string; url: string; title: string },
+  citation: {
+    id: string;
+    url: string;
+    title: string;
+    retrievedAt?: string;
+  },
 ): Promise<void> {
+  const retrievedAt =
+    citation.retrievedAt ?? new Date().toISOString().slice(0, 10);
   await runCypherWrite(
     client,
     `
       MATCH (e:Entity {id: $entityId})
       MERGE (c:Citation {id: $id})
-      SET c.url = $url, c.title = $title
+      SET c.url = $url,
+          c.title = $title,
+          c.retrieved_at = $retrievedAt,
+          c.stale = false
       MERGE (e)-[:HAS_CITATION]->(c)
       RETURN c
     `,
@@ -241,6 +251,7 @@ async function upsertCitation(
       id: citation.id,
       url: citation.url,
       title: citation.title,
+      retrievedAt,
     },
   );
 }

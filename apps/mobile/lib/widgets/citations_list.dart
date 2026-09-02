@@ -43,12 +43,26 @@ class CitationsList extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: InkWell(
                   onTap: () => launchUrl(Uri.parse(c.url)),
-                  child: Text(
-                    c.title,
-                    style: const TextStyle(
-                      color: FupeColors.text,
-                      decoration: TextDecoration.underline,
-                      decorationColor: FupeColors.muted,
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: c.title,
+                          style: const TextStyle(
+                            color: FupeColors.text,
+                            decoration: TextDecoration.underline,
+                            decorationColor: FupeColors.muted,
+                          ),
+                        ),
+                        if (c.stale)
+                          const TextSpan(
+                            text: ' (may be outdated)',
+                            style: TextStyle(
+                              color: FupeColors.muted,
+                              fontSize: 13,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
