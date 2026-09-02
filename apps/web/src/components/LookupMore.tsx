@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { lookup, lookupImage } from '@/lib/api';
+import { resultPath } from '@/lib/slug';
 
 export function LookupMore() {
   const [open, setOpen] = useState(false);
@@ -16,9 +17,7 @@ export function LookupMore() {
     setError(null);
     try {
       const result = await fn();
-      router.push(
-        `/result?q=${encodeURIComponent(result.matched_item)}&from=lookup`,
-      );
+      router.push(resultPath(result.matched_item));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Lookup failed');
     } finally {
@@ -46,7 +45,7 @@ export function LookupMore() {
     recognition.lang = 'en-US';
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
-      router.push(`/result?q=${encodeURIComponent(transcript)}`);
+      router.push(resultPath(transcript));
     };
     recognition.start();
   }

@@ -16,7 +16,7 @@ export function VerdictHero({ result }: VerdictHeroProps) {
         {isYes ? 'YES' : 'NO'}
       </p>
 
-      <p className="mt-4 text-lg text-fupe-muted sm:text-xl">
+      <p className="mt-double text-lg text-fupe-muted sm:text-xl">
         {isYes ? (
           <>
             <span className="font-semibold text-fupe-text">

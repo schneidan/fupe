@@ -31,6 +31,9 @@ const config: Config = {
         yes: '0 0 60px -10px rgba(239, 68, 68, 0.5)',
         no: '0 0 60px -10px rgba(34, 197, 94, 0.4)',
       },
+      spacing: {
+        double: '2rem',
+      },
     },
   },
   plugins: [],

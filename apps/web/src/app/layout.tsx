@@ -5,10 +5,30 @@ import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3001';
+
 export const metadata: Metadata = {
-  title: 'FUPE — Is it owned by Private Equity?',
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: 'FUPE — Is it owned by Private Equity?',
+    template: '%s | FUPE',
+  },
   description:
     'Find out if a brand, product, or company is backed by Private Equity. Trace ownership chains with citations.',
+  openGraph: {
+    siteName: 'FUPE',
+    type: 'website',
+    title: 'FUPE — Is it owned by Private Equity?',
+    description:
+      'Find out if a brand, product, or company is backed by Private Equity. Trace ownership chains with citations.',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'FUPE — Is it owned by Private Equity?',
+    description:
+      'Find out if a brand, product, or company is backed by Private Equity. Trace ownership chains with citations.',
+  },
 };
 
 export default function RootLayout({
