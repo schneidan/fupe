@@ -38,10 +38,12 @@ Until then, keep `NSPrivacyTracking` = false in `PrivacyInfo.xcprivacy`.
 
 Held — no StoreKit / Play Billing yet. When added, declare purchase history only if you collect it beyond Apple/Google’s own receipts.
 
-## Still required before public store submit
+## Still required before public store submit (Phase 8)
 
 - [ ] Real bundle ID (replace `com.example.fupeMobile` / `com.example.fupe_mobile`)
 - [ ] Apple Developer + Google Play developer accounts
+- [ ] Production API / web hosting + domain
 - [ ] Privacy Policy URL (Phase 7)
 - [ ] Screenshots + store listing copy
+- [ ] App Privacy / Data safety forms filed in Connect / Play Console
 - [ ] Re-check this questionnaire after any SDK change

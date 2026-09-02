@@ -12,7 +12,8 @@
     "db:reset-volume": "docker compose down -v",
     "db:migrate": "pnpm --filter @fupe/db migrate",
     "db:setup": "docker compose up -d postgres && pnpm db:migrate",
-    "db:reset": "pnpm --filter @fupe/db reset"
+    "db:reset": "pnpm --filter @fupe/db reset",
+    "ingest": "pnpm --filter @fupe/ingest ingest"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

@@ -12,7 +12,8 @@ fupe/
 ├── services/
 │   └── api/          # NestJS — GraphQL & REST
 ├── packages/
-│   └── db/           # PostgreSQL + Apache AGE migrations
+│   ├── db/           # PostgreSQL + Apache AGE migrations
+│   └── ingest/       # ETL CLI — Wikidata / OFF / etc. (Phase 4)
 └── docker-compose.yml
 ```
 
@@ -24,6 +25,12 @@ pnpm db:setup          # starts Docker Postgres + runs migrations
 cp services/api/.env.example services/api/.env
 pnpm --filter @fupe/api dev    # :3000
 pnpm --filter @fupe/web dev    # :3001
+```
+
+Ingest (dry-run scaffold):
+
+```bash
+pnpm ingest --source wikidata --region EU --dry-run
 ```
 
 > **Note:** FUPE Postgres runs on **port 5433** (not 5432) to avoid conflicts with a local Postgres install.

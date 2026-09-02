@@ -1,0 +1,23 @@
+{
+  "name": "@fupe/ingest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FUPE ETL — fetch, normalize, and load ownership data from licensed sources",
+  "bin": {
+    "fupe-ingest": "./src/cli.ts"
+  },
+  "scripts": {
+    "ingest": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
