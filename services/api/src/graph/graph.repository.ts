@@ -198,12 +198,17 @@ export class GraphRepository {
     );
 
     const pathNodes = rows[0]?.chain;
-    if (!pathNodes?.length) {
+    const validNodes = (pathNodes ?? []).filter(
+      (n): n is { properties: EntityProperties } =>
+        n != null && typeof n === 'object' && n.properties != null,
+    );
+
+    if (!validNodes.length) {
       const entity = await this.findEntityById(entityId);
       return entity ? [{ name: entity.name, type: entity.type }] : [];
     }
 
-    return pathNodes.map((n) => ({
+    return validNodes.map((n) => ({
       name: n.properties.name,
       type: n.properties.type,
     }));

@@ -108,11 +108,14 @@ See [packages/db/README.md](packages/db/README.md) for migration details.
 | `OPENAI_API_KEY` | Whisper + Vision OCR fallback (optional) |
 | `OPEN_FOOD_FACTS_URL` | Barcode fallback API |
 
-## Demo Data
+## Demo / test data
 
-Migration `003_seed_demo.sql` seeds the Panera Bread → JAB Holding ownership chain for testing:
+After `pnpm db:migrate`, try these lookups:
 
-```bash
-pnpm db:migrate
-# Then: POST /api/v1/lookup { "type": "TEXT", "query": "Panera Bread" }
-```
+**PE-owned (expect YES):**
+- Panera Bread, Subway, Dunkin', Arby's, Sonic, Krispy Kreme, Jersey Mike's
+
+**Not PE-owned (expect NO):**
+- In-N-Out Burger, Chick-fil-A, Costco, Chipotle, McDonald's, Raising Cane's
+
+**Related testing:** Subway, Dunkin', Arby's, Sonic share ultimate parent **Roark Capital**. Krispy Kreme, Panera, Pret share **JAB Holding**.

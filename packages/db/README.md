@@ -61,6 +61,7 @@ pnpm db:reset && pnpm db:migrate
 | `001_init_fupe_graph.sql` | Apache AGE graph, labels, indexes |
 | `002_relational_tables.sql` | users, edits_queue, audit_logs, wiki_revisions |
 | `003_seed_demo.sql` | Panera Bread → JAB Holding demo chain |
+| `004_seed_fast_food.sql` | QSR PE portfolios (Roark, JAB, Blackstone) + independent chains |
 
 ## Relational Tables
 

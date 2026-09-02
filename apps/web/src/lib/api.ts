@@ -23,7 +23,10 @@ export async function lookup(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.message ?? 'Lookup failed');
+    const msg =
+      (err as { message?: string | string[] }).message ??
+      'Lookup failed';
+    throw new Error(Array.isArray(msg) ? msg.join(', ') : msg);
   }
 
   return res.json();

@@ -3,11 +3,35 @@
 @import "tailwindcss/utilities";
 
 :root {
-  --background: #fafafa;
-  --foreground: #0f172a;
+  --background: #141414;
+  --foreground: #ffffff;
+  --accent: #d4d4d4;
+}
+
+html {
+  color-scheme: dark;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
+  min-height: 100vh;
+}
+
+/* Subtle grid texture */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(255, 255, 255, 0.04), transparent),
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 100% 100%, 48px 48px, 48px 48px;
+  pointer-events: none;
+  z-index: -1;
+}
+
+input::placeholder {
+  color: #737373;
 }
