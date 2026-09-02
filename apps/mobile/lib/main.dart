@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'navigation/deep_links.dart';
 import 'screens/shell_screen.dart';
 import 'services/api_service.dart';
 import 'theme/fupe_theme.dart';
@@ -18,6 +19,8 @@ String _defaultApiBaseUrl() {
       return 'http://localhost:3000';
   }
 }
+
+final _navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   const apiUrl = String.fromEnvironment(
@@ -40,10 +43,14 @@ class FupeApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FUPE',
-      theme: fupeTheme(),
-      home: const ShellScreen(),
+    return DeepLinkListener(
+      navigatorKey: _navigatorKey,
+      child: MaterialApp(
+        title: 'FUPE',
+        theme: fupeTheme(),
+        navigatorKey: _navigatorKey,
+        home: const ShellScreen(),
+      ),
     );
   }
 }

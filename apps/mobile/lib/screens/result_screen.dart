@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/lookup_result.dart';
 import '../services/api_service.dart';
 import '../theme/fupe_theme.dart';
+import '../utils/slug.dart';
 import '../widgets/citations_list.dart';
 import '../widgets/did_you_know.dart';
 import '../widgets/ownership_chain.dart';
@@ -13,11 +14,16 @@ class ResultScreen extends StatefulWidget {
   const ResultScreen({
     super.key,
     this.query,
+    this.slug,
     this.result,
-  }) : assert(query != null || result != null);
+  }) : assert(query != null || slug != null || result != null);
 
   final String? query;
+  final String? slug;
   final LookupResult? result;
+
+  String? get lookupQuery =>
+      query ?? (slug != null ? slugToQuery(slug!) : null);
 
   @override
   State<ResultScreen> createState() => _ResultScreenState();
@@ -42,7 +48,7 @@ class _ResultScreenState extends State<ResultScreen> {
   Future<void> _load() async {
     final api = context.read<ApiService>();
     try {
-      final result = await api.lookupText(widget.query!);
+      final result = await api.lookupText(widget.lookupQuery!);
       if (!mounted) return;
       setState(() {
         _result = result;
@@ -80,7 +86,7 @@ class _ResultScreenState extends State<ResultScreen> {
             const CircularProgressIndicator(color: FupeColors.muted),
             const SizedBox(height: 16),
             Text(
-              'Tracing ownership for "${widget.query}"…',
+              'Tracing ownership for "${widget.lookupQuery}"…',
               style: const TextStyle(color: FupeColors.muted),
             ),
           ],

@@ -42,5 +42,19 @@ flutter run --dart-define=API_URL=http://192.168.1.10:3000
 ## Tabs
 
 - **Ask** — “Is ___ owned by PE?” + barcode/photo lookup
-- **Browse** — searchable entity directory
+- **Browse** — searchable directory; tap opens the YES/NO result for that entity
 - **Contribute** — coming soon
+
+## Deep links
+
+Open the YES/NO result for an entity:
+
+```
+fupe://entity/panera-bread
+```
+
+Simulator test (iOS):
+
+```bash
+xcrun simctl openurl booted "fupe://entity/panera-bread"
+```

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/lookup_result.dart';
-import '../screens/result_screen.dart';
+import '../navigation/deep_links.dart';
 import '../theme/fupe_theme.dart';
 
 class DidYouKnow extends StatelessWidget {
@@ -59,13 +59,8 @@ class DidYouKnow extends StatelessWidget {
                   final entity = siblings[i];
                   return ActionChip(
                     label: Text(entity.name),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ResultScreen(query: entity.name),
-                        ),
-                      );
-                    },
+                    onPressed: () =>
+                        openEntityResult(context, slug: entity.slug),
                   );
                 },
               ),
@@ -105,13 +100,8 @@ class DidYouKnow extends StatelessWidget {
                   final entity = similar[i];
                   return ActionChip(
                     label: Text(entity.name),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ResultScreen(query: entity.name),
-                        ),
-                      );
-                    },
+                    onPressed: () =>
+                        openEntityResult(context, slug: entity.slug),
                   );
                 },
               ),

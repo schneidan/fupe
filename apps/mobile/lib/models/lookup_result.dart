@@ -118,6 +118,7 @@ class EntitySummary {
     required this.type,
     required this.isPeBacked,
     this.sector,
+    this.countryCodes,
   });
 
   final String id;
@@ -125,6 +126,7 @@ class EntitySummary {
   final String name;
   final String type;
   final String? sector;
+  final List<String>? countryCodes;
   final bool isPeBacked;
 
   factory EntitySummary.fromJson(Map<String, dynamic> json) {
@@ -134,6 +136,9 @@ class EntitySummary {
       name: json['name'] as String? ?? '',
       type: json['type'] as String? ?? '',
       sector: json['sector'] as String?,
+      countryCodes: (json['country_codes'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
       isPeBacked: json['is_pe_backed'] as bool? ?? false,
     );
   }

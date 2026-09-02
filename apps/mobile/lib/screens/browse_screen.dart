@@ -2,9 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/lookup_result.dart';
+import '../navigation/deep_links.dart';
 import '../services/api_service.dart';
 import '../theme/fupe_theme.dart';
-import 'result_screen.dart';
+
+const _entityTypes = [
+  (value: '', label: 'All types'),
+  (value: 'BRAND', label: 'Brand'),
+  (value: 'SUBSIDIARY', label: 'Subsidiary'),
+  (value: 'PE_FIRM', label: 'PE firm'),
+  (value: 'VC_FIRM', label: 'VC firm'),
+];
+
+const _countries = [
+  (value: '', label: 'All countries'),
+  (value: 'US', label: 'United States'),
+  (value: 'GB', label: 'United Kingdom'),
+  (value: 'CA', label: 'Canada'),
+  (value: 'DE', label: 'Germany'),
+  (value: 'FR', label: 'France'),
+];
 
 class BrowseScreen extends StatefulWidget {
   const BrowseScreen({super.key});
@@ -15,6 +32,8 @@ class BrowseScreen extends StatefulWidget {
 
 class _BrowseScreenState extends State<BrowseScreen> {
   final _searchController = TextEditingController();
+  String _type = '';
+  String _country = '';
   bool _peOnly = false;
   int _page = 1;
   bool _loading = true;
@@ -40,6 +59,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
       final api = context.read<ApiService>();
       final data = await api.listEntities(
         q: _searchController.text.trim(),
+        type: _type.isEmpty ? null : _type,
+        country: _country.isEmpty ? null : _country,
         peOnly: _peOnly,
         page: _page,
         limit: _limit,
@@ -60,6 +81,11 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   int get _totalPages => (_total / _limit).ceil().clamp(1, 999);
+
+  void _resetPageAndLoad() {
+    _page = 1;
+    _load();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,28 +112,53 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 hintText: 'Search by name…',
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.search),
-                  onPressed: () {
-                    _page = 1;
-                    _load();
-                  },
+                  onPressed: _resetPageAndLoad,
                 ),
               ),
-              onSubmitted: (_) {
-                _page = 1;
-                _load();
-              },
+              onSubmitted: (_) => _resetPageAndLoad(),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _FilterDropdown<String>(
+                    value: _type,
+                    items: _entityTypes
+                        .map((e) => (e.value, e.label))
+                        .toList(),
+                    onChanged: (v) {
+                      setState(() => _type = v ?? '');
+                      _resetPageAndLoad();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _FilterDropdown<String>(
+                    value: _country,
+                    items: _countries
+                        .map((e) => (e.value, e.label))
+                        .toList(),
+                    onChanged: (v) {
+                      setState(() => _country = v ?? '');
+                      _resetPageAndLoad();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
             child: Row(
               children: [
                 Checkbox(
                   value: _peOnly,
                   onChanged: (v) {
                     setState(() => _peOnly = v ?? false);
-                    _page = 1;
-                    _load();
+                    _resetPageAndLoad();
                   },
                 ),
                 const Text('PE-backed only', style: TextStyle(color: FupeColors.muted)),
@@ -176,14 +227,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
                           fontSize: 12,
                         ),
                       )
-                    : null,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => ResultScreen(query: entity.name),
-                    ),
-                  );
-                },
+                    : const Icon(Icons.chevron_right, color: FupeColors.muted),
+                onTap: () => openEntityResult(context, slug: entity.slug),
               );
             },
           ),
@@ -225,5 +270,47 @@ class _BrowseScreenState extends State<BrowseScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+}
+
+class _FilterDropdown<T> extends StatelessWidget {
+  const _FilterDropdown({
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final T value;
+  final List<(T, String)> items;
+  final ValueChanged<T?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return InputDecorator(
+      decoration: InputDecoration(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          isExpanded: true,
+          isDense: true,
+          items: items
+              .map(
+                (e) => DropdownMenuItem<T>(
+                  value: e.$1,
+                  child: Text(
+                    e.$2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
   }
 }
