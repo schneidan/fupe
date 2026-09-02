@@ -6,3 +6,4 @@ export {
   pingDatabase,
 } from './audit';
 export { loadBatch } from './loader';
+export type { LoadOptions } from './loader';

@@ -66,7 +66,18 @@ pnpm ingest --help
 | `open-food-facts` | **Live** | Products + brand entities + `MANUFACTURED_BY` |
 | `sec-edgar` | Stub (P1) | — |
 | `companies-house` | Stub (P1) | — |
-| `opencorporates` | Stub (P2) | License review required |
+
+Commercial databases (e.g. OpenCorporates) are **out of scope** for now — open sources + community only.
+
+## Deduplication (Phase 4.3)
+
+On load, each entity is matched against the graph:
+
+1. `external_ids.wikidata` / `companies_house` exact
+2. Exact `id` / `slug`
+3. Fuzzy name (pg_trgm) + country overlap  
+   - score ≥ 0.78 → auto-merge onto existing id  
+   - 0.45–0.78 → insert new node **and** queue row in `ingest_match_queue` for human review
 
 ## Programmatic
 

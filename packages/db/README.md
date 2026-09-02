@@ -63,6 +63,7 @@ pnpm db:reset && pnpm db:migrate
 | `003_seed_demo.sql` | Panera Bread → JAB Holding demo chain |
 | `004_seed_fast_food.sql` | QSR PE portfolios (Roark, JAB, Blackstone) + independent chains |
 | `005_entity_metadata.sql` | Entity metadata properties + `data_sources` / `ingestion_runs` tables |
+| `006_ingest_match_queue.sql` | Low-confidence ingest dedupe review queue |
 
 ## Relational Tables
 
@@ -103,6 +104,9 @@ ETL source registry (`id`, `name`, `license`, `attribution_url`).
 
 ### `ingestion_runs`
 Batch ingest audit log linked to `data_sources`.
+
+### `ingest_match_queue`
+Low-confidence entity matches from ETL (Phase 4.3). Reviewers accept/reject merges later.
 
 ## Connection
 

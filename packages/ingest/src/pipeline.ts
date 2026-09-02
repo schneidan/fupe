@@ -15,6 +15,8 @@ const emptyStats = (): LoadStats => ({
   edgesUpserted: 0,
   productsUpserted: 0,
   citationsUpserted: 0,
+  entitiesMatched: 0,
+  entitiesQueued: 0,
 });
 
 export async function runIngest(options: IngestOptions): Promise<IngestResult> {
@@ -34,6 +36,8 @@ export async function runIngest(options: IngestOptions): Promise<IngestResult> {
         edgesUpserted: batch.edges.length,
         productsUpserted: batch.products.length,
         citationsUpserted: batch.entities.filter((e) => e.citation).length,
+        entitiesMatched: 0,
+        entitiesQueued: 0,
       },
       message: source.implemented
         ? `Dry run: would load ${recordCount} record(s) from ${options.source}`
@@ -73,7 +77,9 @@ export async function runIngest(options: IngestOptions): Promise<IngestResult> {
       }
 
       try {
-        const stats = await loadBatch(client, batch);
+        const stats = await loadBatch(client, batch, {
+          ingestionRunId: runId,
+        });
         const processed =
           stats.entitiesUpserted +
           stats.edgesUpserted +

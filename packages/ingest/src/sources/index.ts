@@ -4,14 +4,12 @@ import { wikidataSource } from './wikidata';
 import { openFoodFactsSource } from './open-food-facts';
 import { secEdgarSource } from './sec-edgar';
 import { companiesHouseSource } from './companies-house';
-import { openCorporatesSource } from './opencorporates';
 
 const registry: Record<SourceId, IngestSource> = {
   wikidata: wikidataSource,
   'open-food-facts': openFoodFactsSource,
   'sec-edgar': secEdgarSource,
   'companies-house': companiesHouseSource,
-  opencorporates: openCorporatesSource,
 };
 
 export function getSource(id: SourceId): IngestSource {

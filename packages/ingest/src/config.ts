@@ -27,11 +27,6 @@ export const SOURCE_META: Record<
     license: 'Open Government Licence v3.0',
     attributionUrl: 'https://www.gov.uk/government/organisations/companies-house',
   },
-  opencorporates: {
-    name: 'OpenCorporates',
-    license: 'review-required',
-    attributionUrl: 'https://opencorporates.com/',
-  },
 };
 
 export function resolveDatabaseUrl(override?: string): string {
@@ -105,9 +100,9 @@ Sources:
   open-food-facts    Open Food Facts products — paginate with --page
   sec-edgar          SEC EDGAR (P1 — stub)
   companies-house    UK Companies House (P1 — stub)
-  opencorporates     OpenCorporates (P2 — license review)
 
 Cron-friendly: each run upserts a page; advance --offset/--page until metadata.exhausted=true.
+Paid commercial databases are out of scope for now — open sources + community only.
 
 Examples:
   pnpm ingest --source wikidata --region US --limit 50 --offset 0

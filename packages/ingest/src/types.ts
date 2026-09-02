@@ -13,8 +13,7 @@ export type SourceId =
   | 'wikidata'
   | 'open-food-facts'
   | 'sec-edgar'
-  | 'companies-house'
-  | 'opencorporates';
+  | 'companies-house';
 
 export interface IngestOptions {
   source: SourceId;
@@ -44,7 +43,7 @@ export interface NormalizedEntity {
   countryCodes: string[];
   sector?: string;
   aliases?: string[];
-  /** External ids for dedupe (Phase 4.3). */
+  /** External ids for dedupe (e.g. wikidata QID). */
   externalIds?: Record<string, string>;
   source: SourceId;
   citation?: SourceCitation;
@@ -79,6 +78,8 @@ export interface LoadStats {
   edgesUpserted: number;
   productsUpserted: number;
   citationsUpserted: number;
+  entitiesMatched: number;
+  entitiesQueued: number;
 }
 
 export interface IngestResult {
