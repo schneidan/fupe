@@ -58,3 +58,6 @@ Simulator test (iOS):
 ```bash
 xcrun simctl openurl booted "fupe://entity/panera-bread"
 ```
+## Store prep
+
+See [`STORE_PRIVACY.md`](STORE_PRIVACY.md) for App Store / Play privacy questionnaire answers (including notes for future ads). Billing / IAP is deferred.
