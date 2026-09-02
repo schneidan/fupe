@@ -1,27 +1,22 @@
 import Link from 'next/link';
+import { BrowseDirectory } from '@/components/BrowseDirectory';
 
 export default function BrowsePage() {
   return (
-    <main className="mx-auto max-w-2xl px-4 py-16 text-center">
+    <main className="mx-auto max-w-2xl px-4 py-10">
       <Link
         href="/"
-        className="mb-8 inline-block text-sm text-fupe-muted hover:text-fupe-accent"
+        className="mb-8 inline-block text-sm text-fupe-muted hover:text-fupe-text"
       >
         ← FUPE
       </Link>
-      <h1 className="text-2xl font-bold text-fupe-text">
-        Browse directory
-      </h1>
-      <p className="mt-4 text-fupe-muted">
-        Searchable A–Z entity directory is coming in the next release. For now,
-        use the home page to look up any brand or company.
+      <h1 className="text-2xl font-bold text-fupe-text">Browse directory</h1>
+      <p className="mt-2 text-sm text-fupe-muted">
+        Search brands, subsidiaries, and PE firms in our graph.
       </p>
-      <Link
-        href="/"
-        className="mt-8 inline-block rounded-full bg-fupe-text px-6 py-2 text-sm font-semibold text-fupe-bg hover:bg-fupe-accent"
-      >
-        Is it owned by PE?
-      </Link>
+      <div className="mt-8">
+        <BrowseDirectory />
+      </div>
     </main>
   );
 }

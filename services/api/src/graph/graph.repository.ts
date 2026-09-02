@@ -6,11 +6,15 @@ import { DATABASE_POOL } from '../database/database.constants';
 import {
   ChainNode,
   CitationProperties,
+  EntityDetail,
   EntityProperties,
+  EntitySummary,
   EntityType,
   FuzzySearchHit,
   LookupResult,
   ProductProperties,
+  RelatedEntities,
+  RelatedEntitySummary,
 } from './graph.types';
 
 const PE_TYPES = new Set([EntityType.PE_FIRM, EntityType.VC_FIRM]);
@@ -135,7 +139,7 @@ export class GraphRepository {
   async resolveFromEntity(entity: EntityProperties): Promise<LookupResult> {
     const chain = await this.buildOwnershipChain(entity.id);
     const citations = await this.getCitationsForEntity(entity.id);
-    return this.toLookupResult(entity.name, chain, citations);
+    return this.toLookupResult(entity.name, chain, citations, entity.id);
   }
 
   async resolveFromProduct(gtin: string): Promise<LookupResult | null> {
@@ -177,7 +181,12 @@ export class GraphRepository {
       { name: matchedName, type: 'PRODUCT' },
       ...chain,
     ];
-    return this.toLookupResult(matchedName, fullChain, citations);
+    return this.toLookupResult(
+      matchedName,
+      fullChain,
+      citations,
+      manufacturer.properties.id,
+    );
   }
 
   async buildOwnershipChain(entityId: string): Promise<ChainNode[]> {
@@ -212,6 +221,262 @@ export class GraphRepository {
       name: n.properties.name,
       type: n.properties.type,
     }));
+  }
+
+  async listEntities(options: {
+    q?: string;
+    type?: string;
+    country?: string;
+    peOnly?: boolean;
+    page?: number;
+    limit?: number;
+  }): Promise<{ items: EntitySummary[]; total: number; page: number; limit: number }> {
+    const page = Math.max(1, options.page ?? 1);
+    const limit = Math.min(100, Math.max(1, options.limit ?? 20));
+    const offset = (page - 1) * limit;
+
+    const peIds = options.peOnly ? await this.getPeBackedEntityIds() : null;
+    if (options.peOnly && peIds && !peIds.size) {
+      return { items: [], total: 0, page, limit };
+    }
+
+    const conditions: string[] = ['TRUE'];
+    const params: unknown[] = [];
+    let paramIndex = 1;
+
+    if (options.q?.trim()) {
+      conditions.push(
+        `(properties::jsonb->>'name' ILIKE $${paramIndex} OR properties::jsonb->>'aliases' ILIKE $${paramIndex})`,
+      );
+      params.push(`%${options.q.trim()}%`);
+      paramIndex++;
+    }
+
+    if (options.type) {
+      conditions.push(`properties::jsonb->>'type' = $${paramIndex}`);
+      params.push(options.type);
+      paramIndex++;
+    }
+
+    if (options.country) {
+      conditions.push(
+        `properties::jsonb->>'country_codes' LIKE $${paramIndex}`,
+      );
+      params.push(`%"${options.country.toUpperCase()}"%`);
+      paramIndex++;
+    }
+
+    if (peIds) {
+      conditions.push(
+        `properties::jsonb->>'id' = ANY($${paramIndex}::text[])`,
+      );
+      params.push([...peIds]);
+      paramIndex++;
+    }
+
+    const where = conditions.join(' AND ');
+
+    const countResult = await this.pool.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM fupe_graph."Entity" WHERE ${where}`,
+      params,
+    );
+    const total = parseInt(countResult.rows[0]?.count ?? '0', 10);
+
+    const { rows } = await this.pool.query<{ properties: string }>(
+      `
+        SELECT properties::text AS properties
+        FROM fupe_graph."Entity"
+        WHERE ${where}
+        ORDER BY properties::jsonb->>'name' ASC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `,
+      [...params, limit, offset],
+    );
+
+    const peBackedSet = await this.getPeBackedEntityIds();
+    const items = rows.map((row) => {
+      const entity = this.parseEntityProperties(
+        JSON.parse(row.properties.replace(/::vertex$/i, '')),
+      );
+      return this.toEntitySummary(entity, peBackedSet.has(entity.id));
+    });
+
+    return { items, total, page, limit };
+  }
+
+  async findEntityBySlug(slug: string): Promise<EntityProperties | null> {
+    const { rows } = await this.pool.query<{ properties: string }>(
+      `
+        SELECT properties::text AS properties
+        FROM fupe_graph."Entity"
+        WHERE properties::jsonb->>'slug' = $1
+           OR properties::jsonb->>'id' = $1
+        LIMIT 1
+      `,
+      [slug],
+    );
+
+    if (!rows.length) return null;
+
+    return this.parseEntityProperties(
+      JSON.parse(rows[0].properties.replace(/::vertex$/i, '')),
+    );
+  }
+
+  async getEntityDetail(slug: string): Promise<EntityDetail | null> {
+    const entity = await this.findEntityBySlug(slug);
+    if (!entity) return null;
+
+    const chain = await this.buildOwnershipChain(entity.id);
+    const citations = await this.getCitationsForEntity(entity.id);
+    const peBackedSet = await this.getPeBackedEntityIds();
+
+    return {
+      ...this.toEntitySummary(entity, peBackedSet.has(entity.id)),
+      ownership_chain: chain,
+      citations: citations.map((c) => ({ title: c.title, url: c.url })),
+      aliases: entity.aliases,
+      source: entity.source,
+      updated_at: entity.updated_at,
+    };
+  }
+
+  async getRelatedEntities(entityId: string): Promise<RelatedEntities> {
+    const [sameUltimateParent, similarPeBacked] = await Promise.all([
+      this.getSameUltimateParentEntities(entityId),
+      this.getSimilarPeBackedEntities(entityId),
+    ]);
+
+    return { same_ultimate_parent: sameUltimateParent, similar_pe_backed: similarPeBacked };
+  }
+
+  async getPeBackedEntityIds(): Promise<Set<string>> {
+    const rows = await this.graph.runCypher<{ id: string }>(
+      `
+        MATCH (e:Entity)-[:OWNED_BY*1..${MAX_TRAVERSAL_DEPTH}]->(pe:Entity)
+        WHERE pe.type IN ['PE_FIRM', 'VC_FIRM']
+        RETURN DISTINCT e.id AS id
+      `,
+      {},
+      ['id'],
+    );
+
+    return new Set(
+      rows.map((r) => (typeof r.id === 'object' ? String(r.id) : r.id)).filter(Boolean),
+    );
+  }
+
+  private async getSameUltimateParentEntities(
+    entityId: string,
+  ): Promise<RelatedEntitySummary[]> {
+    const rows = await this.graph.runCypher<{
+      other: { properties: EntityProperties };
+    }>(
+      `
+        MATCH (start:Entity)
+        WHERE start.id = $entityId
+        OPTIONAL MATCH p = (start)-[:OWNED_BY*1..${MAX_TRAVERSAL_DEPTH}]->(ancestor:Entity)
+        WITH start, p
+        ORDER BY length(p) DESC
+        LIMIT 1
+        WITH start, last(nodes(p)) AS ultimateParent
+        WHERE ultimateParent IS NOT NULL
+        MATCH (other:Entity)-[:OWNED_BY*1..${MAX_TRAVERSAL_DEPTH}]->(parent:Entity)
+        WHERE parent.id = ultimateParent.id
+          AND other.id <> start.id
+          AND other.type = 'BRAND'
+        RETURN DISTINCT other AS other
+        LIMIT 8
+      `,
+      { entityId },
+      ['other'],
+    );
+
+    return rows
+      .map((r) => r.other?.properties)
+      .filter((p): p is EntityProperties => !!p)
+      .map((p) => this.toRelatedSummary(p));
+  }
+
+  private async getSimilarPeBackedEntities(
+    entityId: string,
+  ): Promise<RelatedEntitySummary[]> {
+    const entity = await this.findEntityById(entityId);
+    if (!entity?.sector) return [];
+
+    const rows = await this.graph.runCypher<{
+      other: { properties: EntityProperties };
+    }>(
+      `
+        MATCH (other:Entity)
+        WHERE other.sector = $sector
+          AND other.id <> $entityId
+          AND other.type = 'BRAND'
+        MATCH (other)-[:OWNED_BY*1..${MAX_TRAVERSAL_DEPTH}]->(pe:Entity)
+        WHERE pe.type IN ['PE_FIRM', 'VC_FIRM']
+        RETURN DISTINCT other AS other
+        LIMIT 8
+      `,
+      { entityId, sector: entity.sector },
+      ['other'],
+    );
+
+    return rows
+      .map((r) => r.other?.properties)
+      .filter((p): p is EntityProperties => !!p)
+      .map((p) => this.toRelatedSummary(p));
+  }
+
+  private toEntitySummary(
+    entity: EntityProperties,
+    isPeBacked: boolean,
+  ): EntitySummary {
+    return {
+      id: entity.id,
+      slug: entity.slug ?? entity.id,
+      name: entity.name,
+      type: entity.type,
+      sector: entity.sector,
+      country_codes: entity.country_codes,
+      is_pe_backed: isPeBacked,
+    };
+  }
+
+  private toRelatedSummary(entity: EntityProperties): RelatedEntitySummary {
+    return {
+      id: entity.id,
+      name: entity.name,
+      slug: entity.slug ?? entity.id,
+      type: entity.type,
+    };
+  }
+
+  private parseEntityProperties(raw: Record<string, unknown>): EntityProperties {
+    return {
+      id: String(raw.id),
+      name: String(raw.name),
+      type: raw.type as EntityType,
+      slug: raw.slug ? String(raw.slug) : undefined,
+      sector: raw.sector ? String(raw.sector) : undefined,
+      source: raw.source ? String(raw.source) : undefined,
+      updated_at: raw.updated_at ? String(raw.updated_at) : undefined,
+      country_codes: this.parseJsonArray(raw.country_codes),
+      aliases: this.parseJsonArray(raw.aliases),
+    };
+  }
+
+  private parseJsonArray(value: unknown): string[] | undefined {
+    if (!value) return undefined;
+    if (Array.isArray(value)) return value.map(String);
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.map(String) : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+    return undefined;
   }
 
   async applyEntityUpdate(
@@ -299,22 +564,30 @@ export class GraphRepository {
     );
   }
 
-  private toLookupResult(
+  private async toLookupResult(
     matchedItem: string,
     chain: ChainNode[],
     citations: CitationProperties[],
-  ): LookupResult {
+    entityId?: string,
+  ): Promise<LookupResult> {
     const peOrVcInChain = chain.filter((n) => PE_TYPES.has(n.type as EntityType));
     const ultimateParent =
       chain.length > 1 ? chain[chain.length - 1] : chain[0] ?? null;
 
-    return {
+    const result: LookupResult = {
       matched_item: matchedItem,
+      entity_id: entityId,
       is_private_equity_owned: peOrVcInChain.length > 0,
       ultimate_parent: ultimateParent,
       ownership_chain: chain,
       citations: citations.map((c) => ({ title: c.title, url: c.url })),
     };
+
+    if (entityId) {
+      result.related = await this.getRelatedEntities(entityId);
+    }
+
+    return result;
   }
 
   generateEntityId(): string {

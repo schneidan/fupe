@@ -8,7 +8,7 @@ PostgreSQL database with the [Apache AGE](https://age.apache.org/) extension for
 
 | Label | Properties | Description |
 |-------|-----------|-------------|
-| `Entity` | `id`, `name`, `type` | Corporate entity. `type` ∈ `BRAND`, `SUBSIDIARY`, `PARENT_CORP`, `PE_FIRM`, `VC_FIRM` |
+| `Entity` | `id`, `name`, `type`, `slug`, `country_codes`, `sector`, `aliases`, `source`, `updated_at` | Corporate entity. `type` ∈ `BRAND`, `SUBSIDIARY`, `PARENT_CORP`, `PE_FIRM`, `VC_FIRM` |
 | `Product` | `gtin`, `name`, `category` | Consumer product identified by GTIN/UPC/EAN |
 | `Citation` | `id`, `url`, `title` | Source citation for ownership claims |
 
@@ -62,6 +62,7 @@ pnpm db:reset && pnpm db:migrate
 | `002_relational_tables.sql` | users, edits_queue, audit_logs, wiki_revisions |
 | `003_seed_demo.sql` | Panera Bread → JAB Holding demo chain |
 | `004_seed_fast_food.sql` | QSR PE portfolios (Roark, JAB, Blackstone) + independent chains |
+| `005_entity_metadata.sql` | Entity metadata properties + `data_sources` / `ingestion_runs` tables |
 
 ## Relational Tables
 
@@ -96,6 +97,12 @@ pnpm db:reset && pnpm db:migrate
 
 ### `wiki_revisions`
 Revision history mirror for wiki-style entity pages.
+
+### `data_sources`
+ETL source registry (`id`, `name`, `license`, `attribution_url`).
+
+### `ingestion_runs`
+Batch ingest audit log linked to `data_sources`.
 
 ## Connection
 

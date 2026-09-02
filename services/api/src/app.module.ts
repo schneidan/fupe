@@ -8,6 +8,7 @@ import { GraphModule } from './graph/graph.module';
 import { LookupModule } from './lookup/lookup.module';
 import { AuthModule } from './auth/auth.module';
 import { EditsModule } from './edits/edits.module';
+import { EntitiesModule } from './entities/entities.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -24,6 +25,7 @@ import { HealthController } from './health.controller';
     GraphModule,
     LookupModule,
     EditsModule,
+    EntitiesModule,
   ],
   controllers: [HealthController],
 })
