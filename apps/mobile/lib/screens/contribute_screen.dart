@@ -226,9 +226,33 @@ class _ContributeScreenState extends State<ContributeScreen> {
           Text(auth.user!.email, style: const TextStyle(color: FupeColors.text)),
           const SizedBox(height: 4),
           Text(
-            'Trust score ${auth.user!.trustScore}',
+            'Trust score ${auth.user!.trustScore}'
+            '${auth.user!.emailVerified ? '' : ' · email unverified'}'
+            '${auth.user!.isModerator ? ' · moderator' : ''}',
             style: const TextStyle(color: FupeColors.muted, fontSize: 13),
           ),
+          if (!auth.user!.emailVerified)
+            TextButton(
+              onPressed: () async {
+                try {
+                  final msg = await auth.resendVerification();
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('$msg — check API console for the link')),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        e.toString().replaceFirst('Exception: ', ''),
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Resend verification email'),
+            ),
           TextButton(
             onPressed: () async {
               await auth.signOut();

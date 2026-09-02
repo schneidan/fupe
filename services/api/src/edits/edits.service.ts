@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
   NotFoundException,
@@ -9,13 +11,13 @@ import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.constants';
 import { GraphRepository } from '../graph/graph.repository';
 import { EntityType } from '../graph/graph.types';
-import { AuthUser } from '../auth/auth.service';
+import { AuthService, AuthUser } from '../auth/auth.service';
+import { UsersRepository } from '../auth/users.repository';
 
 export type EditStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface ProposedEditData {
   entity?: { name?: string; type?: EntityType };
-  /** parent_id required when linking an existing parent; optional when only supplying percentage for new_parent */
   ownership?: { parent_id?: string; percentage?: number };
   new_parent?: { name: string; type: EntityType };
 }
@@ -27,16 +29,35 @@ export interface SubmitEditDto {
 }
 
 const TRUST_AUTO_COMMIT_THRESHOLD = 50;
+const MAX_PENDING_EDITS = 5;
+const TRUST_ON_APPROVE = 5;
+const TRUST_ON_REJECT = -10;
 
 @Injectable()
 export class EditsService {
   constructor(
     @Inject(DATABASE_POOL) private readonly pool: Pool,
     private readonly graphRepo: GraphRepository,
+    private readonly usersRepo: UsersRepository,
+    private readonly authService: AuthService,
   ) {}
 
   async submitEdit(user: AuthUser, dto: SubmitEditDto) {
     this.validateCitationRequirement(dto);
+
+    if (!user.email_verified) {
+      throw new ForbiddenException(
+        'Verify your email before submitting edits',
+      );
+    }
+
+    const pendingCount = await this.countPending(user.id);
+    if (pendingCount >= MAX_PENDING_EDITS) {
+      throw new HttpException(
+        `You already have ${MAX_PENDING_EDITS} pending edits. Wait for review before submitting more.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
 
     if (user.trust_score > TRUST_AUTO_COMMIT_THRESHOLD) {
       return this.commitEdit(user.id, dto);
@@ -59,7 +80,7 @@ export class EditsService {
 
   async listPending() {
     const { rows } = await this.pool.query(
-      `SELECT eq.*, u.email AS submitter_email
+      `SELECT eq.*, u.email AS submitter_email, u.trust_score AS submitter_trust
        FROM public.edits_queue eq
        JOIN public.users u ON u.id = eq.user_id
        WHERE eq.status = 'PENDING'
@@ -92,8 +113,8 @@ export class EditsService {
     editId: string,
     decision: 'APPROVED' | 'REJECTED',
   ) {
-    if (reviewer.trust_score <= TRUST_AUTO_COMMIT_THRESHOLD) {
-      throw new ForbiddenException('Insufficient trust score to review edits');
+    if (!this.authService.isModerator(reviewer)) {
+      throw new ForbiddenException('Moderator role required to review edits');
     }
 
     const { rows } = await this.pool.query(
@@ -104,11 +125,14 @@ export class EditsService {
     if (!edit) throw new NotFoundException('Edit not found');
 
     if (decision === 'APPROVED') {
-      await this.commitEdit(reviewer.id, {
+      await this.commitEdit(edit.user_id, {
         target_node_id: edit.target_node_id,
         proposed_data: edit.proposed_data,
         citation_url: edit.citation_url,
       });
+      await this.usersRepo.adjustTrustScore(edit.user_id, TRUST_ON_APPROVE);
+    } else {
+      await this.usersRepo.adjustTrustScore(edit.user_id, TRUST_ON_REJECT);
     }
 
     const { rows: updated } = await this.pool.query(
@@ -120,6 +144,16 @@ export class EditsService {
     );
 
     return updated[0];
+  }
+
+  private async countPending(userId: string): Promise<number> {
+    const { rows } = await this.pool.query<{ n: string }>(
+      `SELECT count(*)::text AS n
+       FROM public.edits_queue
+       WHERE user_id = $1 AND status = 'PENDING'`,
+      [userId],
+    );
+    return Number(rows[0]?.n ?? 0);
   }
 
   private async commitEdit(userId: string, dto: SubmitEditDto) {

@@ -148,6 +148,8 @@ export interface QueueEdit {
   reviewer_id?: string | null;
   reviewed_at?: string | null;
   created_at: string;
+  submitter_email?: string;
+  submitter_trust?: number;
 }
 
 export interface SubmitEditResponse {
@@ -199,4 +201,22 @@ export async function listMyEdits(
 ): Promise<{ edits: QueueEdit[] }> {
   const q = status ? `?status=${status}` : '';
   return authJson(`/api/v1/edits/mine${q}`, { method: 'GET', token });
+}
+
+export async function listEditQueue(
+  token: string,
+): Promise<{ edits: QueueEdit[] }> {
+  return authJson('/api/v1/edits/queue', { method: 'GET', token });
+}
+
+export async function reviewEdit(
+  token: string,
+  id: string,
+  decision: 'APPROVED' | 'REJECTED',
+): Promise<QueueEdit> {
+  return authJson(`/api/v1/edits/${encodeURIComponent(id)}/review`, {
+    method: 'PATCH',
+    token,
+    body: JSON.stringify({ decision }),
+  });
 }

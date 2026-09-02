@@ -1,8 +1,7 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { IsEmail, IsString, MinLength } from 'class-validator';
-import { AuthService } from './auth.service';
+import { AuthService, AuthUser } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { AuthUser } from './auth.service';
 
 class RegisterDto {
   @IsEmail()
@@ -19,6 +18,11 @@ class LoginDto {
 
   @IsString()
   password!: string;
+}
+
+class VerifyEmailDto {
+  @IsString()
+  token!: string;
 }
 
 @Controller('auth')
@@ -39,5 +43,19 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@Req() req: { user: AuthUser }) {
     return req.user;
+  }
+
+  @Post('verify-email')
+  verifyEmail(@Body() { token }: VerifyEmailDto) {
+    return this.authService.verifyEmail(token).then((user) => ({
+      message: 'Email verified',
+      user,
+    }));
+  }
+
+  @Post('resend-verification')
+  @UseGuards(JwtAuthGuard)
+  resendVerification(@Req() req: { user: AuthUser }) {
+    return this.authService.resendVerification(req.user);
   }
 }

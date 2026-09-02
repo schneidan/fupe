@@ -56,6 +56,10 @@ export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
         <p className="text-xs text-fupe-muted">
           Trust score: {user.trust_score}
           {user.trust_score > 50 ? ' · edits auto-commit' : ' · edits go to review'}
+          {user.email_verified ? '' : ' · email unverified'}
+          {user.role === 'moderator' || user.role === 'admin'
+            ? ' · moderator'
+            : ''}
         </p>
         <div className="flex flex-wrap gap-3">
           <Link

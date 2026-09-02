@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -11,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { IsEnum, IsObject, IsOptional, IsString, IsUrl } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { AuthUser } from '../auth/auth.service';
+import { AuthService, AuthUser } from '../auth/auth.service';
 import { EditStatus, EditsService, ProposedEditData } from './edits.service';
 
 class SubmitEditBody {
@@ -40,7 +41,10 @@ class ListMineQuery {
 @Controller('edits')
 @UseGuards(JwtAuthGuard)
 export class EditsController {
-  constructor(private readonly editsService: EditsService) {}
+  constructor(
+    private readonly editsService: EditsService,
+    private readonly authService: AuthService,
+  ) {}
 
   @Post()
   submit(@Req() req: { user: AuthUser }, @Body() body: SubmitEditBody) {
@@ -57,8 +61,8 @@ export class EditsController {
 
   @Get('queue')
   listQueue(@Req() req: { user: AuthUser }) {
-    if (req.user.trust_score <= 50) {
-      return { edits: [] };
+    if (!this.authService.isModerator(req.user)) {
+      throw new ForbiddenException('Moderator role required');
     }
     return this.editsService.listPending();
   }

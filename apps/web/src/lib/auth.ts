@@ -1,9 +1,13 @@
 /** Browser-side auth helpers for contributor flows (JWT in localStorage). */
 
+export type UserRole = 'user' | 'moderator' | 'admin';
+
 export interface AuthUser {
   id: string;
   email: string;
   trust_score: number;
+  role: UserRole;
+  email_verified: boolean;
 }
 
 export interface AuthSession {
@@ -24,7 +28,12 @@ export function getStoredUser(): AuthUser | null {
   const raw = localStorage.getItem(USER_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as AuthUser;
+    const user = JSON.parse(raw) as AuthUser;
+    return {
+      ...user,
+      role: user.role ?? 'user',
+      email_verified: Boolean(user.email_verified),
+    };
   } catch {
     return null;
   }
@@ -40,6 +49,10 @@ export function clearSession(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   window.dispatchEvent(new Event('fupe-auth'));
+}
+
+export function isModerator(user: AuthUser | null): boolean {
+  return user?.role === 'moderator' || user?.role === 'admin';
 }
 
 export function authHeaders(): HeadersInit {
@@ -97,5 +110,38 @@ export async function fetchMe(): Promise<AuthUser | null> {
   }
   const user = (await res.json()) as AuthUser;
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  window.dispatchEvent(new Event('fupe-auth'));
   return user;
+}
+
+export async function verifyEmailToken(token: string): Promise<AuthUser> {
+  const res = await fetch('/api/v1/auth/verify-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      (body as { message?: string | string[] }).message ?? 'Verification failed';
+    throw new Error(Array.isArray(msg) ? msg.join(', ') : String(msg));
+  }
+  return (body as { user: AuthUser }).user;
+}
+
+export async function resendVerification(token: string): Promise<string> {
+  const res = await fetch('/api/v1/auth/resend-verification', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      (body as { message?: string | string[] }).message ?? 'Resend failed';
+    throw new Error(Array.isArray(msg) ? msg.join(', ') : String(msg));
+  }
+  return (body as { message: string }).message;
 }

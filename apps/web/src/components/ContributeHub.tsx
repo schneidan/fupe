@@ -4,16 +4,24 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
   clearSession,
+  fetchMe,
   getStoredUser,
+  getToken,
+  isModerator,
+  resendVerification,
   type AuthUser,
 } from '@/lib/auth';
 
 export function ContributeHub() {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const sync = () => setUser(getStoredUser());
     sync();
+    void fetchMe().then((me) => {
+      if (me) setUser(me);
+    });
     window.addEventListener('fupe-auth', sync);
     return () => window.removeEventListener('fupe-auth', sync);
   }, []);
@@ -30,7 +38,38 @@ export function ContributeHub() {
               {user.trust_score > 50
                 ? ' · your edits auto-commit'
                 : ' · your edits need review'}
+              {isModerator(user) ? ' · moderator' : ''}
             </p>
+            {!user.email_verified ? (
+              <div className="rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-sm">
+                <p className="text-fupe-muted">
+                  Verify your email before submitting edits. Check the API
+                  console for the link (dev), or resend.
+                </p>
+                <button
+                  type="button"
+                  className="mt-2 text-fupe-text underline-offset-2 hover:underline"
+                  onClick={async () => {
+                    const token = getToken();
+                    if (!token) return;
+                    try {
+                      const msg = await resendVerification(token);
+                      setResendMsg(msg);
+                      await fetchMe();
+                    } catch (e) {
+                      setResendMsg(
+                        e instanceof Error ? e.message : 'Resend failed',
+                      );
+                    }
+                  }}
+                >
+                  Resend verification
+                </button>
+                {resendMsg ? (
+                  <p className="mt-1 text-xs text-fupe-muted">{resendMsg}</p>
+                ) : null}
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={() => {
@@ -84,12 +123,23 @@ export function ContributeHub() {
             Track pending, approved, and rejected suggestions.
           </p>
         </Link>
+        {isModerator(user) ? (
+          <Link
+            href="/admin/edits"
+            className="rounded-xl border border-fupe-border bg-fupe-surface p-5 transition hover:border-fupe-muted sm:col-span-2"
+          >
+            <h2 className="font-semibold text-fupe-text">Moderate queue</h2>
+            <p className="mt-2 text-sm text-fupe-muted">
+              Approve or reject pending community edits.
+            </p>
+          </Link>
+        ) : null}
       </div>
 
       <p className="text-sm text-fupe-muted">
         Tip: open any entity or lookup result and tap{' '}
         <span className="text-fupe-text">Suggest an edit</span> to prefill the
-        target.
+        target. Max 5 pending edits per account.
       </p>
     </div>
   );

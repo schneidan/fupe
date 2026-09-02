@@ -319,6 +319,15 @@ export function SuggestEditForm() {
             Sign in
           </Link>
         </p>
+      ) : getStoredUser() && !getStoredUser()!.email_verified ? (
+        <p className="text-sm text-fupe-muted">
+          Verify your email before submitting. Check the API console for the
+          link, or resend from{' '}
+          <Link href="/contribute" className="text-fupe-text hover:underline">
+            Contribute
+          </Link>
+          .
+        </p>
       ) : null}
 
       <button
