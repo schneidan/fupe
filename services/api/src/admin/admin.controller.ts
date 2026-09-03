@@ -1,0 +1,137 @@
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiOperation,
+  ApiSecurity,
+  ApiTags,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { AdminGuard } from './admin.guard';
+import { AdminService } from './admin.service';
+import { SkipApiKey } from '../api-keys/api-key.decorators';
+import { UserRole } from '../auth/users.repository';
+
+class ListUsersQuery {
+  @IsOptional() @IsString() q?: string;
+  @IsOptional() @IsEnum(['user', 'moderator', 'admin']) role?: UserRole;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number = 1;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) limit?: number = 50;
+}
+
+class PatchUserBody {
+  @IsOptional() @IsEnum(['user', 'moderator', 'admin']) role?: UserRole;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100) trust_score?: number;
+  @IsOptional() @Transform(({ value }) => value === true || value === 'true') @IsBoolean() email_verified?: boolean;
+}
+
+class ListPageQuery {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number = 1;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) limit?: number = 50;
+}
+
+class OverrideTierBody {
+  @IsEnum(['free', 'developer', 'business']) tier!: 'free' | 'developer' | 'business';
+}
+
+@ApiTags('Admin')
+@ApiBearerAuth('bearer')
+@ApiSecurity('bearer')
+@Controller('admin')
+@SkipApiKey()
+@UseGuards(AdminGuard)
+export class AdminController {
+  constructor(private readonly adminService: AdminService) {}
+
+  // ── Dashboard ─────────────────────────────────────────────────────────────
+
+  @Get('stats')
+  @ApiOperation({ summary: 'Dashboard counts' })
+  stats() {
+    return this.adminService.getStats();
+  }
+
+  // ── Users ─────────────────────────────────────────────────────────────────
+
+  @Get('users')
+  @ApiOperation({ summary: 'List / search users' })
+  listUsers(@Query() query: ListUsersQuery) {
+    return this.adminService.listUsers({
+      q: query.q,
+      role: query.role,
+      page: query.page ?? 1,
+      limit: query.limit ?? 50,
+    });
+  }
+
+  @Patch('users/:id')
+  @ApiOperation({ summary: 'Update role, trust score, or email verification' })
+  patchUser(
+    @Param('id') id: string,
+    @Body() body: PatchUserBody,
+    @Req() req: { adminUser?: { sub: string } },
+  ) {
+    return this.adminService.updateUser(id, body);
+  }
+
+  @Get('users/:id/keys')
+  @ApiOperation({ summary: "List a user's API keys + today's usage" })
+  getUserKeys(@Param('id') id: string) {
+    return this.adminService.getUserKeys(id);
+  }
+
+  @Post('keys/:id/revoke')
+  @ApiOperation({ summary: 'Revoke an API key (admin override)' })
+  revokeKey(@Param('id') id: string) {
+    return this.adminService.revokeKeyAdmin(id).then(() => ({ revoked: true }));
+  }
+
+  // ── Subscriptions ─────────────────────────────────────────────────────────
+
+  @Get('subscriptions')
+  @ApiOperation({ summary: 'List paying / previously paying subscribers' })
+  listSubscribers(@Query() query: ListPageQuery) {
+    return this.adminService.listSubscribers({
+      page: query.page ?? 1,
+      limit: query.limit ?? 50,
+    });
+  }
+
+  @Post('users/:id/tier')
+  @ApiOperation({ summary: 'Manually override subscription tier' })
+  overrideTier(
+    @Param('id') id: string,
+    @Body() { tier }: OverrideTierBody,
+  ) {
+    return this.adminService.overrideTier(id, tier);
+  }
+
+  // ── Usage ──────────────────────────────────────────────────────────────────
+
+  @Get('usage')
+  @ApiOperation({ summary: "API key usage summary (today's requests)" })
+  usageSummary(@Query() query: ListPageQuery) {
+    return this.adminService.getUsageSummary({
+      page: query.page ?? 1,
+      limit: query.limit ?? 50,
+    });
+  }
+}

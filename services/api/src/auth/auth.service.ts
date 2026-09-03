@@ -38,8 +38,12 @@ export class AuthService {
 
     const hash = await bcrypt.hash(password, 10);
     const bootstrap = this.bootstrapModeratorEmail();
-    const isBootstrap =
+    const bootstrapAdmin = this.bootstrapAdminEmail();
+    const isBootstrapMod =
       Boolean(bootstrap) && email.toLowerCase() === bootstrap;
+    const isBootstrapAdmin =
+      Boolean(bootstrapAdmin) && email.toLowerCase() === bootstrapAdmin;
+    const isBootstrap = isBootstrapMod || isBootstrapAdmin;
     const autoVerify =
       isBootstrap || this.config.get<string>('AUTO_VERIFY_EMAIL') === 'true';
 
@@ -48,11 +52,17 @@ export class AuthService {
       ? null
       : new Date(Date.now() + 1000 * 60 * 60 * 24);
 
+    const role: UserRole = isBootstrapAdmin
+      ? 'admin'
+      : isBootstrapMod
+        ? 'moderator'
+        : 'user';
+
     const user = await this.usersRepo.create({
       email,
       passwordHash: hash,
       trustScore: isBootstrap ? 100 : 0,
-      role: isBootstrap ? 'moderator' : 'user',
+      role,
       emailVerifiedAt: autoVerify ? new Date() : null,
       verifyToken,
       verifyExpiresAt: verifyExpires,
@@ -123,6 +133,11 @@ export class AuthService {
 
   private bootstrapModeratorEmail(): string | null {
     const raw = this.config.get<string>('BOOTSTRAP_MODERATOR_EMAIL');
+    return raw ? raw.toLowerCase().trim() : null;
+  }
+
+  private bootstrapAdminEmail(): string | null {
+    const raw = this.config.get<string>('BOOTSTRAP_ADMIN_EMAIL');
     return raw ? raw.toLowerCase().trim() : null;
   }
 

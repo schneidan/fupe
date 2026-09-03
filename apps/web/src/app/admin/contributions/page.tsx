@@ -1,7 +1,6 @@
 import { AdminEditsQueue } from '@/components/AdminEditsQueue';
 export const metadata = { title: 'Contributions' };
-/** Legacy URL kept for bookmarks; renders under the new admin layout. */
-export default function AdminEditsPage() {
+export default function AdminContributionsPage() {
   return (
     <div className="space-y-6">
       <div>

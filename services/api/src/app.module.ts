@@ -11,6 +11,7 @@ import { EditsModule } from './edits/edits.module';
 import { EntitiesModule } from './entities/entities.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { BillingModule } from './billing/billing.module';
+import { AdminModule } from './admin/admin.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -30,6 +31,7 @@ import { HealthController } from './health.controller';
     EntitiesModule,
     ApiKeysModule,
     BillingModule,
+    AdminModule,
   ],
   controllers: [HealthController],
 })
