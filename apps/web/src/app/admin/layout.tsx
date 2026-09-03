@@ -1,4 +1,5 @@
-import { AdminNav } from '@/components/AdminNav';
+import { Suspense } from 'react';
+import { AdminShell } from '@/components/AdminShell';
 
 export const metadata = {
   title: {
@@ -13,11 +14,14 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen">
-      <div className="sticky top-0 h-screen w-52 shrink-0 border-r border-fupe-border bg-fupe-bg px-4 py-8">
-        <AdminNav />
-      </div>
-      <div className="flex-1 overflow-auto px-8 py-8">{children}</div>
-    </div>
+    <Suspense
+      fallback={
+        <div className="flex min-h-[50vh] items-center justify-center text-sm text-fupe-muted">
+          Loading…
+        </div>
+      }
+    >
+      <AdminShell>{children}</AdminShell>
+    </Suspense>
   );
 }

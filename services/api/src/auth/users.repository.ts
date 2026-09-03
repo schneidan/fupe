@@ -106,6 +106,14 @@ export class UsersRepository {
     return rows[0];
   }
 
+  async setRole(userId: string, role: UserRole): Promise<UserRow> {
+    const { rows } = await this.pool.query<UserRow>(
+      `UPDATE public.users SET role = $2 WHERE id = $1 RETURNING *`,
+      [userId, role],
+    );
+    return rows[0];
+  }
+
   async adjustTrustScore(userId: string, delta: number): Promise<number> {
     const { rows } = await this.pool.query<{ trust_score: number }>(
       `UPDATE public.users

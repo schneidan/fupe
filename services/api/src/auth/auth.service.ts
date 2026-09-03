@@ -89,7 +89,8 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.issueToken(user);
+    const promoted = await this.applyBootstrapRole(user);
+    return this.issueToken(promoted);
   }
 
   async validateUser(userId: string): Promise<AuthUser | null> {
@@ -129,6 +130,23 @@ export class AuthService {
       'http://localhost:3001';
     const url = `${site.replace(/\/$/, '')}/verify-email?token=${token}`;
     await this.mail.sendVerificationEmail(email, url);
+  }
+
+  /**
+   * Promote an existing account when env bootstrap emails match.
+   * Admin wins over moderator. Never demotes an admin.
+   */
+  private async applyBootstrapRole(user: UserRow): Promise<UserRow> {
+    const email = user.email.toLowerCase();
+    const wantAdmin = this.bootstrapAdminEmail() === email;
+    const wantMod = this.bootstrapModeratorEmail() === email;
+
+    let next: UserRole | null = null;
+    if (wantAdmin && user.role !== 'admin') next = 'admin';
+    else if (wantMod && user.role === 'user') next = 'moderator';
+
+    if (!next) return user;
+    return this.usersRepo.setRole(user.id, next);
   }
 
   private bootstrapModeratorEmail(): string | null {

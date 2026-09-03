@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { fetchAdminStats, type AdminStats } from '@/lib/admin-api';
-import { getStoredUser } from '@/lib/auth';
 import Link from 'next/link';
 
 function StatCard({ label, value }: { label: string; value: number | undefined }) {
@@ -24,17 +23,6 @@ export function AdminDashboard() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const user = getStoredUser();
-    if (!user) {
-      setError('You must be signed in.');
-      setReady(true);
-      return;
-    }
-    if (user.role !== 'admin') {
-      setError(`Admin role required. Your role: ${user.role}.`);
-      setReady(true);
-      return;
-    }
     fetchAdminStats()
       .then(setStats)
       .catch((e: unknown) =>

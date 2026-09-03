@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { SiteFooter } from '@/components/SiteFooter';
+import { SiteAccountLink } from '@/components/SiteAccountLink';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -41,7 +42,10 @@ export default function RootLayout({
       <body
         className={`${inter.className} ${inter.variable} flex min-h-screen flex-col antialiased`}
       >
-        <div className="flex-1">{children}</div>
+        <div className="flex-1">
+          <SiteAccountLink />
+          {children}
+        </div>
         <SiteFooter />
       </body>
     </html>

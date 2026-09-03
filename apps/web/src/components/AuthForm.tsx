@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
   clearSession,
   getStoredUser,
@@ -16,7 +16,10 @@ type Mode = 'login' | 'register';
 export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get('next') || '/contribute';
+  const pathname = usePathname();
+  const next =
+    searchParams.get('next') ||
+    (pathname.startsWith('/admin') ? '/admin' : '/contribute');
 
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState('');
@@ -58,16 +61,31 @@ export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
           {user.trust_score > 50 ? ' · edits auto-commit' : ' · edits go to review'}
           {user.email_verified ? '' : ' · email unverified'}
           {user.role === 'moderator' || user.role === 'admin'
-            ? ' · moderator'
+            ? ` · ${user.role}`
             : ''}
         </p>
         <div className="flex flex-wrap gap-3">
           <Link
-            href="/contribute"
+            href={next}
             className="rounded-full bg-fupe-text px-5 py-2 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted"
           >
-            Contribute
+            Continue
           </Link>
+          {user.role === 'admin' ? (
+            <Link
+              href="/admin"
+              className="rounded-full border border-fupe-border px-5 py-2 text-sm text-fupe-text hover:border-fupe-muted"
+            >
+              Admin
+            </Link>
+          ) : (
+            <Link
+              href="/contribute"
+              className="rounded-full border border-fupe-border px-5 py-2 text-sm text-fupe-text hover:border-fupe-muted"
+            >
+              Contribute
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => {
