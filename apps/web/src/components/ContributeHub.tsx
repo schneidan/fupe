@@ -11,6 +11,7 @@ import {
   resendVerification,
   type AuthUser,
 } from '@/lib/auth';
+import { AccountPrivacyPanel } from '@/components/AccountPrivacyPanel';
 
 export function ContributeHub() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -94,6 +95,9 @@ export function ContributeHub() {
             >
               Sign out
             </button>
+            <div className="pt-2">
+              <AccountPrivacyPanel onDeleted={() => setUser(null)} />
+            </div>
           </div>
         ) : (
           <div className="space-y-3">

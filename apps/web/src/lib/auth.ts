@@ -145,3 +145,30 @@ export async function resendVerification(token: string): Promise<string> {
   }
   return (body as { message: string }).message;
 }
+
+export async function exportMyData(token: string): Promise<unknown> {
+  const res = await fetch('/api/v1/auth/export', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      (body as { message?: string | string[] }).message ?? 'Export failed';
+    throw new Error(Array.isArray(msg) ? msg.join(', ') : String(msg));
+  }
+  return body;
+}
+
+export async function deleteMyAccount(token: string): Promise<void> {
+  const res = await fetch('/api/v1/auth/me', {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const msg =
+      (body as { message?: string | string[] }).message ?? 'Delete failed';
+    throw new Error(Array.isArray(msg) ? msg.join(', ') : String(msg));
+  }
+  clearSession();
+}

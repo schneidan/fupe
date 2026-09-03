@@ -50,6 +50,9 @@ export function VerdictHero({ result }: VerdictHeroProps) {
           quality, worker conditions, and consumer transparency.
         </p>
       )}
+      <p className="mx-auto mt-4 max-w-lg text-xs text-fupe-muted">
+        Informational only — not legal or financial advice.
+      </p>
     </div>
   );
 }

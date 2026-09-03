@@ -123,6 +123,17 @@ export class AuthService {
     return { message: 'Verification email sent' };
   }
 
+  async exportMyData(user: AuthUser) {
+    const data = await this.usersRepo.exportPersonalData(user.id);
+    if (!data) throw new BadRequestException('Account not found');
+    return data;
+  }
+
+  async deleteMyAccount(user: AuthUser): Promise<{ deleted: true }> {
+    await this.usersRepo.deleteAccount(user.id);
+    return { deleted: true };
+  }
+
   isModerator(user: AuthUser): boolean {
     return user.role === 'moderator' || user.role === 'admin';
   }

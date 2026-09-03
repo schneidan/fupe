@@ -27,6 +27,7 @@ export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   useEffect(() => {
     setUser(getStoredUser());
@@ -40,6 +41,11 @@ export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
       if (mode === 'login') {
         await login(email.trim(), password);
       } else {
+        if (!acceptedTerms) {
+          setError('Accept the Terms and Contributor License to create an account.');
+          setBusy(false);
+          return;
+        }
         await register(email.trim(), password);
       }
       router.push(next);
@@ -152,10 +158,39 @@ export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
             className="mt-1 w-full rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-fupe-text outline-none focus:border-fupe-muted"
           />
         </label>
+        {mode === 'register' ? (
+          <label className="flex items-start gap-2 text-sm text-fupe-muted">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              required
+            />
+            <span>
+              I agree to the{' '}
+              <Link href="/legal/terms" className="text-fupe-text hover:underline">
+                Terms
+              </Link>
+              ,{' '}
+              <Link href="/legal/privacy" className="text-fupe-text hover:underline">
+                Privacy Policy
+              </Link>
+              , and{' '}
+              <Link
+                href="/legal/contributor"
+                className="text-fupe-text hover:underline"
+              >
+                Contributor License
+              </Link>
+              .
+            </span>
+          </label>
+        ) : null}
         {error ? <p className="text-sm text-verdict-yes">{error}</p> : null}
         <button
           type="submit"
-          disabled={busy}
+          disabled={busy || (mode === 'register' && !acceptedTerms)}
           className="w-full rounded-full bg-fupe-text px-5 py-2.5 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted disabled:opacity-60"
         >
           {busy

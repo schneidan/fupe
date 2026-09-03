@@ -11,6 +11,10 @@ class CitationsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final weak = citations.isEmpty ||
+        citations.length == 1 ||
+        citations.every((c) => c.stale);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -34,10 +38,24 @@ class CitationsList extends StatelessWidget {
           const SizedBox(height: 12),
           if (citations.isEmpty)
             const Text(
-              'No citations yet.',
+              'No citations yet. Low confidence — treat as incomplete.',
               style: TextStyle(color: FupeColors.muted, fontSize: 14),
             )
-          else
+          else ...[
+            if (weak)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  citations.length == 1
+                      ? 'Limited evidence — only one citation. Confirm with primary sources.'
+                      : 'Limited evidence — citations may be outdated. Confirm with primary sources.',
+                  style: const TextStyle(
+                    color: FupeColors.muted,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+              ),
             ...citations.map(
               (c) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -68,6 +86,7 @@ class CitationsList extends StatelessWidget {
                 ),
               ),
             ),
+          ],
         ],
       ),
     );

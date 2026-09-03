@@ -180,4 +180,69 @@ export class UsersRepository {
     );
     return rows[0];
   }
+
+  async exportPersonalData(userId: string) {
+    const user = await this.findById(userId);
+    if (!user) return null;
+
+    const edits = await this.pool.query(
+      `SELECT id, target_node_id, proposed_data, citation_url, status,
+              reviewed_at, created_at
+         FROM public.edits_queue WHERE user_id = $1
+         ORDER BY created_at DESC`,
+      [userId],
+    );
+    const keys = await this.pool.query(
+      `SELECT id, name, key_prefix, tier, rate_limit_daily, last_used_at,
+              revoked_at, created_at
+         FROM public.api_keys WHERE user_id = $1
+         ORDER BY created_at DESC`,
+      [userId],
+    );
+
+    return {
+      exported_at: new Date().toISOString(),
+      account: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        trust_score: user.trust_score,
+        email_verified_at: user.email_verified_at,
+        subscription_tier: user.subscription_tier ?? 'free',
+        subscription_status: user.subscription_status ?? null,
+        created_at: user.created_at,
+      },
+      edits: edits.rows,
+      api_keys: keys.rows,
+    };
+  }
+
+  async deleteAccount(userId: string): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `UPDATE public.edits_queue SET reviewer_id = NULL WHERE reviewer_id = $1`,
+        [userId],
+      );
+      await client.query(
+        `UPDATE public.admin_audit_log SET actor_id = NULL WHERE actor_id = $1`,
+        [userId],
+      );
+      await client.query(`DELETE FROM public.audit_logs WHERE edited_by = $1`, [
+        userId,
+      ]);
+      await client.query(
+        `DELETE FROM public.wiki_revisions WHERE edited_by = $1`,
+        [userId],
+      );
+      await client.query(`DELETE FROM public.users WHERE id = $1`, [userId]);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
 }

@@ -16,7 +16,12 @@ export default function DevelopersPage() {
       <h1 className="text-2xl font-bold text-fupe-text">Developers</h1>
       <p className="mt-3 text-fupe-muted">
         Ownership lookup API with citation-backed chains. Free tier for
-        experimentation; Developer unlocks higher limits and IMAGE lookup.
+        experimentation; Developer unlocks higher limits and IMAGE lookup. By
+        using an API key you agree to the{' '}
+        <a href="/legal/api" className="text-fupe-text hover:underline">
+          API Terms
+        </a>
+        .
       </p>
       <Suspense fallback={<p className="mt-8 text-fupe-muted">Loading…</p>}>
         <DevelopersBilling />

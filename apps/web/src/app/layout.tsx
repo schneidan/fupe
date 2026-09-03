@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteAccountLink } from '@/components/SiteAccountLink';
+import { CookieConsentBanner } from '@/components/CookieConsentBanner';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -47,6 +48,7 @@ export default function RootLayout({
           {children}
         </div>
         <SiteFooter />
+        <CookieConsentBanner />
       </body>
     </html>
   );

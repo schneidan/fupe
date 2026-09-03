@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { IsEmail, IsString, MinLength } from 'class-validator';
 import { AuthService, AuthUser } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -59,5 +59,17 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   resendVerification(@Req() req: { user: AuthUser }) {
     return this.authService.resendVerification(req.user);
+  }
+
+  @Get('export')
+  @UseGuards(JwtAuthGuard)
+  exportData(@Req() req: { user: AuthUser }) {
+    return this.authService.exportMyData(req.user);
+  }
+
+  @Delete('me')
+  @UseGuards(JwtAuthGuard)
+  deleteAccount(@Req() req: { user: AuthUser }) {
+    return this.authService.deleteMyAccount(req.user);
   }
 }
