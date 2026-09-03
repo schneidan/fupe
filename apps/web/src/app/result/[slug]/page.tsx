@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { Suspense } from 'react';
 import { ResultView } from '@/components/ResultView';
 import { lookupServer } from '@/lib/lookup-server';
 import { slugToQuery } from '@/lib/slug';
+import { FupeLogo } from '@/components/FupeLogo';
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -67,12 +67,9 @@ export default async function ResultSlugPage({ params }: PageProps) {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">
-      <Link
-        href="/"
-        className="mb-8 inline-block text-sm text-fupe-muted hover:text-fupe-text"
-      >
-        ← FUPE
-      </Link>
+      <div className="mb-8">
+        <FupeLogo size="nav" back />
+      </div>
       <Suspense
         fallback={
           <div className="py-20 text-center text-fupe-muted">Loading…</div>

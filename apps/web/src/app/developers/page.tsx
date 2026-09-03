@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
-import Link from 'next/link';
 import { DevelopersBilling } from '@/components/DevelopersBilling';
+import { FupeLogo } from '@/components/FupeLogo';
 
 export const metadata = {
   title: 'Developers',
@@ -9,12 +9,9 @@ export const metadata = {
 export default function DevelopersPage() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-16">
-      <Link
-        href="/"
-        className="mb-8 inline-block text-sm text-fupe-muted hover:text-fupe-accent"
-      >
-        ← FUPE
-      </Link>
+      <div className="mb-8">
+        <FupeLogo size="nav" back />
+      </div>
       <h1 className="text-2xl font-bold text-fupe-text">Developers</h1>
       <p className="mt-3 text-fupe-muted">
         Ownership lookup API with citation-backed chains. Free tier for

@@ -43,18 +43,32 @@ export function ContributeHub() {
             {!user.email_verified ? (
               <div className="rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-sm">
                 <p className="text-fupe-muted">
-                  Verify your email before submitting edits. Check the API
-                  console for the link (dev), or resend.
+                  Verify your email before submitting edits. Locally, open{' '}
+                  <a
+                    href="http://localhost:8025"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-fupe-text underline-offset-2 hover:underline"
+                  >
+                    Mailpit
+                  </a>{' '}
+                  after resending (or check the API logs if SMTP isn&apos;t set).
                 </p>
                 <button
                   type="button"
                   className="mt-2 text-fupe-text underline-offset-2 hover:underline"
                   onClick={async () => {
                     const token = getToken();
-                    if (!token) return;
+                    if (!token) {
+                      setResendMsg('Sign in again, then retry.');
+                      return;
+                    }
+                    setResendMsg('Sending…');
                     try {
                       const msg = await resendVerification(token);
-                      setResendMsg(msg);
+                      setResendMsg(
+                        `${msg} — check Mailpit (localhost:8025) or your inbox.`,
+                      );
                       await fetchMe();
                     } catch (e) {
                       setResendMsg(

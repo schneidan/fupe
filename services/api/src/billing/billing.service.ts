@@ -5,7 +5,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Stripe from 'stripe';
+import Stripe = require('stripe');
 import {
   ApiKeyTier,
   ApiKeysService,
@@ -22,12 +22,14 @@ export class BillingService {
     private readonly users: UsersRepository,
     private readonly apiKeys: ApiKeysService,
   ) {
-    const secret = this.config.get<string>('STRIPE_SECRET_KEY');
+    const secret = this.config.get<string>('STRIPE_SECRET_KEY')?.trim();
     this.stripe = secret ? new Stripe(secret) : null;
   }
 
   isConfigured(): boolean {
-    return Boolean(this.stripe && this.config.get('STRIPE_PRICE_DEVELOPER'));
+    return Boolean(
+      this.stripe && this.config.get<string>('STRIPE_PRICE_DEVELOPER')?.trim(),
+    );
   }
 
   private requireStripe(): Stripe {
