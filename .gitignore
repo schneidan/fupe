@@ -24,6 +24,7 @@ restart.sh
 # OS
 .DS_Store
 Thumbs.db
+*.af~lock~
 
 # Logs
 *.log
