@@ -122,6 +122,12 @@ stripe listen --forward-to localhost:3000/api/v1/billing/webhook
 
 Env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_DEVELOPER` (see `services/api/.env.example`).
 
+### API docs (Phase 6.3)
+
+- Swagger UI: [`http://localhost:3000/api/docs`](http://localhost:3000/api/docs) (also via web proxy at `/api/docs`)
+- OpenAPI JSON: `/api/docs-json`
+- Curl + sample response on [`/developers`](http://localhost:3001/developers)
+
 **Trust rules:**
 - `trust_score > 50` → ownership edits auto-commit to graph + `audit_logs` + `wiki_revisions`
 - `trust_score ≤ 50` → edits go to `edits_queue` (status `PENDING`)

@@ -11,51 +11,44 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
-  IsEnum,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  ValidateIf,
-} from 'class-validator';
+  ApiBody,
+  ApiConsumes,
+  ApiHeader,
+  ApiOkResponse,
+  ApiOperation,
+  ApiSecurity,
+  ApiTags,
+} from '@nestjs/swagger';
 import { RequestWithApiKey } from '../api-keys/api-key.guard';
 import { TIER_ALLOWS_IMAGE } from '../api-keys/api-keys.service';
-import { LookupInputType, LookupService } from './lookup.service';
+import {
+  LookupResultDto,
+  SearchDto,
+  UnifiedLookupDto,
+} from './lookup.dto';
+import { LookupService } from './lookup.service';
 
-class UnifiedLookupDto {
-  @IsEnum(['BARCODE', 'TEXT', 'IMAGE', 'VOICE'])
-  type!: LookupInputType;
-
-  @ValidateIf((o) => o.type === 'BARCODE')
-  @IsString()
-  @IsNotEmpty()
-  gtin?: string;
-
-  @ValidateIf((o) => o.type === 'TEXT')
-  @IsString()
-  @IsNotEmpty()
-  query?: string;
-
-  @ValidateIf((o) => o.type === 'VOICE')
-  @IsOptional()
-  @IsString()
-  transcript?: string;
-}
-
-class SearchDto {
-  @IsString()
-  @IsNotEmpty()
-  q!: string;
-}
-
+@ApiTags('Lookup')
+@ApiSecurity('api-key')
+@ApiHeader({
+  name: 'X-API-Key',
+  required: false,
+  description:
+    'API key (`fupe_…`). Optional for first-party clients unless REQUIRE_API_KEY=true. Required for third-party use; free tier cannot call IMAGE.',
+})
 @Controller('lookup')
 export class LookupController {
   constructor(private readonly lookupService: LookupService) {}
 
-  /**
-   * Unified multi-modal lookup endpoint.
-   * Accepts JSON body or multipart form (for IMAGE/VOICE with file uploads).
-   */
   @Post()
+  @ApiOperation({
+    summary: 'Unified ownership lookup',
+    description:
+      'Resolve whether a brand/product/company is PE-backed. JSON body for TEXT/BARCODE; multipart for IMAGE/VOICE with a `file` field.',
+  })
+  @ApiConsumes('application/json', 'multipart/form-data')
+  @ApiBody({ type: UnifiedLookupDto })
+  @ApiOkResponse({ type: LookupResultDto })
   @UseInterceptors(FileInterceptor('file'))
   async lookup(
     @Req() req: RequestWithApiKey,
@@ -74,8 +67,11 @@ export class LookupController {
     return this.lookupService.resolve(input);
   }
 
-  /** Legacy fuzzy text search (returns raw hits) */
   @Get('search')
+  @ApiOperation({
+    summary: 'Fuzzy search (legacy)',
+    description: 'Returns raw entity/product hits without PE resolution.',
+  })
   async search(@Query() { q }: SearchDto) {
     const hits = await this.lookupService.fuzzySearchHits(q);
     return { query: q, results: hits, count: hits.length };

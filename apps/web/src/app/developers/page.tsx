@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { DevelopersBilling } from '@/components/DevelopersBilling';
+import { DevelopersApiDocs } from '@/components/DevelopersApiDocs';
 import { FupeLogo } from '@/components/FupeLogo';
 
 export const metadata = {
@@ -20,6 +21,9 @@ export default function DevelopersPage() {
       <Suspense fallback={<p className="mt-8 text-fupe-muted">Loading…</p>}>
         <DevelopersBilling />
       </Suspense>
+      <div className="mt-12 border-t border-fupe-border pt-10">
+        <DevelopersApiDocs />
+      </div>
     </main>
   );
 }

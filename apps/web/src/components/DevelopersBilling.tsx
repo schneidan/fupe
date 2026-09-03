@@ -258,14 +258,6 @@ export function DevelopersBilling() {
         )}
         {error ? <p className="text-sm text-verdict-yes">{error}</p> : null}
       </section>
-
-      <section className="text-sm text-fupe-muted space-y-2">
-        <h2 className="font-semibold text-fupe-text">Quick start</h2>
-        <pre className="overflow-x-auto rounded-lg border border-fupe-border bg-fupe-bg p-4 text-xs text-fupe-text">{`curl -H "X-API-Key: fupe_…" \\
-  -H "Content-Type: application/json" \\
-  -d '{"type":"TEXT","query":"Panera"}' \\
-  ${typeof window !== 'undefined' ? window.location.origin.replace('3001', '3000') : 'http://localhost:3000'}/api/v1/lookup`}</pre>
-      </section>
     </div>
   );
 }
