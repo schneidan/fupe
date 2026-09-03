@@ -9,6 +9,7 @@ import { LookupModule } from './lookup/lookup.module';
 import { AuthModule } from './auth/auth.module';
 import { EditsModule } from './edits/edits.module';
 import { EntitiesModule } from './entities/entities.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -26,6 +27,7 @@ import { HealthController } from './health.controller';
     LookupModule,
     EditsModule,
     EntitiesModule,
+    ApiKeysModule,
   ],
   controllers: [HealthController],
 })

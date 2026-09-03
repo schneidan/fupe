@@ -85,11 +85,30 @@ Traversal walks `OWNED_BY` and `PORTFOLIO_COMPANY_OF` edges up to **10 degrees**
 | `POST /api/v1/auth/login` | — | Get JWT |
 | `POST /api/v1/edits` | Bearer JWT | Submit ownership edit |
 | `GET /api/v1/edits/queue` | Bearer JWT (trust > 50) | List pending edits |
-| `PATCH /api/v1/edits/:id/review` | Bearer JWT (trust > 50) | Approve / reject |
+| `PATCH /api/v1/edits/:id/review` | Bearer JWT (moderator) | Approve / reject |
+
+## Public API keys (Phase 6.1)
+
+Third-party access uses hashed API keys (`fupe_…`). First-party web/mobile still work without a key unless `REQUIRE_API_KEY=true`.
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `POST /api/v1/api-keys` | Bearer JWT | Create key (secret shown once) |
+| `GET /api/v1/api-keys` | Bearer JWT | List your keys (prefix only) |
+| `POST /api/v1/api-keys/:id/revoke` | Bearer JWT | Revoke a key |
+
+```bash
+curl -H "X-API-Key: fupe_…" -H "Content-Type: application/json" \
+  -d '{"type":"TEXT","query":"Panera"}' \
+  http://localhost:3000/api/v1/lookup
+```
+
+Keyed requests are written to `api_usage_log`. Daily tier limits land in Phase 6.2 with Stripe.
 
 **Trust rules:**
-- `trust_score > 50` → edits auto-commit to graph + `audit_logs` + `wiki_revisions`
+- `trust_score > 50` → ownership edits auto-commit to graph + `audit_logs` + `wiki_revisions`
 - `trust_score ≤ 50` → edits go to `edits_queue` (status `PENDING`)
+- New entities (`create_entity`) **always** require moderator approval
 - PE/VC ownership changes **require** a valid `citation_url`
 
 ## Database Schema

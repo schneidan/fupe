@@ -13,6 +13,7 @@ import {
 import { IsEnum, IsObject, IsOptional, IsString, IsUrl } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthService, AuthUser } from '../auth/auth.service';
+import { SkipApiKey } from '../api-keys/api-key.decorators';
 import { EditStatus, EditsService, ProposedEditData } from './edits.service';
 
 class SubmitEditBody {
@@ -40,6 +41,7 @@ class ListMineQuery {
 }
 
 @Controller('edits')
+@SkipApiKey()
 @UseGuards(JwtAuthGuard)
 export class EditsController {
   constructor(

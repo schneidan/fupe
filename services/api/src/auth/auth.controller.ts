@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { IsEmail, IsString, MinLength } from 'class-validator';
 import { AuthService, AuthUser } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { SkipApiKey } from '../api-keys/api-key.decorators';
 
 class RegisterDto {
   @IsEmail()
@@ -26,6 +27,7 @@ class VerifyEmailDto {
 }
 
 @Controller('auth')
+@SkipApiKey()
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
