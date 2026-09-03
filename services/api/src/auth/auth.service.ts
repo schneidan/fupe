@@ -84,6 +84,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (user.disabled_at) {
+      throw new UnauthorizedException('This account has been disabled');
+    }
+
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
       throw new UnauthorizedException('Invalid credentials');
@@ -95,7 +99,7 @@ export class AuthService {
 
   async validateUser(userId: string): Promise<AuthUser | null> {
     const user = await this.usersRepo.findById(userId);
-    if (!user) return null;
+    if (!user || user.disabled_at) return null;
     return this.toAuthUser(user);
   }
 

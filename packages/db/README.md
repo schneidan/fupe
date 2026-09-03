@@ -63,7 +63,8 @@ pnpm db:reset && pnpm db:migrate
 | `003_seed_demo.sql` | Panera Bread → JAB Holding demo chain |
 | `004_seed_fast_food.sql` | QSR PE portfolios (Roark, JAB, Blackstone) + independent chains |
 | `005_entity_metadata.sql` | Entity metadata properties + `data_sources` / `ingestion_runs` tables |
-| `006_ingest_match_queue.sql` | Low-confidence ingest dedupe review queue |
+| `010_stripe_subscriptions.sql` | Stripe fields on users for API tiers |
+| `011_user_disabled.sql` | Soft-disable accounts (`disabled_at`) |
 
 ## Relational Tables
 

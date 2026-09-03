@@ -25,7 +25,7 @@ import {
   Min,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { AdminGuard } from './admin.guard';
+import { AdminGuard, AdminJwtUser } from './admin.guard';
 import { AdminService } from './admin.service';
 import { SkipApiKey } from '../api-keys/api-key.decorators';
 import { UserRole } from '../auth/users.repository';
@@ -33,6 +33,14 @@ import { UserRole } from '../auth/users.repository';
 class ListUsersQuery {
   @IsOptional() @IsString() q?: string;
   @IsOptional() @IsEnum(['user', 'moderator', 'admin']) role?: UserRole;
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined || value === ''
+      ? undefined
+      : value === true || value === 'true',
+  )
+  @IsBoolean()
+  disabled?: boolean;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number = 1;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) limit?: number = 50;
 }
@@ -40,7 +48,14 @@ class ListUsersQuery {
 class PatchUserBody {
   @IsOptional() @IsEnum(['user', 'moderator', 'admin']) role?: UserRole;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100) trust_score?: number;
-  @IsOptional() @Transform(({ value }) => value === true || value === 'true') @IsBoolean() email_verified?: boolean;
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  email_verified?: boolean;
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  disabled?: boolean;
 }
 
 class ListPageQuery {
@@ -77,25 +92,34 @@ export class AdminController {
     return this.adminService.listUsers({
       q: query.q,
       role: query.role,
+      disabled: query.disabled,
       page: query.page ?? 1,
       limit: query.limit ?? 50,
     });
   }
 
+  @Get('users/:id')
+  @ApiOperation({ summary: 'User detail' })
+  getUser(@Param('id') id: string) {
+    return this.adminService.getUser(id);
+  }
+
   @Patch('users/:id')
-  @ApiOperation({ summary: 'Update role, trust score, or email verification' })
+  @ApiOperation({
+    summary: 'Update role, trust, verification, or disabled state',
+  })
   patchUser(
     @Param('id') id: string,
     @Body() body: PatchUserBody,
-    @Req() req: { adminUser?: { sub: string } },
+    @Req() req: { adminUser: AdminJwtUser },
   ) {
-    return this.adminService.updateUser(id, body);
+    return this.adminService.updateUser(req.adminUser.id, id, body);
   }
 
   @Get('users/:id/keys')
   @ApiOperation({ summary: "List a user's API keys + today's usage" })
   getUserKeys(@Param('id') id: string) {
-    return this.adminService.getUserKeys(id);
+    return this.adminService.getUserKeys(id).then((keys) => ({ keys }));
   }
 
   @Post('keys/:id/revoke')

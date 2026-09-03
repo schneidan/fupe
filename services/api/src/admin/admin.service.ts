@@ -1,7 +1,14 @@
-import { Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.constants';
 import { UserRow, UserRole } from '../auth/users.repository';
+import { TIER_LIMITS } from '../api-keys/api-keys.service';
 
 export interface AdminUserRow extends UserRow {
   api_key_count: number;
@@ -16,6 +23,18 @@ export interface AdminStats {
   total_api_keys: number;
 }
 
+export interface AdminApiKeyRow {
+  id: string;
+  name: string;
+  key_prefix: string;
+  tier: string;
+  rate_limit_daily: number;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  usage_today: number;
+}
+
 @Injectable()
 export class AdminService {
   constructor(@Inject(DATABASE_POOL) private readonly pool: Pool) {}
@@ -25,10 +44,11 @@ export class AdminService {
   async listUsers(params: {
     q?: string;
     role?: UserRole;
+    disabled?: boolean;
     page: number;
     limit: number;
   }): Promise<{ users: AdminUserRow[]; total: number }> {
-    const { q, role, page, limit } = params;
+    const { q, role, disabled, page, limit } = params;
     const offset = (page - 1) * limit;
 
     const conditions: string[] = [];
@@ -42,6 +62,11 @@ export class AdminService {
     if (role) {
       conditions.push(`u.role = $${i++}`);
       values.push(role);
+    }
+    if (disabled === true) {
+      conditions.push(`u.disabled_at IS NOT NULL`);
+    } else if (disabled === false) {
+      conditions.push(`u.disabled_at IS NULL`);
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -65,14 +90,42 @@ export class AdminService {
     return { users: rows, total: Number(countRes.rows[0]?.n ?? 0) };
   }
 
+  async getUser(userId: string): Promise<AdminUserRow> {
+    const { rows } = await this.pool.query<AdminUserRow>(
+      `SELECT u.*,
+              (SELECT count(*) FROM public.api_keys k WHERE k.user_id = u.id AND k.revoked_at IS NULL)::int AS api_key_count,
+              (SELECT count(*) FROM public.edits_queue e WHERE e.user_id = u.id AND e.status = 'PENDING')::int AS pending_edit_count
+         FROM public.users u
+        WHERE u.id = $1`,
+      [userId],
+    );
+    if (!rows[0]) throw new NotFoundException('User not found');
+    return rows[0];
+  }
+
   async updateUser(
+    actorId: string,
     userId: string,
     patch: {
       role?: UserRole;
       trust_score?: number;
       email_verified?: boolean;
+      disabled?: boolean;
     },
-  ): Promise<UserRow> {
+  ): Promise<AdminUserRow> {
+    if (Object.keys(patch).length === 0) {
+      throw new BadRequestException('No fields to update');
+    }
+
+    if (actorId === userId) {
+      if (patch.role && patch.role !== 'admin') {
+        throw new ForbiddenException('You cannot demote your own admin role');
+      }
+      if (patch.disabled === true) {
+        throw new ForbiddenException('You cannot disable your own account');
+      }
+    }
+
     const sets: string[] = [];
     const values: unknown[] = [userId];
     let i = 2;
@@ -94,41 +147,81 @@ export class AdminService {
         sets.push(`email_verified_at = NULL`);
       }
     }
+    if (patch.disabled !== undefined) {
+      sets.push(
+        patch.disabled
+          ? `disabled_at = COALESCE(disabled_at, now())`
+          : `disabled_at = NULL`,
+      );
+    }
 
     if (sets.length === 0) {
-      const { rows } = await this.pool.query<UserRow>(
-        'SELECT * FROM public.users WHERE id = $1',
-        [userId],
-      );
-      return rows[0];
+      return this.getUser(userId);
     }
 
     const { rows } = await this.pool.query<UserRow>(
       `UPDATE public.users SET ${sets.join(', ')} WHERE id = $1 RETURNING *`,
       values,
     );
-    return rows[0];
+    if (!rows[0]) throw new NotFoundException('User not found');
+
+    // Disabling should revoke active API keys so they stop working immediately
+    if (patch.disabled === true) {
+      await this.pool.query(
+        `UPDATE public.api_keys SET revoked_at = now()
+          WHERE user_id = $1 AND revoked_at IS NULL`,
+        [userId],
+      );
+    }
+
+    return this.getUser(userId);
   }
 
-  async getUserKeys(userId: string) {
-    const { rows } = await this.pool.query(
-      `SELECT k.*, 
-              (SELECT count(*) FROM public.api_usage_log l 
-               WHERE l.api_key_id = k.id 
-                 AND l.created_at >= date_trunc('day', now()))::int AS usage_today
-         FROM public.api_keys k 
-        WHERE k.user_id = $1 
+  async getUserKeys(userId: string): Promise<AdminApiKeyRow[]> {
+    await this.getUser(userId);
+    const { rows } = await this.pool.query<{
+      id: string;
+      name: string;
+      key_prefix: string;
+      tier: string;
+      rate_limit_daily: number;
+      last_used_at: Date | null;
+      revoked_at: Date | null;
+      created_at: Date;
+      usage_today: number;
+    }>(
+      `SELECT k.id, k.name, k.key_prefix, k.tier, k.rate_limit_daily,
+              k.last_used_at, k.revoked_at, k.created_at,
+              (SELECT count(*) FROM public.api_usage_log l
+                WHERE l.api_key_id = k.id
+                  AND l.created_at >= date_trunc('day', now()))::int AS usage_today
+         FROM public.api_keys k
+        WHERE k.user_id = $1
         ORDER BY k.created_at DESC`,
       [userId],
     );
-    return rows;
+
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      key_prefix: r.key_prefix,
+      tier: r.tier,
+      rate_limit_daily: r.rate_limit_daily ?? TIER_LIMITS.free,
+      last_used_at: r.last_used_at?.toISOString() ?? null,
+      revoked_at: r.revoked_at?.toISOString() ?? null,
+      created_at: r.created_at.toISOString(),
+      usage_today: r.usage_today,
+    }));
   }
 
   async revokeKeyAdmin(keyId: string) {
-    await this.pool.query(
-      `UPDATE public.api_keys SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`,
+    const { rows } = await this.pool.query(
+      `UPDATE public.api_keys SET revoked_at = now()
+        WHERE id = $1 AND revoked_at IS NULL
+        RETURNING id`,
       [keyId],
     );
+    if (!rows[0]) throw new NotFoundException('API key not found or already revoked');
   }
 
   // ─── Stats ────────────────────────────────────────────────────────────────
@@ -136,8 +229,8 @@ export class AdminService {
   async getStats(): Promise<AdminStats> {
     const { rows } = await this.pool.query<AdminStats>(`
       SELECT
-        (SELECT count(*)::int FROM public.users) AS total_users,
-        (SELECT count(*)::int FROM public.users WHERE email_verified_at IS NOT NULL) AS verified_users,
+        (SELECT count(*)::int FROM public.users WHERE disabled_at IS NULL) AS total_users,
+        (SELECT count(*)::int FROM public.users WHERE email_verified_at IS NOT NULL AND disabled_at IS NULL) AS verified_users,
         (SELECT count(*)::int FROM public.users WHERE subscription_tier IN ('developer','business') AND subscription_status = 'active') AS paid_subscribers,
         (SELECT count(*)::int FROM public.edits_queue WHERE status = 'PENDING') AS pending_edits,
         (SELECT count(*)::int FROM public.api_keys WHERE revoked_at IS NULL) AS total_api_keys
@@ -180,6 +273,15 @@ export class AdminService {
         RETURNING *`,
       [userId, tier],
     );
+    if (!rows[0]) throw new NotFoundException('User not found');
+
+    await this.pool.query(
+      `UPDATE public.api_keys
+          SET tier = $2, rate_limit_daily = $3
+        WHERE user_id = $1 AND revoked_at IS NULL`,
+      [userId, tier, TIER_LIMITS[tier]],
+    );
+
     return rows[0];
   }
 

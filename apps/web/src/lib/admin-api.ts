@@ -37,9 +37,22 @@ export interface AdminUser {
   subscription_tier: 'free' | 'developer' | 'business';
   subscription_status: string | null;
   stripe_customer_id: string | null;
+  disabled_at: string | null;
   api_key_count: number;
   pending_edit_count: number;
   created_at: string;
+}
+
+export interface AdminUserKey {
+  id: string;
+  name: string;
+  key_prefix: string;
+  tier: string;
+  rate_limit_daily: number;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  usage_today: number;
 }
 
 export interface AdminStats {
@@ -71,24 +84,38 @@ export interface AdminKeyUsage {
   blocked_today: number;
 }
 
+export type AdminUserPatch = {
+  role?: string;
+  trust_score?: number;
+  email_verified?: boolean;
+  disabled?: boolean;
+};
+
 // ── Endpoints ─────────────────────────────────────────────────────────────
 
 export function fetchAdminStats() {
   return adminFetch<AdminStats>('/stats');
 }
 
-export function fetchAdminUsers(params?: { q?: string; role?: string; page?: number }) {
+export function fetchAdminUsers(params?: {
+  q?: string;
+  role?: string;
+  disabled?: boolean;
+  page?: number;
+}) {
   const qs = new URLSearchParams();
   if (params?.q) qs.set('q', params.q);
   if (params?.role) qs.set('role', params.role);
+  if (params?.disabled !== undefined) qs.set('disabled', String(params.disabled));
   if (params?.page) qs.set('page', String(params.page));
   return adminFetch<{ users: AdminUser[]; total: number }>(`/users?${qs}`);
 }
 
-export function patchAdminUser(
-  id: string,
-  patch: { role?: string; trust_score?: number; email_verified?: boolean },
-) {
+export function fetchAdminUser(id: string) {
+  return adminFetch<AdminUser>(`/users/${id}`);
+}
+
+export function patchAdminUser(id: string, patch: AdminUserPatch) {
   return adminFetch<AdminUser>(`/users/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(patch),
@@ -96,7 +123,7 @@ export function patchAdminUser(
 }
 
 export function fetchUserKeys(userId: string) {
-  return adminFetch<{ id: string; name: string; key_prefix: string; tier: string; usage_today: number; revoked_at: string | null }[]>(`/users/${userId}/keys`);
+  return adminFetch<{ keys: AdminUserKey[] }>(`/users/${userId}/keys`);
 }
 
 export function revokeKeyAdmin(keyId: string) {

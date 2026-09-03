@@ -8,8 +8,8 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
-interface JwtPayload {
-  sub: string;
+export interface AdminJwtUser {
+  id: string;
   email: string;
   role: string;
 }
@@ -29,7 +29,7 @@ export class AdminGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<{
       headers: Record<string, string | undefined>;
-      adminUser?: JwtPayload;
+      adminUser?: AdminJwtUser;
     }>();
 
     const auth = req.headers['authorization'] ?? '';
@@ -39,21 +39,25 @@ export class AdminGuard implements CanActivate {
       throw new UnauthorizedException('Admin endpoints require a Bearer JWT');
     }
 
-    let payload: JwtPayload;
+    let raw: { id?: string; sub?: string; email?: string; role?: string };
     try {
-      payload = this.jwt.verify<JwtPayload>(token, {
+      raw = this.jwt.verify(token, {
         secret: this.config.get<string>('JWT_SECRET'),
       });
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
 
-    if (payload.role !== 'admin') {
+    const id = raw.id ?? raw.sub;
+    if (!id || raw.role !== 'admin') {
       throw new ForbiddenException('Admin role required');
     }
 
-    // Attach for use in controllers
-    req.adminUser = payload;
+    req.adminUser = {
+      id,
+      email: raw.email ?? '',
+      role: raw.role,
+    };
     return true;
   }
 }

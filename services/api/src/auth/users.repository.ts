@@ -17,6 +17,7 @@ export interface UserRow {
   subscription_status?: string | null;
   stripe_customer_id?: string | null;
   stripe_subscription_id?: string | null;
+  disabled_at?: Date | null;
   created_at: Date;
 }
 
