@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../services/auth_service.dart';
 import '../theme/fupe_theme.dart';
+import 'admin_routes.dart';
 import 'admin_section.dart';
 
 class AdminShellScreen extends StatelessWidget {
@@ -144,9 +145,7 @@ class _HubTile extends StatelessWidget {
               return;
             }
             Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => AdminSectionScreen(section: section),
-              ),
+              MaterialPageRoute(builder: (_) => adminSectionPage(section)),
             );
           },
           child: Padding(
@@ -191,7 +190,7 @@ class _HubTile extends StatelessWidget {
   }
 }
 
-/// Destination for hub tiles. Feature UIs land in 7.6.3.
+/// Deep-link destination with a role gate around the feature screen.
 class AdminSectionScreen extends StatelessWidget {
   const AdminSectionScreen({super.key, required this.section});
 
@@ -200,32 +199,24 @@ class AdminSectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
-    final allowed = section.canAccess(auth.user);
-
-    return Scaffold(
-      appBar: AppBar(title: Text(section.label)),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: allowed
-              ? Text(
-                  '${section.description} List and action UIs land next (7.6.3). AdminApiService already wraps the same /api/v1/admin and edits/queue endpoints as web.',
-                  style: const TextStyle(
-                    color: FupeColors.muted,
-                    fontSize: 15,
-                    height: 1.5,
-                  ),
-                )
-              : const Text(
-                  'Admin role required. Moderators can only open Contributions.',
-                  style: TextStyle(
-                    color: FupeColors.muted,
-                    fontSize: 15,
-                    height: 1.5,
-                  ),
-                ),
+    if (!section.canAccess(auth.user)) {
+      return Scaffold(
+        appBar: AppBar(title: Text(section.label)),
+        body: const SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Admin role required. Moderators can only open Contributions.',
+              style: TextStyle(
+                color: FupeColors.muted,
+                fontSize: 15,
+                height: 1.5,
+              ),
+            ),
+          ),
         ),
-      ),
-    );
+      );
+    }
+    return adminSectionPage(section);
   }
 }

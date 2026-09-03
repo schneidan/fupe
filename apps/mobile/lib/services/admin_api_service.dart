@@ -109,6 +109,9 @@ class AdminApiService {
     String token, {
     String status = 'PENDING',
     String? kind,
+    String? submitter,
+    String? from,
+    String? to,
     int page = 1,
   }) async {
     final uri = Uri.parse('$baseUrl/api/v1/edits/queue').replace(
@@ -116,6 +119,9 @@ class AdminApiService {
         'status': status,
         'page': '$page',
         if (kind != null && kind.isNotEmpty) 'kind': kind,
+        if (submitter != null && submitter.isNotEmpty) 'submitter': submitter,
+        if (from != null && from.isNotEmpty) 'from': from,
+        if (to != null && to.isNotEmpty) 'to': to,
       },
     );
     final data = _json(
@@ -281,6 +287,9 @@ class AdminUserRow {
   final String? disabledAt;
   final int apiKeyCount;
   final String createdAt;
+
+  bool get emailVerified => emailVerifiedAt != null && emailVerifiedAt!.isNotEmpty;
+  bool get disabled => disabledAt != null && disabledAt!.isNotEmpty;
 
   factory AdminUserRow.fromJson(Map<String, dynamic> json) {
     return AdminUserRow(

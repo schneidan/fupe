@@ -43,7 +43,7 @@ flutter run --dart-define=API_URL=http://192.168.1.10:3000
 
 - **Ask** — “Is ___ owned by PE?” + barcode/photo lookup
 - **Browse** — searchable directory; tap opens the YES/NO result for that entity
-- **Contribute** — sign in, suggest edits, propose entities; staff see **Admin**
+- **Contribute** — sign in, suggest edits, propose entities; staff see **Admin** (full hub on device)
 
 ## Deep links
 

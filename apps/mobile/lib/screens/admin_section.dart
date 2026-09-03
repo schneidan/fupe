@@ -19,7 +19,8 @@ enum AdminSection {
         AdminSection.dashboard => 'Counts for edits, users, and paid subs.',
         AdminSection.users => 'Roles, trust, verification, and keys.',
         AdminSection.contributions => 'Approve or reject pending edits.',
-        AdminSection.subscriptions => 'Tiers, period end, complimentary upgrades.',
+        AdminSection.subscriptions =>
+          'Tiers, period end, complimentary upgrades.',
         AdminSection.usage => 'Requests, IMAGE blocks, rate-limit hits.',
       };
 
