@@ -44,6 +44,20 @@ const TRUST_AUTO_COMMIT_THRESHOLD = 50;
 const MAX_PENDING_EDITS = 5;
 const TRUST_ON_APPROVE = 5;
 const TRUST_ON_REJECT = -10;
+/** Rejected edits can be reopened to PENDING within this window. */
+const REOPEN_WINDOW_MS = 1000 * 60 * 60 * 48;
+
+export type EditKind = 'ownership' | 'create_entity' | 'other';
+
+export interface QueueListFilters {
+  status?: EditStatus | 'ALL';
+  kind?: EditKind;
+  submitter?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}
 
 @Injectable()
 export class EditsService {
@@ -97,14 +111,96 @@ export class EditsService {
   }
 
   async listPending() {
-    const { rows } = await this.pool.query(
-      `SELECT eq.*, u.email AS submitter_email, u.trust_score AS submitter_trust
+    return this.listQueue({ status: 'PENDING', page: 1, limit: 200 });
+  }
+
+  async listQueue(filters: QueueListFilters = {}) {
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(200, Math.max(1, filters.limit ?? 50));
+    const offset = (page - 1) * limit;
+
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+    let i = 1;
+
+    const status = filters.status ?? 'PENDING';
+    if (status !== 'ALL') {
+      conditions.push(`eq.status = $${i++}`);
+      values.push(status);
+    }
+
+    if (filters.kind === 'create_entity') {
+      conditions.push(`eq.proposed_data ? 'create_entity'`);
+    } else if (filters.kind === 'ownership') {
+      conditions.push(
+        `(eq.proposed_data ? 'ownership' OR eq.proposed_data ? 'new_parent')`,
+      );
+      conditions.push(`NOT (eq.proposed_data ? 'create_entity')`);
+    } else if (filters.kind === 'other') {
+      conditions.push(`NOT (eq.proposed_data ? 'create_entity')`);
+      conditions.push(
+        `NOT (eq.proposed_data ? 'ownership') AND NOT (eq.proposed_data ? 'new_parent')`,
+      );
+    }
+
+    if (filters.submitter?.trim()) {
+      conditions.push(`u.email ILIKE $${i++}`);
+      values.push(`%${filters.submitter.trim()}%`);
+    }
+
+    if (filters.from) {
+      conditions.push(`eq.created_at >= $${i++}::timestamptz`);
+      values.push(filters.from);
+    }
+    if (filters.to) {
+      conditions.push(`eq.created_at < ($${i++}::date + interval '1 day')`);
+      values.push(filters.to);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const countRes = await this.pool.query<{ n: string }>(
+      `SELECT count(*)::text AS n
        FROM public.edits_queue eq
        JOIN public.users u ON u.id = eq.user_id
-       WHERE eq.status = 'PENDING'
-       ORDER BY eq.created_at ASC`,
+       ${where}`,
+      values,
     );
-    return { edits: rows };
+
+    const { rows } = await this.pool.query(
+      `SELECT eq.*,
+              u.email AS submitter_email,
+              u.trust_score AS submitter_trust,
+              r.email AS reviewer_email,
+              CASE
+                WHEN eq.proposed_data ? 'create_entity' THEN 'create_entity'
+                WHEN eq.proposed_data ? 'ownership' OR eq.proposed_data ? 'new_parent' THEN 'ownership'
+                ELSE 'other'
+              END AS edit_kind,
+              CASE
+                WHEN eq.status = 'REJECTED'
+                 AND eq.reviewed_at IS NOT NULL
+                 AND eq.reviewed_at > now() - interval '48 hours'
+                THEN true
+                ELSE false
+              END AS can_reopen
+       FROM public.edits_queue eq
+       JOIN public.users u ON u.id = eq.user_id
+       LEFT JOIN public.users r ON r.id = eq.reviewer_id
+       ${where}
+       ORDER BY
+         CASE WHEN eq.status = 'PENDING' THEN 0 ELSE 1 END,
+         COALESCE(eq.reviewed_at, eq.created_at) DESC
+       LIMIT $${i++} OFFSET $${i}`,
+      [...values, limit, offset],
+    );
+
+    return {
+      edits: rows,
+      total: Number(countRes.rows[0]?.n ?? 0),
+      page,
+      limit,
+    };
   }
 
   async listMine(userId: string, status?: EditStatus) {
@@ -130,9 +226,15 @@ export class EditsService {
     reviewer: AuthUser,
     editId: string,
     decision: 'APPROVED' | 'REJECTED',
+    reviewNote?: string,
   ) {
     if (!this.authService.isModerator(reviewer)) {
       throw new ForbiddenException('Moderator role required to review edits');
+    }
+
+    const note = reviewNote?.trim() || null;
+    if (note && note.length > 2000) {
+      throw new BadRequestException('review_note must be ≤ 2000 characters');
     }
 
     const { rows } = await this.pool.query(
@@ -140,7 +242,7 @@ export class EditsService {
       [editId],
     );
     const edit = rows[0];
-    if (!edit) throw new NotFoundException('Edit not found');
+    if (!edit) throw new NotFoundException('Edit not found or already reviewed');
 
     if (decision === 'APPROVED') {
       await this.commitEdit(edit.user_id, {
@@ -155,10 +257,62 @@ export class EditsService {
 
     const { rows: updated } = await this.pool.query(
       `UPDATE public.edits_queue
-       SET status = $1, reviewer_id = $2, reviewed_at = now()
-       WHERE id = $3
+       SET status = $1,
+           reviewer_id = $2,
+           reviewed_at = now(),
+           review_note = $3
+       WHERE id = $4
        RETURNING *`,
-      [decision, reviewer.id, editId],
+      [decision, reviewer.id, note, editId],
+    );
+
+    return updated[0];
+  }
+
+  /**
+   * Re-open a REJECTED edit back to PENDING within the undo window.
+   * Reverses the rejection trust penalty. Approved commits are not undone.
+   */
+  async reopenEdit(reviewer: AuthUser, editId: string) {
+    if (!this.authService.isModerator(reviewer)) {
+      throw new ForbiddenException('Moderator role required to reopen edits');
+    }
+
+    const { rows } = await this.pool.query(
+      `SELECT * FROM public.edits_queue WHERE id = $1`,
+      [editId],
+    );
+    const edit = rows[0];
+    if (!edit) throw new NotFoundException('Edit not found');
+    if (edit.status !== 'REJECTED') {
+      throw new BadRequestException(
+        'Only rejected edits can be reopened (approved commits stay in the graph)',
+      );
+    }
+    if (!edit.reviewed_at) {
+      throw new BadRequestException('Edit has no review timestamp');
+    }
+    const reviewedAt = new Date(edit.reviewed_at).getTime();
+    if (Date.now() - reviewedAt > REOPEN_WINDOW_MS) {
+      throw new BadRequestException(
+        'Reopen window expired (48 hours after rejection)',
+      );
+    }
+
+    await this.usersRepo.adjustTrustScore(edit.user_id, -TRUST_ON_REJECT);
+
+    const { rows: updated } = await this.pool.query(
+      `UPDATE public.edits_queue
+       SET status = 'PENDING',
+           reviewer_id = NULL,
+           reviewed_at = NULL,
+           review_note = COALESCE(review_note, '') || CASE
+             WHEN review_note IS NULL OR review_note = '' THEN '[reopened]'
+             ELSE E'\n[reopened]'
+           END
+       WHERE id = $1
+       RETURNING *`,
+      [editId],
     );
 
     return updated[0];

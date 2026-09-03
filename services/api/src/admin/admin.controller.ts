@@ -67,6 +67,17 @@ class OverrideTierBody {
   @IsEnum(['free', 'developer', 'business']) tier!: 'free' | 'developer' | 'business';
 }
 
+class ResolveIngestBody {
+  @IsEnum(['accepted', 'rejected', 'merged'])
+  decision!: 'accepted' | 'rejected' | 'merged';
+}
+
+class IngestListQuery {
+  @IsOptional() @IsString() status?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number = 1;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) limit?: number = 50;
+}
+
 @ApiTags('Admin')
 @ApiBearerAuth('bearer')
 @ApiSecurity('bearer')
@@ -157,5 +168,26 @@ export class AdminController {
       page: query.page ?? 1,
       limit: query.limit ?? 50,
     });
+  }
+
+  // ── Ingest match queue ────────────────────────────────────────────────────
+
+  @Get('ingest-matches')
+  @ApiOperation({ summary: 'List ingest dedupe review queue' })
+  listIngestMatches(@Query() query: IngestListQuery) {
+    return this.adminService.listIngestMatches({
+      status: query.status ?? 'pending',
+      page: query.page ?? 1,
+      limit: query.limit ?? 50,
+    });
+  }
+
+  @Post('ingest-matches/:id/resolve')
+  @ApiOperation({ summary: 'Resolve an ingest match (accept / reject / merged)' })
+  resolveIngestMatch(
+    @Param('id') id: string,
+    @Body() { decision }: ResolveIngestBody,
+  ) {
+    return this.adminService.resolveIngestMatch(id, decision);
   }
 }

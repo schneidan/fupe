@@ -153,9 +153,25 @@ export interface QueueEdit {
   status: EditStatus;
   reviewer_id?: string | null;
   reviewed_at?: string | null;
+  review_note?: string | null;
   created_at: string;
   submitter_email?: string;
   submitter_trust?: number;
+  reviewer_email?: string | null;
+  edit_kind?: 'ownership' | 'create_entity' | 'other';
+  can_reopen?: boolean;
+}
+
+export type EditKindFilter = 'ownership' | 'create_entity' | 'other';
+
+export interface EditQueueFilters {
+  status?: EditStatus | 'ALL';
+  kind?: EditKindFilter;
+  submitter?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface SubmitEditResponse {
@@ -211,18 +227,45 @@ export async function listMyEdits(
 
 export async function listEditQueue(
   token: string,
-): Promise<{ edits: QueueEdit[] }> {
-  return authJson('/api/v1/edits/queue', { method: 'GET', token });
+  filters: EditQueueFilters = {},
+): Promise<{ edits: QueueEdit[]; total: number; page: number; limit: number }> {
+  const qs = new URLSearchParams();
+  if (filters.status) qs.set('status', filters.status);
+  if (filters.kind) qs.set('kind', filters.kind);
+  if (filters.submitter) qs.set('submitter', filters.submitter);
+  if (filters.from) qs.set('from', filters.from);
+  if (filters.to) qs.set('to', filters.to);
+  if (filters.page) qs.set('page', String(filters.page));
+  if (filters.limit) qs.set('limit', String(filters.limit));
+  const q = qs.toString();
+  return authJson(`/api/v1/edits/queue${q ? `?${q}` : ''}`, {
+    method: 'GET',
+    token,
+  });
 }
 
 export async function reviewEdit(
   token: string,
   id: string,
   decision: 'APPROVED' | 'REJECTED',
+  reviewNote?: string,
 ): Promise<QueueEdit> {
   return authJson(`/api/v1/edits/${encodeURIComponent(id)}/review`, {
     method: 'PATCH',
     token,
-    body: JSON.stringify({ decision }),
+    body: JSON.stringify({
+      decision,
+      ...(reviewNote?.trim() ? { review_note: reviewNote.trim() } : {}),
+    }),
+  });
+}
+
+export async function reopenEdit(
+  token: string,
+  id: string,
+): Promise<QueueEdit> {
+  return authJson(`/api/v1/edits/${encodeURIComponent(id)}/reopen`, {
+    method: 'POST',
+    token,
   });
 }

@@ -307,4 +307,52 @@ export class AdminService {
     );
     return { usage: rows };
   }
+
+  // ─── Ingest match queue ───────────────────────────────────────────────────
+
+  async listIngestMatches(params: {
+    status?: string;
+    page: number;
+    limit: number;
+  }) {
+    const status = params.status ?? 'pending';
+    const offset = (params.page - 1) * params.limit;
+
+    const countRes = await this.pool.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM public.ingest_match_queue WHERE status = $1`,
+      [status],
+    );
+
+    const { rows } = await this.pool.query(
+      `SELECT id, incoming_entity, candidate_entity_id, candidate_name, score,
+              match_reason, status, source_id, ingestion_run_id, created_at, resolved_at
+         FROM public.ingest_match_queue
+        WHERE status = $1
+        ORDER BY created_at ASC
+        LIMIT $2 OFFSET $3`,
+      [status, params.limit, offset],
+    );
+
+    return {
+      matches: rows,
+      total: Number(countRes.rows[0]?.n ?? 0),
+    };
+  }
+
+  async resolveIngestMatch(
+    id: string,
+    decision: 'accepted' | 'rejected' | 'merged',
+  ) {
+    const { rows } = await this.pool.query(
+      `UPDATE public.ingest_match_queue
+          SET status = $2, resolved_at = now()
+        WHERE id = $1 AND status = 'pending'
+        RETURNING *`,
+      [id, decision],
+    );
+    if (!rows[0]) {
+      throw new NotFoundException('Ingest match not found or already resolved');
+    }
+    return rows[0];
+  }
 }

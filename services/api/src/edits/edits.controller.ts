@@ -10,11 +10,27 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { IsEnum, IsObject, IsOptional, IsString, IsUrl } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthService, AuthUser } from '../auth/auth.service';
 import { SkipApiKey } from '../api-keys/api-key.decorators';
-import { EditStatus, EditsService, ProposedEditData } from './edits.service';
+import {
+  EditKind,
+  EditStatus,
+  EditsService,
+  ProposedEditData,
+} from './edits.service';
 
 class SubmitEditBody {
   @IsOptional()
@@ -32,12 +48,52 @@ class SubmitEditBody {
 class ReviewEditBody {
   @IsEnum(['APPROVED', 'REJECTED'])
   decision!: 'APPROVED' | 'REJECTED';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  review_note?: string;
 }
 
 class ListMineQuery {
   @IsOptional()
   @IsEnum(['PENDING', 'APPROVED', 'REJECTED'])
   status?: EditStatus;
+}
+
+class ListQueueQuery {
+  @IsOptional()
+  @IsEnum(['PENDING', 'APPROVED', 'REJECTED', 'ALL'])
+  status?: EditStatus | 'ALL';
+
+  @IsOptional()
+  @IsEnum(['ownership', 'create_entity', 'other'])
+  kind?: EditKind;
+
+  @IsOptional()
+  @IsString()
+  submitter?: string;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number;
 }
 
 @Controller('edits')
@@ -63,19 +119,37 @@ export class EditsController {
   }
 
   @Get('queue')
-  listQueue(@Req() req: { user: AuthUser }) {
+  listQueue(@Req() req: { user: AuthUser }, @Query() query: ListQueueQuery) {
     if (!this.authService.isModerator(req.user)) {
       throw new ForbiddenException('Moderator role required');
     }
-    return this.editsService.listPending();
+    return this.editsService.listQueue({
+      status: query.status ?? 'PENDING',
+      kind: query.kind,
+      submitter: query.submitter,
+      from: query.from,
+      to: query.to,
+      page: query.page ?? 1,
+      limit: query.limit ?? 50,
+    });
   }
 
   @Patch(':id/review')
   review(
     @Req() req: { user: AuthUser },
     @Param('id') id: string,
-    @Body() { decision }: ReviewEditBody,
+    @Body() body: ReviewEditBody,
   ) {
-    return this.editsService.reviewEdit(req.user, id, decision);
+    return this.editsService.reviewEdit(
+      req.user,
+      id,
+      body.decision,
+      body.review_note,
+    );
+  }
+
+  @Post(':id/reopen')
+  reopen(@Req() req: { user: AuthUser }, @Param('id') id: string) {
+    return this.editsService.reopenEdit(req.user, id);
   }
 }

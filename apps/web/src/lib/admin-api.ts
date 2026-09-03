@@ -148,3 +148,34 @@ export function fetchUsageSummary(params?: { page?: number }) {
   if (params?.page) qs.set('page', String(params.page));
   return adminFetch<{ usage: AdminKeyUsage[] }>(`/usage?${qs}`);
 }
+
+export interface IngestMatch {
+  id: string;
+  incoming_entity: Record<string, unknown>;
+  candidate_entity_id: string | null;
+  candidate_name: string | null;
+  score: number;
+  match_reason: string;
+  status: string;
+  source_id: string | null;
+  created_at: string;
+}
+
+export function fetchIngestMatches(params?: { status?: string; page?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set('status', params.status);
+  if (params?.page) qs.set('page', String(params.page));
+  return adminFetch<{ matches: IngestMatch[]; total: number }>(
+    `/ingest-matches?${qs}`,
+  );
+}
+
+export function resolveIngestMatch(
+  id: string,
+  decision: 'accepted' | 'rejected' | 'merged',
+) {
+  return adminFetch<IngestMatch>(`/ingest-matches/${id}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify({ decision }),
+  });
+}
