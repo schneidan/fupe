@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'navigation/deep_links.dart';
 import 'screens/shell_screen.dart';
 import 'services/api_service.dart';
+import 'services/admin_api_service.dart';
 import 'services/auth_service.dart';
 import 'theme/fupe_theme.dart';
 
@@ -35,6 +36,7 @@ void main() {
     MultiProvider(
       providers: [
         Provider(create: (_) => ApiService(baseUrl: baseUrl)),
+        Provider(create: (_) => AdminApiService(baseUrl: baseUrl)),
         ChangeNotifierProvider.value(value: auth),
       ],
       child: const FupeApp(),

@@ -1,7 +1,8 @@
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 
-import '../screens/admin_entry_screen.dart';
+import '../screens/admin_section.dart';
+import '../screens/admin_shell_screen.dart';
 import '../screens/result_screen.dart';
 
 /// Parses `fupe://entity/panera-bread` style URIs.
@@ -14,12 +15,23 @@ String? entitySlugFromUri(Uri uri) {
   return Uri.decodeComponent(segments.first);
 }
 
-/// `fupe://admin` (and `fupe://admin/…` for later hub routes).
+/// `fupe://admin` (and `fupe://admin/users` etc.).
 bool isAdminDeepLink(Uri uri) {
   if (uri.scheme != 'fupe') return false;
   if (uri.host == 'admin') return true;
   final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
   return uri.host.isEmpty && segments.isNotEmpty && segments.first == 'admin';
+}
+
+AdminSection? adminSectionFromUri(Uri uri) {
+  if (!isAdminDeepLink(uri)) return null;
+  if (uri.host == 'admin') {
+    final segs = uri.pathSegments.where((s) => s.isNotEmpty);
+    return segs.isEmpty ? null : AdminSection.tryParse(segs.first);
+  }
+  final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+  if (segments.length >= 2) return AdminSection.tryParse(segments[1]);
+  return null;
 }
 
 /// Opens the YES/NO lookup result for an entity slug.
@@ -31,12 +43,12 @@ void openEntityResult(BuildContext context, {required String slug}) {
   );
 }
 
-void openAdminEntry(BuildContext context) {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => const AdminEntryScreen(),
-    ),
-  );
+void openAdminShell(BuildContext context, {AdminSection? section}) {
+  final nav = Navigator.of(context);
+  nav.push(MaterialPageRoute(builder: (_) => const AdminShellScreen()));
+  if (section != null) {
+    nav.push(MaterialPageRoute(builder: (_) => AdminSectionScreen(section: section)));
+  }
 }
 
 class DeepLinkListener extends StatefulWidget {
@@ -73,12 +85,16 @@ class _DeepLinkListenerState extends State<DeepLinkListener> {
 
   void _handle(Uri uri) {
     if (isAdminDeepLink(uri)) {
+      final section = adminSectionFromUri(uri);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        widget.navigatorKey.currentState?.push(
-          MaterialPageRoute(
-            builder: (_) => const AdminEntryScreen(),
-          ),
-        );
+        final nav = widget.navigatorKey.currentState;
+        if (nav == null) return;
+        nav.push(MaterialPageRoute(builder: (_) => const AdminShellScreen()));
+        if (section != null) {
+          nav.push(
+            MaterialPageRoute(builder: (_) => AdminSectionScreen(section: section)),
+          );
+        }
       });
       return;
     }

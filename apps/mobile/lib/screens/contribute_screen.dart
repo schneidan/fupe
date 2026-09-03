@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../theme/fupe_theme.dart';
-import 'admin_entry_screen.dart';
+import 'admin_shell_screen.dart';
 import 'suggest_edit_screen.dart';
 import 'propose_entity_screen.dart';
 
@@ -128,7 +128,7 @@ class _ContributeScreenState extends State<ContributeScreen> {
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const AdminEntryScreen(),
+                      builder: (_) => const AdminShellScreen(),
                     ),
                   );
                 },

@@ -53,10 +53,11 @@ Open the YES/NO result for an entity:
 fupe://entity/panera-bread
 ```
 
-Open staff admin discovery (role-gated; non-staff see no Contribute Admin button):
+Open the staff admin hub (role-gated; non-staff see no Contribute Admin button):
 
 ```
 fupe://admin
+fupe://admin/contributions
 ```
 
 Simulator test (iOS):
