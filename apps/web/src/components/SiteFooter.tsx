@@ -18,6 +18,13 @@ export function SiteFooter() {
           Contribute
         </Link>
         <span className="hidden text-fupe-border sm:inline">|</span>
+        <Link
+          href="/developers"
+          className="text-fupe-text transition hover:text-fupe-muted"
+        >
+          Developers
+        </Link>
+        <span className="hidden text-fupe-border sm:inline">|</span>
         <span>
           Ownership data is sourced from public records &amp; community edits.
           Not legal or financial advice.

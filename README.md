@@ -103,7 +103,24 @@ curl -H "X-API-Key: fupe_…" -H "Content-Type: application/json" \
   http://localhost:3000/api/v1/lookup
 ```
 
-Keyed requests are written to `api_usage_log`. Daily tier limits land in Phase 6.2 with Stripe.
+Keyed requests are written to `api_usage_log`. Daily tier limits and Stripe Checkout are Phase 6.2.
+
+### Billing tiers (Phase 6.2)
+
+| Tier | Price | Limit | IMAGE |
+|------|-------|-------|-------|
+| Free | $0 | 100/day | no |
+| Developer | $9/mo | 10k/day | yes |
+| Business | custom | 100k/day | yes |
+
+Sign in at [`/developers`](http://localhost:3001/developers) → create a key → Upgrade (Stripe Test mode).
+
+```bash
+# Local webhook forwarding
+stripe listen --forward-to localhost:3000/api/v1/billing/webhook
+```
+
+Env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_DEVELOPER` (see `services/api/.env.example`).
 
 **Trust rules:**
 - `trust_score > 50` → ownership edits auto-commit to graph + `audit_logs` + `wiki_revisions`

@@ -10,6 +10,7 @@ import {
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { AuthUser } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UsersRepository } from '../auth/users.repository';
 import { SkipApiKey } from './api-key.decorators';
 import { ApiKeysService } from './api-keys.service';
 
@@ -24,17 +25,22 @@ class CreateApiKeyBody {
 @SkipApiKey()
 @UseGuards(JwtAuthGuard)
 export class ApiKeysController {
-  constructor(private readonly apiKeys: ApiKeysService) {}
+  constructor(
+    private readonly apiKeys: ApiKeysService,
+    private readonly users: UsersRepository,
+  ) {}
 
   @Post()
   async create(
     @Req() req: { user: AuthUser },
     @Body() body: CreateApiKeyBody,
   ) {
+    const user = await this.users.findById(req.user.id);
+    const tier = user?.subscription_tier ?? 'free';
     const { key, rawKey } = await this.apiKeys.createKey(
       req.user.id,
       body.name ?? 'Default',
-      'free',
+      tier,
     );
     return {
       key,

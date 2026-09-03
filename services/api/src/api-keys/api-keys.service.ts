@@ -5,6 +5,18 @@ import { DATABASE_POOL } from '../database/database.constants';
 
 export type ApiKeyTier = 'free' | 'developer' | 'business';
 
+export const TIER_LIMITS: Record<ApiKeyTier, number> = {
+  free: 100,
+  developer: 10_000,
+  business: 100_000,
+};
+
+export const TIER_ALLOWS_IMAGE: Record<ApiKeyTier, boolean> = {
+  free: false,
+  developer: true,
+  business: true,
+};
+
 export interface ApiKeyRow {
   id: string;
   user_id: string;
@@ -37,12 +49,6 @@ export interface ApiKeyPublic {
   created_at: string;
 }
 
-const TIER_LIMITS: Record<ApiKeyTier, number> = {
-  free: 100,
-  developer: 10_000,
-  business: 100_000,
-};
-
 @Injectable()
 export class ApiKeysService {
   constructor(@Inject(DATABASE_POOL) private readonly pool: Pool) {}
@@ -62,7 +68,14 @@ export class ApiKeysService {
        )
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [userId, name.trim() || 'Default', keyPrefix, keyHash, tier, TIER_LIMITS[tier]],
+      [
+        userId,
+        name.trim() || 'Default',
+        keyPrefix,
+        keyHash,
+        tier,
+        TIER_LIMITS[tier],
+      ],
     );
 
     return {
@@ -147,6 +160,16 @@ export class ApiKeysService {
       [apiKeyId],
     );
     return Number(rows[0]?.n ?? 0);
+  }
+
+  /** Sync all of a user's keys to a subscription tier (Stripe webhook). */
+  async setTierForUser(userId: string, tier: ApiKeyTier): Promise<void> {
+    await this.pool.query(
+      `UPDATE public.api_keys
+       SET tier = $2, rate_limit_daily = $3
+       WHERE user_id = $1 AND revoked_at IS NULL`,
+      [userId, tier, TIER_LIMITS[tier]],
+    );
   }
 
   private generateRawKey(): string {

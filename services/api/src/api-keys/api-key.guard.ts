@@ -1,6 +1,8 @@
 import {
   CanActivate,
   ExecutionContext,
+  HttpException,
+  HttpStatus,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -51,13 +53,21 @@ export class ApiKeyGuard implements CanActivate {
           'API key required. Pass X-API-Key or Authorization: Bearer fupe_…',
         );
       }
-      // First-party web/mobile: no key yet (Phase 6.1).
+      // First-party web/mobile: no key yet.
       return true;
     }
 
     const key = await this.apiKeys.findByRawKey(raw);
     if (!key) {
       throw new UnauthorizedException('Invalid or revoked API key');
+    }
+
+    const used = await this.apiKeys.countUsageToday(key.id);
+    if (used >= key.rateLimitDaily) {
+      throw new HttpException(
+        `Daily rate limit exceeded (${key.rateLimitDaily}/day for ${key.tier} tier). Upgrade at /developers.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
 
     req.apiKey = key;

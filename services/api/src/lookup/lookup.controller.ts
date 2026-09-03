@@ -1,11 +1,13 @@
 import {
   Body,
   Controller,
-  Get,
+  ForbiddenException,
   Post,
-  Query,
+  Req,
   UploadedFile,
   UseInterceptors,
+  Get,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -15,6 +17,8 @@ import {
   IsString,
   ValidateIf,
 } from 'class-validator';
+import { RequestWithApiKey } from '../api-keys/api-key.guard';
+import { TIER_ALLOWS_IMAGE } from '../api-keys/api-keys.service';
 import { LookupInputType, LookupService } from './lookup.service';
 
 class UnifiedLookupDto {
@@ -54,9 +58,18 @@ export class LookupController {
   @Post()
   @UseInterceptors(FileInterceptor('file'))
   async lookup(
+    @Req() req: RequestWithApiKey,
     @Body() body: UnifiedLookupDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
+    if (body.type === 'IMAGE' && req.apiKey) {
+      if (!TIER_ALLOWS_IMAGE[req.apiKey.tier]) {
+        throw new ForbiddenException(
+          'IMAGE lookup requires Developer or Business tier. Upgrade at /developers.',
+        );
+      }
+    }
+
     const input = this.toLookupInput(body, file);
     return this.lookupService.resolve(input);
   }

@@ -13,6 +13,10 @@ export interface UserRow {
   email_verified_at: Date | null;
   email_verify_token: string | null;
   email_verify_expires_at: Date | null;
+  subscription_tier?: 'free' | 'developer' | 'business';
+  subscription_status?: string | null;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
   created_at: Date;
 }
 
@@ -111,5 +115,46 @@ export class UsersRepository {
       [userId, delta],
     );
     return rows[0]?.trust_score ?? 0;
+  }
+
+  async findByStripeCustomerId(customerId: string): Promise<UserRow | null> {
+    const { rows } = await this.pool.query<UserRow>(
+      `SELECT * FROM public.users WHERE stripe_customer_id = $1`,
+      [customerId],
+    );
+    return rows[0] ?? null;
+  }
+
+  async setStripeCustomerId(
+    userId: string,
+    customerId: string,
+  ): Promise<void> {
+    await this.pool.query(
+      `UPDATE public.users SET stripe_customer_id = $2 WHERE id = $1`,
+      [userId, customerId],
+    );
+  }
+
+  async setSubscription(params: {
+    userId: string;
+    tier: 'free' | 'developer' | 'business';
+    status: string | null;
+    subscriptionId: string | null;
+  }): Promise<UserRow> {
+    const { rows } = await this.pool.query<UserRow>(
+      `UPDATE public.users
+       SET subscription_tier = $2,
+           subscription_status = $3,
+           stripe_subscription_id = $4
+       WHERE id = $1
+       RETURNING *`,
+      [
+        params.userId,
+        params.tier,
+        params.status,
+        params.subscriptionId,
+      ],
+    );
+    return rows[0];
   }
 }
