@@ -274,6 +274,13 @@ export function AdminSubscriptionsPanel() {
         <h2 className="text-sm font-semibold uppercase tracking-wider text-fupe-muted">
           Recent tier overrides
         </h2>
+        <p className="mt-1 text-xs text-fupe-muted">
+          Full log at{' '}
+          <a href="/admin/audit" className="text-fupe-text hover:underline">
+            Audit
+          </a>
+          .
+        </p>
         {audit.length === 0 ? (
           <p className="mt-2 text-sm text-fupe-muted">None yet.</p>
         ) : (
@@ -283,7 +290,7 @@ export function AdminSubscriptionsPanel() {
                 <p className="text-fupe-text">
                   <span className="font-mono text-xs">{e.actor_email ?? 'unknown'}</span>
                   {' '}
-                  {e.previous_state?.subscription_tier ?? '?'} → {e.new_state?.subscription_tier ?? '?'}
+                  {String(e.previous_state?.subscription_tier ?? '?')} → {String(e.new_state?.subscription_tier ?? '?')}
                 </p>
                 <p className="text-xs text-fupe-muted">
                   {new Date(e.created_at).toLocaleString()}

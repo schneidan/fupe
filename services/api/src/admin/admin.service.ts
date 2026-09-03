@@ -10,6 +10,7 @@ import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.constants';
 import { UserRow, UserRole } from '../auth/users.repository';
 import { TIER_LIMITS } from '../api-keys/api-keys.service';
+import { writeAdminAudit } from './audit-log';
 
 const WEBHOOK_STALE_MS = 48 * 60 * 60 * 1000;
 
@@ -21,9 +22,14 @@ export interface AdminUserRow extends UserRow {
 export interface AdminStats {
   total_users: number;
   verified_users: number;
+  new_users_24h: number;
+  new_users_7d: number;
   paid_subscribers: number;
   pending_edits: number;
+  pending_ingest_matches: number;
   total_api_keys: number;
+  requests_today: number;
+  audit_actions_7d: number;
 }
 
 export interface AdminApiKeyRow {
@@ -189,11 +195,33 @@ export class AdminService {
       return this.getUser(userId);
     }
 
+    const previous = await this.getUser(userId);
+
     const { rows } = await this.pool.query<UserRow>(
       `UPDATE public.users SET ${sets.join(', ')} WHERE id = $1 RETURNING *`,
       values,
     );
     if (!rows[0]) throw new NotFoundException('User not found');
+
+    const updated = rows[0];
+    await writeAdminAudit(this.pool, {
+      actorId,
+      action: 'user_update',
+      targetType: 'user',
+      targetId: userId,
+      previousState: {
+        role: previous.role,
+        trust_score: previous.trust_score,
+        email_verified: Boolean(previous.email_verified_at),
+        disabled: Boolean(previous.disabled_at),
+      },
+      newState: {
+        role: updated.role,
+        trust_score: updated.trust_score,
+        email_verified: Boolean(updated.email_verified_at),
+        disabled: Boolean(updated.disabled_at),
+      },
+    });
 
     // Disabling should revoke active API keys so they stop working immediately
     if (patch.disabled === true) {
@@ -244,14 +272,22 @@ export class AdminService {
     }));
   }
 
-  async revokeKeyAdmin(keyId: string) {
-    const { rows } = await this.pool.query(
+  async revokeKeyAdmin(actorId: string, keyId: string) {
+    const { rows } = await this.pool.query<{ id: string; user_id: string; key_prefix: string }>(
       `UPDATE public.api_keys SET revoked_at = now()
         WHERE id = $1 AND revoked_at IS NULL
-        RETURNING id`,
+        RETURNING id, user_id, key_prefix`,
       [keyId],
     );
     if (!rows[0]) throw new NotFoundException('API key not found or already revoked');
+    await writeAdminAudit(this.pool, {
+      actorId,
+      action: 'key_revoke',
+      targetType: 'api_key',
+      targetId: keyId,
+      previousState: { revoked: false, user_id: rows[0].user_id },
+      newState: { revoked: true, key_prefix: rows[0].key_prefix },
+    });
   }
 
   // ─── Stats ────────────────────────────────────────────────────────────────
@@ -261,9 +297,14 @@ export class AdminService {
       SELECT
         (SELECT count(*)::int FROM public.users WHERE disabled_at IS NULL) AS total_users,
         (SELECT count(*)::int FROM public.users WHERE email_verified_at IS NOT NULL AND disabled_at IS NULL) AS verified_users,
+        (SELECT count(*)::int FROM public.users WHERE created_at >= now() - interval '24 hours') AS new_users_24h,
+        (SELECT count(*)::int FROM public.users WHERE created_at >= now() - interval '7 days') AS new_users_7d,
         (SELECT count(*)::int FROM public.users WHERE subscription_tier IN ('developer','business') AND subscription_status IN ('active', 'trialing', 'admin_override')) AS paid_subscribers,
         (SELECT count(*)::int FROM public.edits_queue WHERE status = 'PENDING') AS pending_edits,
-        (SELECT count(*)::int FROM public.api_keys WHERE revoked_at IS NULL) AS total_api_keys
+        (SELECT count(*)::int FROM public.ingest_match_queue WHERE status = 'pending') AS pending_ingest_matches,
+        (SELECT count(*)::int FROM public.api_keys WHERE revoked_at IS NULL) AS total_api_keys,
+        (SELECT count(*)::int FROM public.api_usage_log WHERE created_at >= date_trunc('day', now())) AS requests_today,
+        (SELECT count(*)::int FROM public.admin_audit_log WHERE created_at >= now() - interval '7 days') AS audit_actions_7d
     `);
     return rows[0];
   }
@@ -347,7 +388,18 @@ export class AdminService {
     };
   }
 
-  async listAudit(params: { action?: string; limit: number }): Promise<AdminAuditRow[]> {
+  async listAudit(params: {
+    action?: string;
+    page: number;
+    limit: number;
+  }): Promise<{ entries: AdminAuditRow[]; total: number }> {
+    const offset = (params.page - 1) * params.limit;
+    const countRes = await this.pool.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM public.admin_audit_log
+        WHERE ($1::text IS NULL OR action = $1)`,
+      [params.action ?? null],
+    );
+
     const { rows } = await this.pool.query<{
       id: string;
       actor_id: string | null;
@@ -366,14 +418,17 @@ export class AdminService {
     LEFT JOIN public.users u ON u.id = a.actor_id
         WHERE ($1::text IS NULL OR a.action = $1)
         ORDER BY a.created_at DESC
-        LIMIT $2`,
-      [params.action ?? null, params.limit],
+        LIMIT $2 OFFSET $3`,
+      [params.action ?? null, params.limit, offset],
     );
 
-    return rows.map((r) => ({
-      ...r,
-      created_at: r.created_at.toISOString(),
-    }));
+    return {
+      total: Number(countRes.rows[0]?.n ?? 0),
+      entries: rows.map((r) => ({
+        ...r,
+        created_at: r.created_at.toISOString(),
+      })),
+    };
   }
 
   async overrideTier(
@@ -400,24 +455,21 @@ export class AdminService {
       [userId, tier, TIER_LIMITS[tier]],
     );
 
-    await this.pool.query(
-      `INSERT INTO public.admin_audit_log
-         (actor_id, action, target_type, target_id, previous_state, new_state, note)
-       VALUES ($1, 'tier_override', 'user', $2, $3::jsonb, $4::jsonb, $5)`,
-      [
-        actorId,
-        userId,
-        JSON.stringify({
-          subscription_tier: previous.subscription_tier,
-          subscription_status: previous.subscription_status,
-        }),
-        JSON.stringify({
-          subscription_tier: tier,
-          subscription_status: 'admin_override',
-        }),
-        note?.trim() || null,
-      ],
-    );
+    await writeAdminAudit(this.pool, {
+      actorId,
+      action: 'tier_override',
+      targetType: 'user',
+      targetId: userId,
+      previousState: {
+        subscription_tier: previous.subscription_tier,
+        subscription_status: previous.subscription_status,
+      },
+      newState: {
+        subscription_tier: tier,
+        subscription_status: 'admin_override',
+      },
+      note: note?.trim() || null,
+    });
 
     return rows[0];
   }
@@ -480,6 +532,7 @@ export class AdminService {
   }
 
   async resolveIngestMatch(
+    actorId: string,
     id: string,
     decision: 'accepted' | 'rejected' | 'merged',
   ) {
@@ -493,6 +546,14 @@ export class AdminService {
     if (!rows[0]) {
       throw new NotFoundException('Ingest match not found or already resolved');
     }
+    await writeAdminAudit(this.pool, {
+      actorId,
+      action: 'ingest_resolve',
+      targetType: 'ingest_match',
+      targetId: id,
+      previousState: { status: 'pending' },
+      newState: { status: decision },
+    });
     return rows[0];
   }
 }

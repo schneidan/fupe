@@ -10,6 +10,7 @@ const NAV = [
   { href: '/admin/contributions', label: 'Contributions' },
   { href: '/admin/subscriptions', label: 'Subscriptions' },
   { href: '/admin/usage', label: 'API usage' },
+  { href: '/admin/audit', label: 'Audit' },
 ];
 
 export function AdminNav() {

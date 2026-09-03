@@ -58,9 +58,14 @@ export interface AdminUserKey {
 export interface AdminStats {
   total_users: number;
   verified_users: number;
+  new_users_24h: number;
+  new_users_7d: number;
   paid_subscribers: number;
   pending_edits: number;
+  pending_ingest_matches: number;
   total_api_keys: number;
+  requests_today: number;
+  audit_actions_7d: number;
 }
 
 export interface AdminSubscriber {
@@ -93,8 +98,8 @@ export interface AdminAuditEntry {
   action: string;
   target_type: string;
   target_id: string;
-  previous_state: { subscription_tier?: string; subscription_status?: string | null } | null;
-  new_state: { subscription_tier?: string; subscription_status?: string | null } | null;
+  previous_state: Record<string, unknown> | null;
+  new_state: Record<string, unknown> | null;
   note: string | null;
   created_at: string;
 }
@@ -166,11 +171,16 @@ export function fetchBillingHealth() {
   return adminFetch<BillingHealth>('/billing/health');
 }
 
-export function fetchAdminAudit(params?: { action?: string; limit?: number }) {
+export function fetchAdminAudit(params?: {
+  action?: string;
+  page?: number;
+  limit?: number;
+}) {
   const qs = new URLSearchParams();
   if (params?.action) qs.set('action', params.action);
+  if (params?.page) qs.set('page', String(params.page));
   if (params?.limit) qs.set('limit', String(params.limit));
-  return adminFetch<{ entries: AdminAuditEntry[] }>(`/audit?${qs}`);
+  return adminFetch<{ entries: AdminAuditEntry[]; total: number }>(`/audit?${qs}`);
 }
 
 export function overrideTier(

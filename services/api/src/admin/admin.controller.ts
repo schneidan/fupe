@@ -71,7 +71,8 @@ class OverrideTierBody {
 
 class AuditQuery {
   @IsOptional() @IsString() action?: string;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number = 20;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number = 1;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number = 50;
 }
 
 class ResolveIngestBody {
@@ -142,8 +143,13 @@ export class AdminController {
 
   @Post('keys/:id/revoke')
   @ApiOperation({ summary: 'Revoke an API key (admin override)' })
-  revokeKey(@Param('id') id: string) {
-    return this.adminService.revokeKeyAdmin(id).then(() => ({ revoked: true }));
+  revokeKey(
+    @Param('id') id: string,
+    @Req() req: { adminUser: AdminJwtUser },
+  ) {
+    return this.adminService
+      .revokeKeyAdmin(req.adminUser.id, id)
+      .then(() => ({ revoked: true }));
   }
 
   // ── Subscriptions ─────────────────────────────────────────────────────────
@@ -164,11 +170,13 @@ export class AdminController {
   }
 
   @Get('audit')
-  @ApiOperation({ summary: 'Recent admin audit log entries' })
+  @ApiOperation({ summary: 'Admin audit log' })
   listAudit(@Query() query: AuditQuery) {
-    return this.adminService
-      .listAudit({ action: query.action, limit: query.limit ?? 20 })
-      .then((entries) => ({ entries }));
+    return this.adminService.listAudit({
+      action: query.action,
+      page: query.page ?? 1,
+      limit: query.limit ?? 50,
+    });
   }
 
   @Post('users/:id/tier')
@@ -209,7 +217,8 @@ export class AdminController {
   resolveIngestMatch(
     @Param('id') id: string,
     @Body() { decision }: ResolveIngestBody,
+    @Req() req: { adminUser: AdminJwtUser },
   ) {
-    return this.adminService.resolveIngestMatch(id, decision);
+    return this.adminService.resolveIngestMatch(req.adminUser.id, id, decision);
   }
 }

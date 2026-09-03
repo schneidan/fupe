@@ -14,6 +14,7 @@ import { GraphRepository } from '../graph/graph.repository';
 import { EntityType } from '../graph/graph.types';
 import { AuthService, AuthUser } from '../auth/auth.service';
 import { UsersRepository } from '../auth/users.repository';
+import { writeAdminAudit } from '../admin/audit-log';
 
 export type EditStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -266,6 +267,16 @@ export class EditsService {
       [decision, reviewer.id, note, editId],
     );
 
+    await writeAdminAudit(this.pool, {
+      actorId: reviewer.id,
+      action: 'edit_review',
+      targetType: 'edit',
+      targetId: editId,
+      previousState: { status: 'PENDING' },
+      newState: { status: decision },
+      note,
+    });
+
     return updated[0];
   }
 
@@ -314,6 +325,15 @@ export class EditsService {
        RETURNING *`,
       [editId],
     );
+
+    await writeAdminAudit(this.pool, {
+      actorId: reviewer.id,
+      action: 'edit_reopen',
+      targetType: 'edit',
+      targetId: editId,
+      previousState: { status: 'REJECTED' },
+      newState: { status: 'PENDING' },
+    });
 
     return updated[0];
   }
