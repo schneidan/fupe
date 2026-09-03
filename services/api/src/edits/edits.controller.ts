@@ -16,8 +16,9 @@ import { AuthService, AuthUser } from '../auth/auth.service';
 import { EditStatus, EditsService, ProposedEditData } from './edits.service';
 
 class SubmitEditBody {
+  @IsOptional()
   @IsString()
-  target_node_id!: string;
+  target_node_id?: string;
 
   @IsObject()
   proposed_data!: ProposedEditData;

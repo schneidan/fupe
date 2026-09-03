@@ -6,22 +6,11 @@ import {
   reviewEdit,
   type QueueEdit,
 } from '@/lib/api';
+import { summarizeEdit } from '@/lib/edit-summary';
 import { getToken, isModerator, getStoredUser, fetchMe } from '@/lib/auth';
 
 function summarize(edit: QueueEdit): string {
-  const p = edit.proposed_data;
-  if (p.ownership?.parent_id) {
-    return `Link parent ${p.ownership.parent_id}${
-      p.ownership.percentage != null ? ` (${p.ownership.percentage}%)` : ''
-    }`;
-  }
-  if (p.new_parent) {
-    return `New parent “${p.new_parent.name}” (${p.new_parent.type.replace(/_/g, ' ')})`;
-  }
-  if (p.entity) {
-    return `Update entity${p.entity.name ? `: ${p.entity.name}` : ''}`;
-  }
-  return 'Edit';
+  return summarizeEdit(edit);
 }
 
 export function AdminEditsQueue() {

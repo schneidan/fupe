@@ -530,9 +530,38 @@ export class GraphRepository {
   }
 
   async createEntity(entity: EntityProperties): Promise<EntityProperties> {
+    const params: Record<string, unknown> = {
+      id: entity.id,
+      name: entity.name,
+      type: entity.type,
+    };
+    const sets = ['e.id = $id', 'e.name = $name', 'e.type = $type'];
+
+    if (entity.slug) {
+      sets.push('e.slug = $slug');
+      params.slug = entity.slug;
+    }
+    if (entity.sector) {
+      sets.push('e.sector = $sector');
+      params.sector = entity.sector;
+    }
+    if (entity.country_codes?.length) {
+      sets.push('e.country_codes = $country_codes');
+      params.country_codes = entity.country_codes;
+    }
+    if (entity.source) {
+      sets.push('e.source = $source');
+      params.source = entity.source;
+    }
+    if (entity.updated_at) {
+      sets.push('e.updated_at = $updated_at');
+      params.updated_at = entity.updated_at;
+    }
+
     await this.graph.runCypherWrite(
-      `CREATE (e:Entity {id: $id, name: $name, type: $type})`,
-      { id: entity.id, name: entity.name, type: entity.type },
+      `CREATE (e:Entity)
+       SET ${sets.join(', ')}`,
+      params,
     );
     return entity;
   }

@@ -83,9 +83,13 @@ export function ResultView({ slug }: ResultViewProps) {
         <p className="text-lg text-verdict-yes">{error ?? 'Not found'}</p>
         {isNotFound && (
           <p className="mt-2 text-sm text-fupe-muted">
-            No match in our directory yet. Try a different spelling or{' '}
+            No match in our directory yet. Try a different spelling,{' '}
+            <Link href="/contribute/new-entity" className="text-fupe-text hover:underline">
+              propose a new entity
+            </Link>
+            , or{' '}
             <Link href="/contribute" className="text-fupe-text hover:underline">
-              add it
+              contribute
             </Link>
             .
           </p>

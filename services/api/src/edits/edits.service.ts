@@ -8,6 +8,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Pool } from 'pg';
+import { toSlug } from '../common/slug';
 import { DATABASE_POOL } from '../database/database.constants';
 import { GraphRepository } from '../graph/graph.repository';
 import { EntityType } from '../graph/graph.types';
@@ -16,14 +17,25 @@ import { UsersRepository } from '../auth/users.repository';
 
 export type EditStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
+/** Placeholder target when proposing a brand-new entity (Phase 5.3). */
+export const NEW_ENTITY_TARGET = '__new_entity__';
+
+export interface CreateEntityProposal {
+  name: string;
+  type: EntityType;
+  sector?: string;
+  country_codes?: string[];
+}
+
 export interface ProposedEditData {
   entity?: { name?: string; type?: EntityType };
   ownership?: { parent_id?: string; percentage?: number };
   new_parent?: { name: string; type: EntityType };
+  create_entity?: CreateEntityProposal;
 }
 
 export interface SubmitEditDto {
-  target_node_id: string;
+  target_node_id?: string;
   proposed_data: ProposedEditData;
   citation_url?: string;
 }
@@ -43,7 +55,7 @@ export class EditsService {
   ) {}
 
   async submitEdit(user: AuthUser, dto: SubmitEditDto) {
-    this.validateCitationRequirement(dto);
+    this.validateSubmitDto(dto);
 
     if (!user.email_verified) {
       throw new ForbiddenException(
@@ -59,8 +71,14 @@ export class EditsService {
       );
     }
 
-    if (user.trust_score > TRUST_AUTO_COMMIT_THRESHOLD) {
-      return this.commitEdit(user.id, dto);
+    const targetNodeId = this.resolveTargetNodeId(dto);
+    const normalized: SubmitEditDto = { ...dto, target_node_id: targetNodeId };
+
+    // New entities always require moderator approval (Phase 5.3).
+    if (!this.isNewEntitySubmission(normalized)) {
+      if (user.trust_score > TRUST_AUTO_COMMIT_THRESHOLD) {
+        return this.commitEdit(user.id, normalized);
+      }
     }
 
     const { rows } = await this.pool.query(
@@ -69,7 +87,7 @@ export class EditsService {
        RETURNING *`,
       [
         user.id,
-        dto.target_node_id,
+        targetNodeId,
         JSON.stringify(dto.proposed_data),
         dto.citation_url ?? null,
       ],
@@ -146,6 +164,21 @@ export class EditsService {
     return updated[0];
   }
 
+  isNewEntitySubmission(dto: SubmitEditDto): boolean {
+    return Boolean(dto.proposed_data.create_entity);
+  }
+
+  private resolveTargetNodeId(dto: SubmitEditDto): string {
+    if (this.isNewEntitySubmission(dto)) {
+      return NEW_ENTITY_TARGET;
+    }
+    const id = dto.target_node_id?.trim();
+    if (!id) {
+      throw new BadRequestException('target_node_id is required');
+    }
+    return id;
+  }
+
   private async countPending(userId: string): Promise<number> {
     const { rows } = await this.pool.query<{ n: string }>(
       `SELECT count(*)::text AS n
@@ -157,18 +190,28 @@ export class EditsService {
   }
 
   private async commitEdit(userId: string, dto: SubmitEditDto) {
-    const entity = await this.graphRepo.findEntityById(dto.target_node_id);
-    const previousState = entity ? { ...entity } : null;
-
     const proposed = dto.proposed_data;
+    let targetNodeId = dto.target_node_id ?? NEW_ENTITY_TARGET;
+    let previousState: Record<string, unknown> | null = null;
+
+    if (proposed.create_entity) {
+      targetNodeId = await this.createEntityFromProposal(proposed.create_entity);
+      previousState = null;
+    } else {
+      const entity = await this.graphRepo.findEntityById(targetNodeId);
+      previousState = entity ? { ...entity } : null;
+      if (!entity) {
+        throw new NotFoundException(`Entity ${targetNodeId} not found`);
+      }
+    }
 
     if (proposed.entity) {
-      await this.graphRepo.applyEntityUpdate(dto.target_node_id, proposed.entity);
+      await this.graphRepo.applyEntityUpdate(targetNodeId, proposed.entity);
     }
 
     if (proposed.ownership?.parent_id) {
       await this.graphRepo.createOwnershipEdge(
-        dto.target_node_id,
+        targetNodeId,
         proposed.ownership.parent_id,
         proposed.ownership.percentage,
       );
@@ -180,29 +223,32 @@ export class EditsService {
         id: parentId,
         name: proposed.new_parent.name,
         type: proposed.new_parent.type,
+        slug: toSlug(proposed.new_parent.name) || parentId,
+        source: 'community',
+        updated_at: new Date().toISOString(),
       });
       await this.graphRepo.createOwnershipEdge(
-        dto.target_node_id,
+        targetNodeId,
         parentId,
         proposed.ownership?.percentage,
       );
     }
 
     if (dto.citation_url) {
-      await this.graphRepo.addCitation(dto.target_node_id, {
+      await this.graphRepo.addCitation(targetNodeId, {
         id: this.graphRepo.generateCitationId(),
         url: dto.citation_url,
         title: 'Community citation',
       });
     }
 
-    const updatedEntity = await this.graphRepo.findEntityById(dto.target_node_id);
+    const updatedEntity = await this.graphRepo.findEntityById(targetNodeId);
 
     await this.pool.query(
       `INSERT INTO public.audit_logs (entity_id, previous_state, new_state, edited_by)
        VALUES ($1, $2, $3, $4)`,
       [
-        dto.target_node_id,
+        targetNodeId,
         previousState ? JSON.stringify(previousState) : null,
         JSON.stringify({ ...updatedEntity, proposed_data: proposed }),
         userId,
@@ -213,7 +259,7 @@ export class EditsService {
       `INSERT INTO public.wiki_revisions (entity_id, revision_data, citation_url, edited_by)
        VALUES ($1, $2, $3, $4)`,
       [
-        dto.target_node_id,
+        targetNodeId,
         JSON.stringify(proposed),
         dto.citation_url ?? null,
         userId,
@@ -223,9 +269,71 @@ export class EditsService {
     return { status: 'committed', entity: updatedEntity };
   }
 
+  private async createEntityFromProposal(
+    proposal: CreateEntityProposal,
+  ): Promise<string> {
+    const name = proposal.name.trim();
+    const slug = toSlug(name);
+    const id = slug || this.graphRepo.generateEntityId();
+
+    const byId = await this.graphRepo.findEntityById(id);
+    if (byId) {
+      throw new BadRequestException(
+        `An entity with id "${id}" already exists`,
+      );
+    }
+    if (slug) {
+      const bySlug = await this.graphRepo.findEntityBySlug(slug);
+      if (bySlug) {
+        throw new BadRequestException(
+          `An entity with slug "${slug}" already exists`,
+        );
+      }
+    }
+
+    await this.graphRepo.createEntity({
+      id,
+      name,
+      type: proposal.type,
+      slug: slug || id,
+      sector: proposal.sector?.trim() || undefined,
+      country_codes: proposal.country_codes?.length
+        ? proposal.country_codes
+        : undefined,
+      source: 'community',
+      updated_at: new Date().toISOString(),
+    });
+
+    return id;
+  }
+
+  private validateSubmitDto(dto: SubmitEditDto) {
+    const proposed = dto.proposed_data;
+
+    if (proposed.create_entity) {
+      const ce = proposed.create_entity;
+      if (!ce.name?.trim()) {
+        throw new BadRequestException('create_entity.name is required');
+      }
+      if (!ce.type || !Object.values(EntityType).includes(ce.type)) {
+        throw new BadRequestException('create_entity.type is required');
+      }
+      if (!dto.citation_url) {
+        throw new BadRequestException(
+          'citation_url is required when proposing a new entity',
+        );
+      }
+    } else if (!dto.target_node_id?.trim()) {
+      throw new BadRequestException('target_node_id is required');
+    }
+
+    this.validateCitationRequirement(dto);
+  }
+
   private validateCitationRequirement(dto: SubmitEditDto) {
     const proposed = dto.proposed_data;
     const involvesPe =
+      proposed.create_entity?.type === EntityType.PE_FIRM ||
       proposed.entity?.type === EntityType.PE_FIRM ||
       proposed.new_parent?.type === EntityType.PE_FIRM ||
       proposed.ownership != null;

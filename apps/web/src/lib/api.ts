@@ -137,6 +137,12 @@ export interface ProposedEditData {
   entity?: { name?: string; type?: string };
   ownership?: { parent_id?: string; percentage?: number };
   new_parent?: { name: string; type: string };
+  create_entity?: {
+    name: string;
+    type: string;
+    sector?: string;
+    country_codes?: string[];
+  };
 }
 
 export interface QueueEdit {
@@ -183,7 +189,7 @@ async function authJson<T>(
 export async function submitEdit(
   token: string,
   payload: {
-    target_node_id: string;
+    target_node_id?: string;
     proposed_data: ProposedEditData;
     citation_url: string;
   },

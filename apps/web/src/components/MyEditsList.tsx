@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { listMyEdits, type EditStatus, type QueueEdit } from '@/lib/api';
+import { summarizeEdit } from '@/lib/edit-summary';
 import { getToken } from '@/lib/auth';
 
 const TABS: Array<{ id: EditStatus | 'ALL'; label: string }> = [
@@ -24,19 +25,7 @@ function statusColor(status: EditStatus) {
 }
 
 function summarize(edit: QueueEdit): string {
-  const p = edit.proposed_data;
-  if (p.ownership?.parent_id) {
-    return `Link parent ${p.ownership.parent_id}${
-      p.ownership.percentage != null ? ` (${p.ownership.percentage}%)` : ''
-    }`;
-  }
-  if (p.new_parent) {
-    return `New parent “${p.new_parent.name}” (${p.new_parent.type.replace(/_/g, ' ')})`;
-  }
-  if (p.entity) {
-    return `Update entity${p.entity.name ? `: ${p.entity.name}` : ''}`;
-  }
-  return 'Edit';
+  return summarizeEdit(edit);
 }
 
 function MyEditsInner() {

@@ -36,8 +36,8 @@ export function ContributeHub() {
             <p className="text-xs text-fupe-muted">
               Trust score {user.trust_score}
               {user.trust_score > 50
-                ? ' · your edits auto-commit'
-                : ' · your edits need review'}
+                ? ' · ownership edits auto-commit'
+                : ' · edits need review'}
               {isModerator(user) ? ' · moderator' : ''}
             </p>
             {!user.email_verified ? (
@@ -115,8 +115,17 @@ export function ContributeHub() {
           </p>
         </Link>
         <Link
-          href="/contribute/edits"
+          href="/contribute/new-entity"
           className="rounded-xl border border-fupe-border bg-fupe-surface p-5 transition hover:border-fupe-muted"
+        >
+          <h2 className="font-semibold text-fupe-text">Propose new entity</h2>
+          <p className="mt-2 text-sm text-fupe-muted">
+            Add a missing brand or company — always reviewed by a moderator.
+          </p>
+        </Link>
+        <Link
+          href="/contribute/edits"
+          className="rounded-xl border border-fupe-border bg-fupe-surface p-5 transition hover:border-fupe-muted sm:col-span-2"
         >
           <h2 className="font-semibold text-fupe-text">My edits</h2>
           <p className="mt-2 text-sm text-fupe-muted">

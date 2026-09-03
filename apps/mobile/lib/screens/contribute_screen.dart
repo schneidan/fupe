@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../theme/fupe_theme.dart';
 import 'suggest_edit_screen.dart';
+import 'propose_entity_screen.dart';
 
 class ContributeScreen extends StatefulWidget {
   const ContributeScreen({super.key});
@@ -108,6 +109,17 @@ class _ContributeScreenState extends State<ContributeScreen> {
                 ).then((_) => _loadEdits());
               },
               child: const Text('Suggest an edit'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ProposeEntityScreen(),
+                  ),
+                ).then((_) => _loadEdits());
+              },
+              child: const Text('Propose new entity'),
             ),
             const SizedBox(height: 28),
             Row(

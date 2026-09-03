@@ -107,21 +107,24 @@ class ApiService {
 
   Future<Map<String, dynamic>> submitEdit({
     required String token,
-    required String targetNodeId,
+    String? targetNodeId,
     required Map<String, dynamic> proposedData,
     required String citationUrl,
   }) async {
+    final body = <String, dynamic>{
+      'proposed_data': proposedData,
+      'citation_url': citationUrl,
+    };
+    if (targetNodeId != null && targetNodeId.isNotEmpty) {
+      body['target_node_id'] = targetNodeId;
+    }
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/edits'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       },
-      body: jsonEncode({
-        'target_node_id': targetNodeId,
-        'proposed_data': proposedData,
-        'citation_url': citationUrl,
-      }),
+      body: jsonEncode(body),
     );
     return _parseJsonMap(response);
   }
@@ -192,8 +195,20 @@ class QueueEdit {
   }
 
   String get summary {
+    final createEntity = proposedData['create_entity'] as Map?;
     final ownership = proposedData['ownership'] as Map?;
     final newParent = proposedData['new_parent'] as Map?;
+    if (createEntity != null) {
+      final name = createEntity['name'] ?? 'entity';
+      final type = (createEntity['type'] as String? ?? '').replaceAll('_', ' ');
+      var s = 'New entity “$name” ($type)';
+      if (ownership != null && ownership['parent_id'] != null) {
+        s += ' → parent ${ownership['parent_id']}';
+      } else if (newParent != null) {
+        s += ' → new parent “${newParent['name']}”';
+      }
+      return s;
+    }
     if (ownership != null && ownership['parent_id'] != null) {
       final pct = ownership['percentage'];
       return 'Link parent ${ownership['parent_id']}${pct != null ? ' ($pct%)' : ''}';
