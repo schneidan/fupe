@@ -19,7 +19,10 @@ class AuthUser {
   final String role;
   final bool emailVerified;
 
+  bool get isAdmin => role == 'admin';
   bool get isModerator => role == 'moderator' || role == 'admin';
+  /// Admin hub (full) or queue-only for moderators.
+  bool get canSeeAdminEntry => isModerator;
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
     return AuthUser(
@@ -55,6 +58,8 @@ class AuthService extends ChangeNotifier {
   AuthUser? get user => _user;
   bool get isSignedIn => _token != null && _user != null;
   bool get ready => _ready;
+  bool get isAdmin => user?.isAdmin ?? false;
+  bool get canSeeAdminEntry => user?.canSeeAdminEntry ?? false;
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();

@@ -43,7 +43,7 @@ flutter run --dart-define=API_URL=http://192.168.1.10:3000
 
 - **Ask** — “Is ___ owned by PE?” + barcode/photo lookup
 - **Browse** — searchable directory; tap opens the YES/NO result for that entity
-- **Contribute** — coming soon
+- **Contribute** — sign in, suggest edits, propose entities; staff see **Admin**
 
 ## Deep links
 
@@ -53,10 +53,17 @@ Open the YES/NO result for an entity:
 fupe://entity/panera-bread
 ```
 
+Open staff admin discovery (role-gated; non-staff see no Contribute Admin button):
+
+```
+fupe://admin
+```
+
 Simulator test (iOS):
 
 ```bash
 xcrun simctl openurl booted "fupe://entity/panera-bread"
+xcrun simctl openurl booted "fupe://admin"
 ```
 ## Store prep
 

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../theme/fupe_theme.dart';
+import 'admin_entry_screen.dart';
 import 'suggest_edit_screen.dart';
 import 'propose_entity_screen.dart';
 
@@ -121,6 +122,21 @@ class _ContributeScreenState extends State<ContributeScreen> {
               },
               child: const Text('Propose new entity'),
             ),
+            if (auth.canSeeAdminEntry) ...[
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AdminEntryScreen(),
+                    ),
+                  );
+                },
+                child: Text(
+                  auth.isAdmin ? 'Admin' : 'Admin (queue)',
+                ),
+              ),
+            ],
             const SizedBox(height: 28),
             Row(
               children: [
@@ -240,7 +256,7 @@ class _ContributeScreenState extends State<ContributeScreen> {
           Text(
             'Trust score ${auth.user!.trustScore}'
             '${auth.user!.emailVerified ? '' : ' · email unverified'}'
-            '${auth.user!.isModerator ? ' · moderator' : ''}',
+            '${auth.user!.isAdmin ? ' · admin' : (auth.user!.isModerator ? ' · moderator' : '')}',
             style: const TextStyle(color: FupeColors.muted, fontSize: 13),
           ),
           if (!auth.user!.emailVerified)
