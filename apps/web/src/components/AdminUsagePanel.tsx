@@ -28,7 +28,9 @@ export function AdminUsagePanel() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-fupe-text">API usage</h1>
-        <p className="mt-1 text-sm text-fupe-muted">Today's requests per active key.</p>
+        <p className="mt-1 text-sm text-fupe-muted">
+          Today&apos;s requests per active key, including IMAGE 403s and rate-limit 429s.
+        </p>
       </div>
 
       {error && <p className="text-sm text-verdict-yes">{error}</p>}
@@ -42,14 +44,15 @@ export function AdminUsagePanel() {
               <th className="px-4 py-3 text-left">Owner</th>
               <th className="px-4 py-3 text-left">Tier</th>
               <th className="px-4 py-3 text-right">Requests today</th>
-              <th className="px-4 py-3 text-right">Blocked (403)</th>
+              <th className="px-4 py-3 text-right">IMAGE blocks</th>
+              <th className="px-4 py-3 text-right">Rate-limit hits</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-fupe-border">
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-fupe-muted">Loading…</td></tr>
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-fupe-muted">Loading…</td></tr>
             ) : usage.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-fupe-muted">No API keys active yet.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-fupe-muted">No API keys active yet.</td></tr>
             ) : usage.map((row) => (
               <tr key={row.id} className="hover:bg-fupe-elevated/40">
                 <td className="px-4 py-3 font-mono text-xs text-fupe-muted">{row.key_prefix}…</td>
@@ -57,7 +60,8 @@ export function AdminUsagePanel() {
                 <td className="px-4 py-3 font-mono text-xs text-fupe-muted">{row.email}</td>
                 <td className="px-4 py-3 text-fupe-muted">{row.tier}</td>
                 <td className="px-4 py-3 text-right font-semibold text-fupe-text">{row.requests_today}</td>
-                <td className="px-4 py-3 text-right text-verdict-yes">{row.blocked_today || '—'}</td>
+                <td className="px-4 py-3 text-right text-verdict-yes">{row.image_blocks_today || '—'}</td>
+                <td className="px-4 py-3 text-right text-verdict-yes">{row.rate_limit_hits_today || '—'}</td>
               </tr>
             ))}
           </tbody>

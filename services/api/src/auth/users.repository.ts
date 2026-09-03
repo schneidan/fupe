@@ -17,6 +17,7 @@ export interface UserRow {
   subscription_status?: string | null;
   stripe_customer_id?: string | null;
   stripe_subscription_id?: string | null;
+  subscription_current_period_end?: Date | null;
   disabled_at?: Date | null;
   created_at: Date;
 }
@@ -149,20 +150,33 @@ export class UsersRepository {
     tier: 'free' | 'developer' | 'business';
     status: string | null;
     subscriptionId: string | null;
+    currentPeriodEnd?: Date | null;
   }): Promise<UserRow> {
+    const touchPeriod = params.currentPeriodEnd !== undefined;
     const { rows } = await this.pool.query<UserRow>(
-      `UPDATE public.users
-       SET subscription_tier = $2,
-           subscription_status = $3,
-           stripe_subscription_id = $4
-       WHERE id = $1
-       RETURNING *`,
-      [
-        params.userId,
-        params.tier,
-        params.status,
-        params.subscriptionId,
-      ],
+      touchPeriod
+        ? `UPDATE public.users
+           SET subscription_tier = $2,
+               subscription_status = $3,
+               stripe_subscription_id = $4,
+               subscription_current_period_end = $5
+           WHERE id = $1
+           RETURNING *`
+        : `UPDATE public.users
+           SET subscription_tier = $2,
+               subscription_status = $3,
+               stripe_subscription_id = $4
+           WHERE id = $1
+           RETURNING *`,
+      touchPeriod
+        ? [
+            params.userId,
+            params.tier,
+            params.status,
+            params.subscriptionId,
+            params.currentPeriodEnd,
+          ]
+        : [params.userId, params.tier, params.status, params.subscriptionId],
     );
     return rows[0];
   }

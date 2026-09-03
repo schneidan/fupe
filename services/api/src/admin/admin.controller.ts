@@ -22,6 +22,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
@@ -65,6 +66,12 @@ class ListPageQuery {
 
 class OverrideTierBody {
   @IsEnum(['free', 'developer', 'business']) tier!: 'free' | 'developer' | 'business';
+  @IsOptional() @IsString() @MaxLength(500) note?: string;
+}
+
+class AuditQuery {
+  @IsOptional() @IsString() action?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number = 20;
 }
 
 class ResolveIngestBody {
@@ -150,13 +157,28 @@ export class AdminController {
     });
   }
 
+  @Get('billing/health')
+  @ApiOperation({ summary: 'Stripe config + webhook sync health' })
+  billingHealth() {
+    return this.adminService.getBillingHealth();
+  }
+
+  @Get('audit')
+  @ApiOperation({ summary: 'Recent admin audit log entries' })
+  listAudit(@Query() query: AuditQuery) {
+    return this.adminService
+      .listAudit({ action: query.action, limit: query.limit ?? 20 })
+      .then((entries) => ({ entries }));
+  }
+
   @Post('users/:id/tier')
-  @ApiOperation({ summary: 'Manually override subscription tier' })
+  @ApiOperation({ summary: 'Manually override subscription tier (audited)' })
   overrideTier(
     @Param('id') id: string,
-    @Body() { tier }: OverrideTierBody,
+    @Body() { tier, note }: OverrideTierBody,
+    @Req() req: { adminUser: AdminJwtUser },
   ) {
-    return this.adminService.overrideTier(id, tier);
+    return this.adminService.overrideTier(req.adminUser.id, id, tier, note);
   }
 
   // ── Usage ──────────────────────────────────────────────────────────────────

@@ -71,6 +71,31 @@ export interface AdminSubscriber {
   subscription_status: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
+  subscription_current_period_end: string | null;
+  created_at: string;
+}
+
+export interface BillingHealth {
+  stripe_configured: boolean;
+  webhook_secret_set: boolean;
+  stripe_mode: 'test' | 'live' | 'unset';
+  dashboard_url: string;
+  last_event_at: string | null;
+  last_event_type: string | null;
+  events_last_7d: number;
+  stale: boolean;
+}
+
+export interface AdminAuditEntry {
+  id: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  action: string;
+  target_type: string;
+  target_id: string;
+  previous_state: { subscription_tier?: string; subscription_status?: string | null } | null;
+  new_state: { subscription_tier?: string; subscription_status?: string | null } | null;
+  note: string | null;
   created_at: string;
 }
 
@@ -81,7 +106,8 @@ export interface AdminKeyUsage {
   tier: string;
   email: string;
   requests_today: number;
-  blocked_today: number;
+  image_blocks_today: number;
+  rate_limit_hits_today: number;
 }
 
 export type AdminUserPatch = {
@@ -136,10 +162,25 @@ export function fetchAdminSubscriptions(params?: { page?: number }) {
   return adminFetch<{ subscribers: AdminSubscriber[]; total: number }>(`/subscriptions?${qs}`);
 }
 
-export function overrideTier(userId: string, tier: 'free' | 'developer' | 'business') {
+export function fetchBillingHealth() {
+  return adminFetch<BillingHealth>('/billing/health');
+}
+
+export function fetchAdminAudit(params?: { action?: string; limit?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.action) qs.set('action', params.action);
+  if (params?.limit) qs.set('limit', String(params.limit));
+  return adminFetch<{ entries: AdminAuditEntry[] }>(`/audit?${qs}`);
+}
+
+export function overrideTier(
+  userId: string,
+  tier: 'free' | 'developer' | 'business',
+  note?: string,
+) {
   return adminFetch<AdminUser>(`/users/${userId}/tier`, {
     method: 'POST',
-    body: JSON.stringify({ tier }),
+    body: JSON.stringify({ tier, ...(note ? { note } : {}) }),
   });
 }
 

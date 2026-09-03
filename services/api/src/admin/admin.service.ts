@@ -5,10 +5,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.constants';
 import { UserRow, UserRole } from '../auth/users.repository';
 import { TIER_LIMITS } from '../api-keys/api-keys.service';
+
+const WEBHOOK_STALE_MS = 48 * 60 * 60 * 1000;
 
 export interface AdminUserRow extends UserRow {
   api_key_count: number;
@@ -35,9 +38,36 @@ export interface AdminApiKeyRow {
   usage_today: number;
 }
 
+export interface BillingHealth {
+  stripe_configured: boolean;
+  webhook_secret_set: boolean;
+  stripe_mode: 'test' | 'live' | 'unset';
+  dashboard_url: string;
+  last_event_at: string | null;
+  last_event_type: string | null;
+  events_last_7d: number;
+  stale: boolean;
+}
+
+export interface AdminAuditRow {
+  id: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  action: string;
+  target_type: string;
+  target_id: string;
+  previous_state: unknown;
+  new_state: unknown;
+  note: string | null;
+  created_at: string;
+}
+
 @Injectable()
 export class AdminService {
-  constructor(@Inject(DATABASE_POOL) private readonly pool: Pool) {}
+  constructor(
+    @Inject(DATABASE_POOL) private readonly pool: Pool,
+    private readonly config: ConfigService,
+  ) {}
 
   // ─── Users ────────────────────────────────────────────────────────────────
 
@@ -231,7 +261,7 @@ export class AdminService {
       SELECT
         (SELECT count(*)::int FROM public.users WHERE disabled_at IS NULL) AS total_users,
         (SELECT count(*)::int FROM public.users WHERE email_verified_at IS NOT NULL AND disabled_at IS NULL) AS verified_users,
-        (SELECT count(*)::int FROM public.users WHERE subscription_tier IN ('developer','business') AND subscription_status = 'active') AS paid_subscribers,
+        (SELECT count(*)::int FROM public.users WHERE subscription_tier IN ('developer','business') AND subscription_status IN ('active', 'trialing', 'admin_override')) AS paid_subscribers,
         (SELECT count(*)::int FROM public.edits_queue WHERE status = 'PENDING') AS pending_edits,
         (SELECT count(*)::int FROM public.api_keys WHERE revoked_at IS NULL) AS total_api_keys
     `);
@@ -250,7 +280,7 @@ export class AdminService {
 
     const { rows } = await this.pool.query(
       `SELECT id, email, role, subscription_tier, subscription_status, stripe_customer_id,
-              stripe_subscription_id, created_at
+              stripe_subscription_id, subscription_current_period_end, created_at
          FROM public.users
         WHERE subscription_tier != 'free' OR subscription_status IS NOT NULL
         ORDER BY created_at DESC
@@ -261,10 +291,98 @@ export class AdminService {
     return { subscribers: rows, total: Number(countRes.rows[0]?.n ?? 0) };
   }
 
+  stripeMode(): 'test' | 'live' | 'unset' {
+    const key = this.config.get<string>('STRIPE_SECRET_KEY')?.trim() ?? '';
+    if (key.startsWith('sk_live_')) return 'live';
+    if (key.startsWith('sk_test_')) return 'test';
+    return key ? 'test' : 'unset';
+  }
+
+  async getBillingHealth(): Promise<BillingHealth> {
+    const stripeConfigured = Boolean(
+      this.config.get<string>('STRIPE_SECRET_KEY')?.trim() &&
+        this.config.get<string>('STRIPE_PRICE_DEVELOPER')?.trim(),
+    );
+    const webhookSecretSet = Boolean(
+      this.config.get<string>('STRIPE_WEBHOOK_SECRET')?.trim(),
+    );
+    const mode = this.stripeMode();
+    const dashboard_url =
+      mode === 'live'
+        ? 'https://dashboard.stripe.com/subscriptions'
+        : 'https://dashboard.stripe.com/test/subscriptions';
+
+    const last = await this.pool.query<{
+      received_at: Date;
+      event_type: string;
+    }>(
+      `SELECT received_at, event_type
+         FROM public.stripe_webhook_log
+        ORDER BY received_at DESC
+        LIMIT 1`,
+    );
+    const week = await this.pool.query<{ n: string }>(
+      `SELECT count(*)::text AS n
+         FROM public.stripe_webhook_log
+        WHERE received_at >= now() - interval '7 days'`,
+    );
+
+    const last_event_at = last.rows[0]?.received_at?.toISOString() ?? null;
+    const last_event_type = last.rows[0]?.event_type ?? null;
+    const ageMs = last.rows[0]
+      ? Date.now() - last.rows[0].received_at.getTime()
+      : null;
+    const stale =
+      stripeConfigured && (ageMs === null || ageMs > WEBHOOK_STALE_MS);
+
+    return {
+      stripe_configured: stripeConfigured,
+      webhook_secret_set: webhookSecretSet,
+      stripe_mode: mode,
+      dashboard_url,
+      last_event_at,
+      last_event_type,
+      events_last_7d: Number(week.rows[0]?.n ?? 0),
+      stale,
+    };
+  }
+
+  async listAudit(params: { action?: string; limit: number }): Promise<AdminAuditRow[]> {
+    const { rows } = await this.pool.query<{
+      id: string;
+      actor_id: string | null;
+      actor_email: string | null;
+      action: string;
+      target_type: string;
+      target_id: string;
+      previous_state: unknown;
+      new_state: unknown;
+      note: string | null;
+      created_at: Date;
+    }>(
+      `SELECT a.id, a.actor_id, u.email AS actor_email, a.action, a.target_type,
+              a.target_id, a.previous_state, a.new_state, a.note, a.created_at
+         FROM public.admin_audit_log a
+    LEFT JOIN public.users u ON u.id = a.actor_id
+        WHERE ($1::text IS NULL OR a.action = $1)
+        ORDER BY a.created_at DESC
+        LIMIT $2`,
+      [params.action ?? null, params.limit],
+    );
+
+    return rows.map((r) => ({
+      ...r,
+      created_at: r.created_at.toISOString(),
+    }));
+  }
+
   async overrideTier(
+    actorId: string,
     userId: string,
     tier: 'free' | 'developer' | 'business',
+    note?: string,
   ): Promise<UserRow> {
+    const previous = await this.getUser(userId);
     const { rows } = await this.pool.query<UserRow>(
       `UPDATE public.users
           SET subscription_tier = $2,
@@ -282,6 +400,25 @@ export class AdminService {
       [userId, tier, TIER_LIMITS[tier]],
     );
 
+    await this.pool.query(
+      `INSERT INTO public.admin_audit_log
+         (actor_id, action, target_type, target_id, previous_state, new_state, note)
+       VALUES ($1, 'tier_override', 'user', $2, $3::jsonb, $4::jsonb, $5)`,
+      [
+        actorId,
+        userId,
+        JSON.stringify({
+          subscription_tier: previous.subscription_tier,
+          subscription_status: previous.subscription_status,
+        }),
+        JSON.stringify({
+          subscription_tier: tier,
+          subscription_status: 'admin_override',
+        }),
+        note?.trim() || null,
+      ],
+    );
+
     return rows[0];
   }
 
@@ -294,7 +431,10 @@ export class AdminService {
     const { rows } = await this.pool.query(
       `SELECT k.id, k.name, k.key_prefix, k.tier, u.email,
               count(l.id)::int AS requests_today,
-              count(l.id) FILTER (WHERE l.status_code = 403)::int AS blocked_today
+              count(l.id) FILTER (
+                WHERE l.status_code = 403 AND l.endpoint ILIKE '%lookup%'
+              )::int AS image_blocks_today,
+              count(l.id) FILTER (WHERE l.status_code = 429)::int AS rate_limit_hits_today
          FROM public.api_keys k
          JOIN public.users u ON u.id = k.user_id
     LEFT JOIN public.api_usage_log l ON l.api_key_id = k.id

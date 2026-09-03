@@ -1,16 +1,35 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Pool } from 'pg';
 import Stripe = require('stripe');
 import {
   ApiKeyTier,
   ApiKeysService,
 } from '../api-keys/api-keys.service';
 import { UsersRepository, UserRow } from '../auth/users.repository';
+import { DATABASE_POOL } from '../database/database.constants';
+
+function unixToDate(n: unknown): Date | null {
+  return typeof n === 'number' && n > 0 ? new Date(n * 1000) : null;
+}
+
+/** Stripe API 2024+ moved current_period_end onto subscription items. */
+function periodEndFromSubscription(sub: Stripe.Subscription): Date | null {
+  const top = unixToDate(
+    (sub as unknown as { current_period_end?: number }).current_period_end,
+  );
+  if (top) return top;
+  const item = sub.items?.data?.[0] as
+    | { current_period_end?: number }
+    | undefined;
+  return unixToDate(item?.current_period_end);
+}
 
 @Injectable()
 export class BillingService {
@@ -21,6 +40,7 @@ export class BillingService {
     private readonly config: ConfigService,
     private readonly users: UsersRepository,
     private readonly apiKeys: ApiKeysService,
+    @Inject(DATABASE_POOL) private readonly pool: Pool,
   ) {
     const secret = this.config.get<string>('STRIPE_SECRET_KEY')?.trim();
     this.stripe = secret ? new Stripe(secret) : null;
@@ -45,6 +65,8 @@ export class BillingService {
     return {
       subscription_tier: user.subscription_tier ?? 'free',
       subscription_status: user.subscription_status,
+      current_period_end:
+        user.subscription_current_period_end?.toISOString() ?? null,
       stripe_configured: this.isConfigured(),
       tiers: {
         free: {
@@ -150,6 +172,8 @@ export class BillingService {
       throw new BadRequestException(`Webhook Error: ${message}`);
     }
 
+    await this.logWebhook(event);
+
     switch (event.type) {
       case 'checkout.session.completed':
         await this.onCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
@@ -165,6 +189,21 @@ export class BillingService {
     }
 
     return { received: true };
+  }
+
+  private async logWebhook(event: Stripe.Event) {
+    try {
+      await this.pool.query(
+        `INSERT INTO public.stripe_webhook_log (stripe_event_id, event_type)
+         VALUES ($1, $2)
+         ON CONFLICT (stripe_event_id) DO UPDATE SET received_at = now()`,
+        [event.id, event.type],
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Failed to log Stripe event ${event.id}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
   }
 
   private async ensureCustomer(user: UserRow): Promise<string> {
@@ -193,7 +232,19 @@ export class BillingService {
         ? session.subscription
         : session.subscription?.id ?? null;
 
-    await this.applyTier(userId, tier, 'active', subscriptionId);
+    let periodEnd: Date | null | undefined;
+    if (subscriptionId && this.stripe) {
+      try {
+        const sub = await this.stripe.subscriptions.retrieve(subscriptionId);
+        periodEnd = periodEndFromSubscription(sub);
+      } catch (err) {
+        this.logger.warn(
+          `Could not load subscription ${subscriptionId}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+
+    await this.applyTier(userId, tier, 'active', subscriptionId, periodEnd);
 
     if (session.customer && typeof session.customer === 'string') {
       await this.users.setStripeCustomerId(userId, session.customer);
@@ -213,6 +264,14 @@ export class BillingService {
       return;
     }
 
+    if (user.subscription_status === 'admin_override') {
+      this.logger.log(
+        `Skip Stripe subscription.updated for ${user.id}: admin_override`,
+      );
+      return;
+    }
+
+    const periodEnd = periodEndFromSubscription(sub);
     const tier =
       this.parseTier(sub.metadata?.tier) ??
       this.tierFromPrice(sub) ??
@@ -221,19 +280,20 @@ export class BillingService {
 
     const status = sub.status;
     if (status === 'active' || status === 'trialing') {
-      await this.applyTier(user.id, tier, status, sub.id);
+      await this.applyTier(user.id, tier, status, sub.id, periodEnd);
     } else if (
       status === 'canceled' ||
       status === 'unpaid' ||
       status === 'incomplete_expired'
     ) {
-      await this.applyTier(user.id, 'free', status, sub.id);
+      await this.applyTier(user.id, 'free', status, sub.id, periodEnd);
     } else {
       await this.users.setSubscription({
         userId: user.id,
         tier: user.subscription_tier ?? 'free',
         status,
         subscriptionId: sub.id,
+        currentPeriodEnd: periodEnd,
       });
     }
   }
@@ -247,7 +307,13 @@ export class BillingService {
       user = await this.users.findByStripeCustomerId(sub.customer);
     }
     if (!user) return;
-    await this.applyTier(user.id, 'free', 'canceled', null);
+    if (user.subscription_status === 'admin_override') {
+      this.logger.log(
+        `Skip Stripe subscription.deleted for ${user.id}: admin_override`,
+      );
+      return;
+    }
+    await this.applyTier(user.id, 'free', 'canceled', null, null);
   }
 
   private async applyTier(
@@ -255,12 +321,14 @@ export class BillingService {
     tier: ApiKeyTier,
     status: string | null,
     subscriptionId: string | null,
+    currentPeriodEnd?: Date | null,
   ) {
     await this.users.setSubscription({
       userId,
       tier,
       status,
       subscriptionId,
+      currentPeriodEnd,
     });
     await this.apiKeys.setTierForUser(userId, tier);
     this.logger.log(`User ${userId} → tier=${tier} status=${status}`);
