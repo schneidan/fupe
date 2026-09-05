@@ -1,4 +1,5 @@
 import { LegalDoc, LegalH2 } from '@/components/LegalDoc';
+import { ObfuscatedEmail } from '@/components/ObfuscatedEmail';
 
 export const metadata = { title: 'API Terms' };
 
@@ -27,11 +28,14 @@ export default function ApiTermsPage() {
         results in your product is fine; republishing the entire directory is not
         without written permission.
       </p>
-      <LegalH2>3. Billing</LegalH2>
+      <LegalH2>3. Billing, cancellation &amp; refunds</LegalH2>
       <p>
-        Paid tiers are billed through Stripe. Cancellations take effect at period
-        end unless stated otherwise. Complimentary admin overrides are audited
-        and may be revoked.
+        Paid tiers are billed through Stripe. Cancel anytime from the Developers
+        page via the Stripe Customer Portal — access continues through the end of
+        the paid period, then the key returns to Free limits. Refunds for unused
+        time are not guaranteed but we will correct erroneous charges; email{' '}
+        <ObfuscatedEmail user="support" domain="fupe.com" />. Complimentary admin
+        overrides are audited and may be revoked.
       </p>
       <LegalH2>4. Attribution</LegalH2>
       <p>

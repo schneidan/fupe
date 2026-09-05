@@ -38,6 +38,12 @@ export function SiteFooter() {
         <Link href="/legal/terms" className="text-fupe-text transition hover:text-fupe-muted">
           Terms
         </Link>
+        <Link
+          href="/legal/contact"
+          className="text-fupe-muted transition hover:text-fupe-text"
+        >
+          Contact
+        </Link>
       </nav>
       <p className="mx-auto mt-4 max-w-2xl text-xs leading-relaxed">
         Ownership data is sourced from public records &amp; community edits.

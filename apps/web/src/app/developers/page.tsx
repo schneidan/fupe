@@ -23,6 +23,16 @@ export default function DevelopersPage() {
         </a>
         .
       </p>
+      <p className="mt-4 text-sm text-fupe-muted">
+        <strong className="font-medium text-fupe-text">Billing:</strong> Paid
+        plans renew monthly via Stripe. Cancel anytime from this page (Manage
+        billing) — you keep Developer access until the period ends, then limits
+        return to Free. Questions or charge issues:{' '}
+        <a href="/legal/contact" className="text-fupe-text hover:underline">
+          Contact
+        </a>
+        .
+      </p>
       <Suspense fallback={<p className="mt-8 text-fupe-muted">Loading…</p>}>
         <DevelopersBilling />
       </Suspense>

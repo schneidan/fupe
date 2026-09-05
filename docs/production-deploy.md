@@ -694,7 +694,9 @@ Point nginx `ssl_certificate` / `ssl_certificate_key` at `/etc/letsencrypt/live/
 You can process **test** payments on the real hostname while Stripe account activation is pending. Cloudflare in front is fine for Checkout and webhooks.
 
 1. In Stripe Dashboard → **Test mode** → **Payment Links**  
-   - Edit success/cancel URLs to `https://fupe.app` (and/or `/developers?checkout=success`).
+   - After donation success URL: `https://fupe.app/thanks` (optional `?next=/browse` etc.)  
+   - Cancel URL: `https://fupe.app`  
+   - Developer Checkout success/cancel can stay `/developers?checkout=success` / `cancel`
 2. Set `NEXT_PUBLIC_SUPPORT_URL` to the test Payment Link (rebuild web if you change it — see §14).
 3. **Developers subscriptions:**  
    - `STRIPE_SECRET_KEY=sk_test_...`  
@@ -734,6 +736,18 @@ When Stripe unlocks live mode later: create **live** Payment Link + prices + web
 
 ## 14. Redeploy after code changes
 
+From the repo on the VPS (pull yourself, then rebuild):
+
+```bash
+cd /root/fupe   # or your clone path
+git pull
+./rebuild.sh
+```
+
+`rebuild.sh` runs: ensure Postgres → `pnpm install` → migrate → build API + web → `systemctl restart fupe-api fupe-web` → health curls. It reads `DATABASE_URL` from `services/api/.env` (or root `.env`) if not already exported.
+
+Manual equivalent:
+
 ```bash
 cd /home/YOUR_USER/fupe
 git pull
@@ -746,7 +760,7 @@ sudo systemctl restart fupe-api fupe-web
 sudo systemctl status fupe-api fupe-web
 ```
 
-If you change `NEXT_PUBLIC_*` or `API_URL`, you **must** rebuild the web app (`pnpm --filter @fupe/web build`).
+If you change `NEXT_PUBLIC_*` or `API_URL`, you **must** rebuild the web app (included in `./rebuild.sh`).
 
 ---
 

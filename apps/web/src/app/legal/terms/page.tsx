@@ -1,4 +1,5 @@
 import { LegalDoc, LegalH2 } from '@/components/LegalDoc';
+import { ObfuscatedEmail } from '@/components/ObfuscatedEmail';
 
 export const metadata = { title: 'Terms of Service' };
 
@@ -57,16 +58,34 @@ export default function TermsPage() {
         incidental, or consequential damages arising from use of the Service, or
         for reliance on lookup results.
       </p>
-      <LegalH2>7. Changes</LegalH2>
+      <LegalH2>7. Paid plans &amp; voluntary support</LegalH2>
+      <p>
+        Developer and Business API subscriptions are billed through Stripe.
+        You can cancel or manage billing from the{' '}
+        <a href="/developers" className="text-fupe-text hover:underline">
+          Developers
+        </a>{' '}
+        page (Stripe Customer Portal). Cancellation stops renewal at the end of
+        the current paid period; you keep access until then. One-time voluntary
+        contributions (“keep the lights on”) are non-refundable except where
+        required by law or if a charge was made in error — contact support and
+        we will make it right.
+      </p>
+      <LegalH2>8. Changes</LegalH2>
       <p>
         We may update these Terms. Continued use after a change constitutes
         acceptance of the revised Terms. Material changes will be noted by updating
         the date at the top of this page.
       </p>
-      <LegalH2>8. Contact</LegalH2>
+      <LegalH2>9. Contact</LegalH2>
       <p>
-        Questions: <span className="text-fupe-text">legal@fupe.app</span> (replace
-        with your production support address before launch).
+        Questions:{' '}
+        <ObfuscatedEmail user="support" domain="fupe.com" />{' '}
+        or see{' '}
+        <a href="/legal/contact" className="text-fupe-text hover:underline">
+          Contact
+        </a>
+        .
       </p>
     </LegalDoc>
   );

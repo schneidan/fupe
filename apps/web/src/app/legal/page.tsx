@@ -10,6 +10,7 @@ const DOCS = [
   { href: '/legal/api', title: 'API Terms', desc: 'Rules for API keys and rate limits.' },
   { href: '/legal/sources', title: 'Data Sources & Attribution', desc: 'Where ownership data comes from; ODbL notes.' },
   { href: '/legal/dmca', title: 'DMCA / Takedown', desc: 'How to request removal of content.' },
+  { href: '/legal/contact', title: 'Contact', desc: 'Support email and where to send requests.' },
 ];
 
 export default function LegalIndexPage() {
