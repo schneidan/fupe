@@ -26,6 +26,20 @@ class VerifyEmailDto {
   token!: string;
 }
 
+class ForgotPasswordDto {
+  @IsEmail()
+  email!: string;
+}
+
+class ResetPasswordDto {
+  @IsString()
+  token!: string;
+
+  @IsString()
+  @MinLength(8)
+  password!: string;
+}
+
 @Controller('auth')
 @SkipApiKey()
 export class AuthController {
@@ -39,6 +53,16 @@ export class AuthController {
   @Post('login')
   login(@Body() { email, password }: LoginDto) {
     return this.authService.login(email, password);
+  }
+
+  @Post('forgot-password')
+  forgotPassword(@Body() { email }: ForgotPasswordDto) {
+    return this.authService.forgotPassword(email);
+  }
+
+  @Post('reset-password')
+  resetPassword(@Body() { token, password }: ResetPasswordDto) {
+    return this.authService.resetPassword(token, password);
   }
 
   @Get('me')

@@ -172,3 +172,34 @@ export async function deleteMyAccount(token: string): Promise<void> {
   }
   clearSession();
 }
+
+async function parseMessage(res: Response): Promise<string> {
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      (body as { message?: string | string[] }).message ?? 'Request failed';
+    throw new Error(Array.isArray(msg) ? msg.join(', ') : String(msg));
+  }
+  return (body as { message: string }).message ?? 'OK';
+}
+
+export async function forgotPassword(email: string): Promise<string> {
+  const res = await fetch('/api/v1/auth/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  return parseMessage(res);
+}
+
+export async function resetPassword(
+  token: string,
+  password: string,
+): Promise<string> {
+  const res = await fetch('/api/v1/auth/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, password }),
+  });
+  return parseMessage(res);
+}

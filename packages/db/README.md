@@ -66,6 +66,8 @@ pnpm db:reset && pnpm db:migrate
 | `010_stripe_subscriptions.sql` | Stripe fields on users for API tiers |
 | `011_user_disabled.sql` | Soft-disable accounts (`disabled_at`) |
 | `012_edits_review_notes.sql` | `review_note` on edits_queue + reviewed_at index |
+| `013_billing_admin.sql` | Subscription period end, webhook log, admin audit |
+| `014_password_reset.sql` | Forgot-password tokens on users |
 
 ## Relational Tables
 

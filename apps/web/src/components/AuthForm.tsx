@@ -158,6 +158,16 @@ export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
             className="mt-1 w-full rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-fupe-text outline-none focus:border-fupe-muted"
           />
         </label>
+        {mode === 'login' ? (
+          <p className="text-right text-xs">
+            <Link
+              href="/forgot-password"
+              className="text-fupe-muted hover:text-fupe-text hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </p>
+        ) : null}
         {mode === 'register' ? (
           <label className="flex items-start gap-2 text-sm text-fupe-muted">
             <input

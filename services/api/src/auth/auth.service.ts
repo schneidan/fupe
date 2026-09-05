@@ -123,6 +123,44 @@ export class AuthService {
     return { message: 'Verification email sent' };
   }
 
+  /**
+   * Always returns the same message whether or not the email exists
+   * (avoids account enumeration).
+   */
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const message =
+      'If an account exists for that email, we sent a password reset link.';
+    const user = await this.usersRepo.findByEmail(email);
+    if (!user || user.disabled_at) {
+      return { message };
+    }
+
+    const token = randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+    await this.usersRepo.setPasswordResetToken(user.id, token, expires);
+
+    const site =
+      this.config.get<string>('NEXT_PUBLIC_SITE_URL') ??
+      this.config.get<string>('SITE_URL') ??
+      'http://localhost:3001';
+    const url = `${site.replace(/\/$/, '')}/reset-password?token=${token}`;
+    await this.mail.sendPasswordResetEmail(user.email, url);
+    return { message };
+  }
+
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const user = await this.usersRepo.findByPasswordResetToken(token);
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset link');
+    }
+    const hash = await bcrypt.hash(newPassword, 10);
+    await this.usersRepo.updatePasswordHash(user.id, hash);
+    return { message: 'Password updated. You can sign in with your new password.' };
+  }
+
   async exportMyData(user: AuthUser) {
     const data = await this.usersRepo.exportPersonalData(user.id);
     if (!data) throw new BadRequestException('Account not found');

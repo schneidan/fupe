@@ -13,6 +13,8 @@ export interface UserRow {
   email_verified_at: Date | null;
   email_verify_token: string | null;
   email_verify_expires_at: Date | null;
+  password_reset_token?: string | null;
+  password_reset_expires_at?: Date | null;
   subscription_tier?: 'free' | 'developer' | 'business';
   subscription_status?: string | null;
   stripe_customer_id?: string | null;
@@ -104,6 +106,54 @@ export class UsersRepository {
        WHERE id = $1
        RETURNING *`,
       [userId],
+    );
+    return rows[0];
+  }
+
+  async findByPasswordResetToken(token: string): Promise<UserRow | null> {
+    const { rows } = await this.pool.query<UserRow>(
+      `SELECT * FROM public.users
+       WHERE password_reset_token = $1
+         AND password_reset_expires_at > now()
+         AND disabled_at IS NULL`,
+      [token],
+    );
+    return rows[0] ?? null;
+  }
+
+  async setPasswordResetToken(
+    userId: string,
+    token: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    await this.pool.query(
+      `UPDATE public.users
+       SET password_reset_token = $2,
+           password_reset_expires_at = $3
+       WHERE id = $1`,
+      [userId, token, expiresAt],
+    );
+  }
+
+  async clearPasswordResetToken(userId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE public.users
+       SET password_reset_token = NULL,
+           password_reset_expires_at = NULL
+       WHERE id = $1`,
+      [userId],
+    );
+  }
+
+  async updatePasswordHash(userId: string, passwordHash: string): Promise<UserRow> {
+    const { rows } = await this.pool.query<UserRow>(
+      `UPDATE public.users
+       SET password_hash = $2,
+           password_reset_token = NULL,
+           password_reset_expires_at = NULL
+       WHERE id = $1
+       RETURNING *`,
+      [userId, passwordHash],
     );
     return rows[0];
   }
