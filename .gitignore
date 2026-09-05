@@ -31,6 +31,9 @@ Thumbs.db
 npm-debug.log*
 pnpm-debug.log*
 
+# Database dumps (pg_dump) — keep local/VPS only
+*.dump
+
 # Testing
 coverage/
 

@@ -236,22 +236,58 @@ docker compose exec -T postgres pg_restore -U fupe -d fupe --clean --if-exists /
 
 Notes:
 
-- Local dump may still use the old `fupe_dev` password *inside* roles; the server role password is whatever you set in compose. Connection from the host always uses the compose password.
-- If `pg_restore` warns about errors, check whether the graph/`age` extension loaded:  
-  `docker compose exec postgres psql -U fupe -d fupe -c "SELECT * FROM ag_catalog.ag_graph;"`
-- After restore, run `pnpm db:migrate` anyway so any newer migrations apply.
+- A normal `pg_dump -Fc` of the `fupe` database does **not** change the server login password. Use the same `POSTGRES_PASSWORD` / `DATABASE_URL` password you set in compose.
+- `pg_restore` may print non-fatal warnings (extensions, ownership). That’s OK if queries work afterward.
+- **Apache AGE OID repair (required after logical restore):** `pg_restore` assigns new schema OIDs, so Cypher can fail with `graph with oid … does not exist` even when `fupe_graph."Entity"` has rows. Remap the catalog:
+
+```bash
+docker compose exec -T postgres psql -U fupe -d fupe -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+LOAD 'age';
+SET search_path = ag_catalog, "$user", public;
+ALTER TABLE ag_catalog.ag_label DROP CONSTRAINT IF EXISTS fk_graph_oid;
+UPDATE ag_catalog.ag_label l
+SET graph = n.oid::integer
+FROM ag_catalog.ag_graph g
+JOIN pg_catalog.pg_namespace n ON n.nspname = g.name
+WHERE l.graph = g.graphid AND g.name = 'fupe_graph' AND g.graphid <> n.oid;
+UPDATE ag_catalog.ag_graph g
+SET graphid = n.oid::integer, namespace = n.oid
+FROM pg_catalog.pg_namespace n
+WHERE n.nspname = g.name AND g.name = 'fupe_graph' AND g.graphid <> n.oid;
+ALTER TABLE ag_catalog.ag_label
+  ADD CONSTRAINT fk_graph_oid
+  FOREIGN KEY (graph) REFERENCES ag_catalog.ag_graph(graphid);
+COMMIT;
+SELECT * FROM cypher('fupe_graph', $$ MATCH (e:Entity) RETURN count(e) $$) AS (c agtype);
+SQL
+```
+
+- After restore + OID repair, run `pnpm db:migrate` so any newer migrations apply (cursors/data are preserved).
 
 ---
 
-## 8. Environment files
+## 8. Environment files (production)
 
-Generate secrets:
+You need **two** files on the VPS. The root `.env.example` is for local monorepo convenience — **do not rely on it in production**.
+
+| File | Used by | Must exist on VPS? |
+|------|---------|-------------------|
+| `services/api/.env` | Nest API (`pnpm start:prod`, systemd) | **Yes** |
+| `apps/web/.env.production` | Next build + `pnpm start` / systemd | **Yes** |
+| Repo root `.env` | Optional — only if you want `pnpm db:migrate` / ingest to pick up `DATABASE_URL` without exporting it | Nice to have |
+| `apps/web/.env.local` | Local Next only | **No** (skip on VPS) |
+
+`127.0.0.1` for the **database and internal API** is correct on the VPS (same machine). What must **not** stay as localhost are public URLs: site, CORS, Stripe redirects.
+
+Generate secrets once:
 
 ```bash
-openssl rand -hex 32   # JWT_SECRET
+openssl rand -hex 32   # → paste as JWT_SECRET
+# DB password: same value you put in docker-compose.yml POSTGRES_PASSWORD
 ```
 
-### API — `services/api/.env`
+### 8a. API — `services/api/.env`
 
 ```bash
 cd /home/YOUR_USER/fupe
@@ -259,49 +295,106 @@ cp services/api/.env.example services/api/.env
 nano services/api/.env
 ```
 
-Use something like:
+Replace the whole file with this template (fill every `CHANGE_ME` / paste your secrets):
 
 ```bash
-DATABASE_URL=postgresql://fupe:STRONG_DB_PASSWORD@127.0.0.1:5433/fupe
+# --- required ---
+DATABASE_URL=postgresql://fupe:CHANGE_ME_DB_PASSWORD@127.0.0.1:5433/fupe
 PORT=3000
 NODE_ENV=production
-JWT_SECRET=STRONG_JWT_SECRET
+JWT_SECRET=CHANGE_ME_JWT_SECRET
 CORS_ORIGIN=https://fupe.app,https://www.fupe.app
 NEXT_PUBLIC_SITE_URL=https://fupe.app
 
-# Stripe Test mode until live site + Stripe activation
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PRICE_DEVELOPER=price_...
-# STRIPE_PRICE_BUSINESS=price_...
-# Webhook secret: create after section 12
-# STRIPE_WEBHOOK_SECRET=whsec_...
+# --- Stripe Test mode (live keys later) ---
+STRIPE_SECRET_KEY=sk_test_CHANGE_ME
+STRIPE_PRICE_DEVELOPER=price_CHANGE_ME
+# STRIPE_PRICE_BUSINESS=price_CHANGE_ME
+# Add after §12 webhook is created:
+# STRIPE_WEBHOOK_SECRET=whsec_CHANGE_ME
 
 REQUIRE_API_KEY=false
 
-# Email — start simple (links print in API logs), then switch to SMTP
+# --- email: console until real SMTP ---
 # EMAIL_PROVIDER=console
 AUTO_VERIFY_EMAIL=true
-BOOTSTRAP_ADMIN_EMAIL=you@example.com
+BOOTSTRAP_ADMIN_EMAIL=CHANGE_ME_YOUR_EMAIL@example.com
+# BOOTSTRAP_MODERATOR_EMAIL=CHANGE_ME_YOUR_EMAIL@example.com
 
-# Optional OCR / voice
+# --- optional ---
+OPEN_FOOD_FACTS_URL=https://world.openfoodfacts.org/api/v2/product
 # OPENAI_API_KEY=
+# OPENAI_VISION_MODEL=gpt-4o-mini
+# WHISPER_MODEL=whisper-1
 ```
 
-### Web — `apps/web/.env.production` (and/or `.env.local`)
+Checklist for this file:
 
-Next reads env at **build** time for `NEXT_PUBLIC_*` and for `API_URL` used in `next.config.js` rewrites.
+- [ ] `DATABASE_URL` password matches `docker-compose.yml` `POSTGRES_PASSWORD`
+- [ ] Host is `127.0.0.1:5433` (not a public hostname)
+- [ ] `NODE_ENV=production` (not `development`)
+- [ ] `JWT_SECRET` is a long random string (not `change-me-in-production`)
+- [ ] `CORS_ORIGIN` and `NEXT_PUBLIC_SITE_URL` use `https://fupe.app` (no `localhost:3001`)
+- [ ] Stripe test keys filled if you want `/developers` billing + footer later
+- [ ] `BOOTSTRAP_ADMIN_EMAIL` is **your** email (admin on register / next login)
+
+### 8b. Web — `apps/web/.env.production`
+
+Next bakes `NEXT_PUBLIC_*` and `API_URL` (rewrites) in at **build** time. Create this **before** `pnpm --filter @fupe/web build`.
 
 ```bash
 nano apps/web/.env.production
 ```
 
 ```bash
+# Internal: Next (on this VPS) talks to Nest on loopback — NOT api.fupe.app
 API_URL=http://127.0.0.1:3000
+
+# Public site URL (metadata, absolute links)
 NEXT_PUBLIC_SITE_URL=https://fupe.app
-NEXT_PUBLIC_SUPPORT_URL=https://buy.stripe.com/test_YOUR_PAYMENT_LINK
+
+# Footer "keep the lights on" — Stripe Payment Link (Test mode OK)
+NEXT_PUBLIC_SUPPORT_URL=https://buy.stripe.com/test_CHANGE_ME
 ```
 
-`NEXT_PUBLIC_SUPPORT_URL` is the Stripe Payment Link that powers the footer “keep the lights on” line.
+Checklist:
+
+- [ ] `API_URL` is `http://127.0.0.1:3000` (loopback; nginx/Cloudflare handle public HTTPS)
+- [ ] `NEXT_PUBLIC_SITE_URL` is `https://fupe.app` (not `:3001`)
+- [ ] Payment link set (or omit `NEXT_PUBLIC_SUPPORT_URL` to hide the footer line)
+- [ ] After any change to this file → **rebuild** web (`pnpm --filter @fupe/web build`) then restart `fupe-web`
+
+### 8c. Optional root `.env` (migrations / ingest on the VPS)
+
+```bash
+nano /home/YOUR_USER/fupe/.env
+```
+
+```bash
+DATABASE_URL=postgresql://fupe:CHANGE_ME_DB_PASSWORD@127.0.0.1:5433/fupe
+```
+
+Or export it when you migrate:
+
+```bash
+export DATABASE_URL="postgresql://fupe:CHANGE_ME_DB_PASSWORD@127.0.0.1:5433/fupe"
+pnpm db:migrate
+```
+
+### 8d. Sanity grep (no leftover localhost *public* URLs)
+
+```bash
+cd /home/YOUR_USER/fupe
+grep -nE 'localhost:3001|NODE_ENV=development|fupe_dev|change-me' \
+  services/api/.env apps/web/.env.production .env 2>/dev/null || true
+```
+
+Expect:
+
+- **OK:** `127.0.0.1:5433` and `127.0.0.1:3000` (internal)
+- **Bad:** `localhost:3001`, `NODE_ENV=development`, `fupe_dev`, `change-me` JWT
+
+None of these files are committed (gitignored). Keep a copy in a password manager.
 
 ---
 
