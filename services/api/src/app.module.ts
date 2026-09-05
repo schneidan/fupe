@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { join } from 'path';
+import { isGraphqlEnabled } from './common/security';
 import { DatabaseModule } from './database/database.module';
 import { GraphModule } from './graph/graph.module';
 import { LookupModule } from './lookup/lookup.module';
@@ -17,12 +18,17 @@ import { HealthController } from './health.controller';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    GraphQLModule.forRoot<ApolloDriverConfig>({
-      driver: ApolloDriver,
-      autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
-      sortSchema: true,
-      playground: process.env.NODE_ENV !== 'production',
-    }),
+    ...(isGraphqlEnabled()
+      ? [
+          GraphQLModule.forRoot<ApolloDriverConfig>({
+            driver: ApolloDriver,
+            autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
+            sortSchema: true,
+            playground: process.env.NODE_ENV !== 'production',
+            introspection: process.env.NODE_ENV !== 'production',
+          }),
+        ]
+      : []),
     DatabaseModule,
     AuthModule,
     GraphModule,

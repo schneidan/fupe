@@ -120,9 +120,24 @@ export class MailService {
 
   private resolveProvider(): string {
     const explicit = this.config.get<string>('EMAIL_PROVIDER')?.toLowerCase();
-    if (explicit) return explicit;
+    if (explicit) {
+      if (
+        explicit === 'console' &&
+        process.env.NODE_ENV === 'production'
+      ) {
+        throw new Error(
+          'EMAIL_PROVIDER=console is not allowed when NODE_ENV=production',
+        );
+      }
+      return explicit;
+    }
     if (this.config.get<string>('RESEND_API_KEY')?.trim()) return 'resend';
     if (this.config.get<string>('SMTP_HOST')) return 'smtp';
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'No email provider configured in production (set EMAIL_PROVIDER=resend or smtp)',
+      );
+    }
     return 'console';
   }
 

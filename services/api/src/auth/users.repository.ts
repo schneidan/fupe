@@ -21,6 +21,7 @@ export interface UserRow {
   stripe_subscription_id?: string | null;
   subscription_current_period_end?: Date | null;
   disabled_at?: Date | null;
+  token_version?: number;
   created_at: Date;
 }
 
@@ -44,12 +45,12 @@ export class UsersRepository {
     return rows[0] ?? null;
   }
 
-  async findByVerifyToken(token: string): Promise<UserRow | null> {
+  async findByVerifyToken(tokenHash: string): Promise<UserRow | null> {
     const { rows } = await this.pool.query<UserRow>(
       `SELECT * FROM public.users
        WHERE email_verify_token = $1
          AND email_verify_expires_at > now()`,
-      [token],
+      [tokenHash],
     );
     return rows[0] ?? null;
   }
@@ -85,7 +86,7 @@ export class UsersRepository {
 
   async setVerifyToken(
     userId: string,
-    token: string,
+    tokenHash: string,
     expiresAt: Date,
   ): Promise<void> {
     await this.pool.query(
@@ -93,7 +94,7 @@ export class UsersRepository {
        SET email_verify_token = $2,
            email_verify_expires_at = $3
        WHERE id = $1`,
-      [userId, token, expiresAt],
+      [userId, tokenHash, expiresAt],
     );
   }
 
@@ -110,20 +111,20 @@ export class UsersRepository {
     return rows[0];
   }
 
-  async findByPasswordResetToken(token: string): Promise<UserRow | null> {
+  async findByPasswordResetToken(tokenHash: string): Promise<UserRow | null> {
     const { rows } = await this.pool.query<UserRow>(
       `SELECT * FROM public.users
        WHERE password_reset_token = $1
          AND password_reset_expires_at > now()
          AND disabled_at IS NULL`,
-      [token],
+      [tokenHash],
     );
     return rows[0] ?? null;
   }
 
   async setPasswordResetToken(
     userId: string,
-    token: string,
+    tokenHash: string,
     expiresAt: Date,
   ): Promise<void> {
     await this.pool.query(
@@ -131,7 +132,7 @@ export class UsersRepository {
        SET password_reset_token = $2,
            password_reset_expires_at = $3
        WHERE id = $1`,
-      [userId, token, expiresAt],
+      [userId, tokenHash, expiresAt],
     );
   }
 
@@ -150,7 +151,8 @@ export class UsersRepository {
       `UPDATE public.users
        SET password_hash = $2,
            password_reset_token = NULL,
-           password_reset_expires_at = NULL
+           password_reset_expires_at = NULL,
+           token_version = COALESCE(token_version, 0) + 1
        WHERE id = $1
        RETURNING *`,
       [userId, passwordHash],
@@ -158,9 +160,30 @@ export class UsersRepository {
     return rows[0];
   }
 
+  async bumpTokenVersion(userId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE public.users
+          SET token_version = COALESCE(token_version, 0) + 1
+        WHERE id = $1`,
+      [userId],
+    );
+  }
+
+  async countAdmins(): Promise<number> {
+    const { rows } = await this.pool.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM public.users
+        WHERE role = 'admin' AND disabled_at IS NULL`,
+    );
+    return Number(rows[0]?.n ?? 0);
+  }
+
   async setRole(userId: string, role: UserRole): Promise<UserRow> {
     const { rows } = await this.pool.query<UserRow>(
-      `UPDATE public.users SET role = $2 WHERE id = $1 RETURNING *`,
+      `UPDATE public.users
+          SET role = $2,
+              token_version = COALESCE(token_version, 0) + 1
+        WHERE id = $1
+        RETURNING *`,
       [userId, role],
     );
     return rows[0];

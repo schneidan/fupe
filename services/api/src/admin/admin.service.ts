@@ -225,6 +225,12 @@ export class AdminService {
 
     const previous = await this.getUser(userId);
 
+    const bumpSession =
+      patch.role !== undefined || patch.disabled === true;
+    if (bumpSession) {
+      sets.push(`token_version = COALESCE(token_version, 0) + 1`);
+    }
+
     const { rowCount } = await this.pool.query(
       `UPDATE public.users SET ${sets.join(', ')} WHERE id = $1`,
       values,

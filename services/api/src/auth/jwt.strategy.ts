@@ -2,7 +2,10 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import { resolveJwtSecret } from '../common/security';
 import { AuthService, AuthUser } from './auth.service';
+
+type JwtPayload = AuthUser & { token_version?: number };
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -13,12 +16,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.get<string>('JWT_SECRET') ?? 'fupe-dev-secret-change-me',
+      secretOrKey: resolveJwtSecret(config),
     });
   }
 
-  async validate(payload: AuthUser): Promise<AuthUser> {
-    const user = await this.authService.validateUser(payload.id);
+  async validate(payload: JwtPayload): Promise<AuthUser> {
+    const user = await this.authService.validateUser(
+      payload.id,
+      payload.token_version ?? 0,
+    );
     if (!user) {
       throw new UnauthorizedException('Account not found or disabled');
     }

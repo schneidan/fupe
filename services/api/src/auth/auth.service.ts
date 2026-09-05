@@ -1,13 +1,17 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { MailService } from '../mail/mail.service';
+import {
+  hashOpaqueToken,
+  newOpaqueToken,
+} from '../common/security';
 import { UsersRepository, UserRole, UserRow } from './users.repository';
 
 export interface AuthUser {
@@ -20,6 +24,8 @@ export interface AuthUser {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersRepo: UsersRepository,
     private readonly jwtService: JwtService,
@@ -37,39 +43,34 @@ export class AuthService {
     }
 
     const hash = await bcrypt.hash(password, 10);
-    const bootstrap = this.bootstrapModeratorEmail();
-    const bootstrapAdmin = this.bootstrapAdminEmail();
-    const isBootstrapMod =
-      Boolean(bootstrap) && email.toLowerCase() === bootstrap;
-    const isBootstrapAdmin =
-      Boolean(bootstrapAdmin) && email.toLowerCase() === bootstrapAdmin;
-    const isBootstrap = isBootstrapMod || isBootstrapAdmin;
+    const bootstrap = await this.resolveBootstrapRole(email);
     const autoVerify =
-      isBootstrap || this.config.get<string>('AUTO_VERIFY_EMAIL') === 'true';
+      Boolean(bootstrap) ||
+      this.config.get<string>('AUTO_VERIFY_EMAIL') === 'true';
 
-    const verifyToken = autoVerify ? null : randomBytes(32).toString('hex');
+    const rawVerify = autoVerify ? null : newOpaqueToken();
     const verifyExpires = autoVerify
       ? null
       : new Date(Date.now() + 1000 * 60 * 60 * 24);
 
-    const role: UserRole = isBootstrapAdmin
-      ? 'admin'
-      : isBootstrapMod
-        ? 'moderator'
-        : 'user';
-
     const user = await this.usersRepo.create({
       email,
       passwordHash: hash,
-      trustScore: isBootstrap ? 100 : 0,
-      role,
+      trustScore: bootstrap ? 100 : 0,
+      role: bootstrap ?? 'user',
       emailVerifiedAt: autoVerify ? new Date() : null,
-      verifyToken,
+      verifyToken: rawVerify ? hashOpaqueToken(rawVerify) : null,
       verifyExpiresAt: verifyExpires,
     });
 
-    if (verifyToken) {
-      await this.sendVerification(user.email, verifyToken);
+    if (rawVerify) {
+      await this.sendVerification(user.email, rawVerify);
+    }
+
+    if (bootstrap === 'admin') {
+      this.logger.warn(
+        `Bootstrap admin granted to ${user.email}. Unset BOOTSTRAP_ADMIN_EMAIL now.`,
+      );
     }
 
     return this.issueToken(user);
@@ -97,14 +98,21 @@ export class AuthService {
     return this.issueToken(promoted);
   }
 
-  async validateUser(userId: string): Promise<AuthUser | null> {
+  async validateUser(
+    userId: string,
+    tokenVersion?: number,
+  ): Promise<AuthUser | null> {
     const user = await this.usersRepo.findById(userId);
     if (!user || user.disabled_at) return null;
+    const current = user.token_version ?? 0;
+    if (tokenVersion !== undefined && tokenVersion !== current) {
+      return null;
+    }
     return this.toAuthUser(user);
   }
 
   async verifyEmail(token: string): Promise<AuthUser> {
-    const user = await this.usersRepo.findByVerifyToken(token);
+    const user = await this.usersRepo.findByVerifyToken(hashOpaqueToken(token));
     if (!user) {
       throw new BadRequestException('Invalid or expired verification link');
     }
@@ -116,10 +124,10 @@ export class AuthService {
     if (user.email_verified) {
       return { message: 'Email already verified' };
     }
-    const token = randomBytes(32).toString('hex');
+    const raw = newOpaqueToken();
     const expires = new Date(Date.now() + 1000 * 60 * 60 * 24);
-    await this.usersRepo.setVerifyToken(user.id, token, expires);
-    await this.sendVerification(user.email, token);
+    await this.usersRepo.setVerifyToken(user.id, hashOpaqueToken(raw), expires);
+    await this.sendVerification(user.email, raw);
     return { message: 'Verification email sent' };
   }
 
@@ -135,15 +143,19 @@ export class AuthService {
       return { message };
     }
 
-    const token = randomBytes(32).toString('hex');
+    const raw = newOpaqueToken();
     const expires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
-    await this.usersRepo.setPasswordResetToken(user.id, token, expires);
+    await this.usersRepo.setPasswordResetToken(
+      user.id,
+      hashOpaqueToken(raw),
+      expires,
+    );
 
     const site =
       this.config.get<string>('NEXT_PUBLIC_SITE_URL') ??
       this.config.get<string>('SITE_URL') ??
       'http://localhost:3001';
-    const url = `${site.replace(/\/$/, '')}/reset-password?token=${token}`;
+    const url = `${site.replace(/\/$/, '')}/reset-password?token=${raw}`;
     await this.mail.sendPasswordResetEmail(user.email, url);
     return { message };
   }
@@ -152,13 +164,17 @@ export class AuthService {
     token: string,
     newPassword: string,
   ): Promise<{ message: string }> {
-    const user = await this.usersRepo.findByPasswordResetToken(token);
+    const user = await this.usersRepo.findByPasswordResetToken(
+      hashOpaqueToken(token),
+    );
     if (!user) {
       throw new BadRequestException('Invalid or expired reset link');
     }
     const hash = await bcrypt.hash(newPassword, 10);
     await this.usersRepo.updatePasswordHash(user.id, hash);
-    return { message: 'Password updated. You can sign in with your new password.' };
+    return {
+      message: 'Password updated. You can sign in with your new password.',
+    };
   }
 
   async exportMyData(user: AuthUser) {
@@ -176,30 +192,52 @@ export class AuthService {
     return user.role === 'moderator' || user.role === 'admin';
   }
 
-  private async sendVerification(email: string, token: string) {
+  private async sendVerification(email: string, rawToken: string) {
     const site =
       this.config.get<string>('NEXT_PUBLIC_SITE_URL') ??
       this.config.get<string>('SITE_URL') ??
       'http://localhost:3001';
-    const url = `${site.replace(/\/$/, '')}/verify-email?token=${token}`;
+    const url = `${site.replace(/\/$/, '')}/verify-email?token=${rawToken}`;
     await this.mail.sendVerificationEmail(email, url);
   }
 
   /**
-   * Promote an existing account when env bootstrap emails match.
-   * Admin wins over moderator. Never demotes an admin.
+   * Bootstrap admin only when no active admin exists (one-shot).
+   * Moderator bootstrap is email-match only (still log to unset).
    */
+  private async resolveBootstrapRole(
+    email: string,
+  ): Promise<UserRole | null> {
+    const normalized = email.toLowerCase();
+    const wantAdmin = this.bootstrapAdminEmail() === normalized;
+    const wantMod = this.bootstrapModeratorEmail() === normalized;
+
+    if (wantAdmin) {
+      const admins = await this.usersRepo.countAdmins();
+      if (admins === 0) return 'admin';
+      this.logger.warn(
+        `BOOTSTRAP_ADMIN_EMAIL matches ${normalized} but an admin already exists — ignoring. Unset BOOTSTRAP_ADMIN_EMAIL.`,
+      );
+      return wantMod ? 'moderator' : null;
+    }
+    if (wantMod) return 'moderator';
+    return null;
+  }
+
   private async applyBootstrapRole(user: UserRow): Promise<UserRow> {
-    const email = user.email.toLowerCase();
-    const wantAdmin = this.bootstrapAdminEmail() === email;
-    const wantMod = this.bootstrapModeratorEmail() === email;
-
-    let next: UserRole | null = null;
-    if (wantAdmin && user.role !== 'admin') next = 'admin';
-    else if (wantMod && user.role === 'user') next = 'moderator';
-
+    const next = await this.resolveBootstrapRole(user.email);
     if (!next) return user;
-    return this.usersRepo.setRole(user.id, next);
+    if (user.role === 'admin') return user;
+    if (next === 'moderator' && user.role !== 'user') return user;
+    if (next === user.role) return user;
+
+    const updated = await this.usersRepo.setRole(user.id, next);
+    if (next === 'admin') {
+      this.logger.warn(
+        `Bootstrap admin granted to ${user.email} on login. Unset BOOTSTRAP_ADMIN_EMAIL now.`,
+      );
+    }
+    return updated;
   }
 
   private bootstrapModeratorEmail(): string | null {
@@ -221,6 +259,7 @@ export class AuthService {
         trust_score: payload.trust_score,
         role: payload.role,
         email_verified: payload.email_verified,
+        token_version: user.token_version ?? 0,
       }),
       user: payload,
     };

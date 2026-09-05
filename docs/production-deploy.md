@@ -315,8 +315,13 @@ STRIPE_PRICE_DEVELOPER=price_CHANGE_ME
 
 REQUIRE_API_KEY=false
 LOOKUP_IP_RATE_LIMIT_PER_MIN=60
+AUTH_IP_RATE_LIMIT_PER_MIN=20
+MAX_ACTIVE_API_KEYS_PER_USER=5
 # Same value in apps/web/.env.production — first-party IMAGE (camera) without a paid API key
 FIRST_PARTY_LOOKUP_SECRET=CHANGE_ME_LONG_RANDOM
+# Leave unset in prod (defaults off). Set true only if you need them:
+# ENABLE_SWAGGER=true
+# ENABLE_GRAPHQL=true
 
 # --- email: Resend (verify fupe.app in Resend dashboard first) ---
 EMAIL_PROVIDER=resend
@@ -324,7 +329,8 @@ RESEND_API_KEY=re_CHANGE_ME
 EMAIL_FROM=FUPE <noreply@fupe.app>
 # While testing locally without mail: EMAIL_PROVIDER=console
 AUTO_VERIFY_EMAIL=false
-BOOTSTRAP_ADMIN_EMAIL=CHANGE_ME_YOUR_EMAIL@example.com
+# One-shot: grants admin only if no admin exists yet — then remove this line
+# BOOTSTRAP_ADMIN_EMAIL=CHANGE_ME_YOUR_EMAIL@example.com
 # BOOTSTRAP_MODERATOR_EMAIL=CHANGE_ME_YOUR_EMAIL@example.com
 
 # --- optional ---
@@ -341,9 +347,11 @@ Checklist for this file:
 - [ ] `NODE_ENV=production` (not `development`)
 - [ ] `JWT_SECRET` is a long random string (not `change-me-in-production`)
 - [ ] `FIRST_PARTY_LOOKUP_SECRET` set and mirrored on web (IMAGE gate)
+- [ ] `EMAIL_PROVIDER` is `resend` or `smtp` (not `console`); `AUTO_VERIFY_EMAIL=false`
+- [ ] `BOOTSTRAP_ADMIN_EMAIL` unset after you have an admin
 - [ ] `CORS_ORIGIN` and `NEXT_PUBLIC_SITE_URL` use `https://fupe.app` (no `localhost:3001`)
 - [ ] Stripe test keys filled if you want `/developers` billing + footer later
-- [ ] `BOOTSTRAP_ADMIN_EMAIL` is **your** email (admin on register / next login)
+- [ ] Unset `BOOTSTRAP_ADMIN_EMAIL` once you already have an admin account
 
 ### 8b. Web — `apps/web/.env.production`
 

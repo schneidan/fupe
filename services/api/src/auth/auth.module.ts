@@ -3,7 +3,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailModule } from '../mail/mail.module';
+import { resolveJwtSecret } from '../common/security';
 import { AuthController } from './auth.controller';
+import { AuthIpThrottleGuard } from './auth-ip-throttle.guard';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { UsersRepository } from './users.repository';
@@ -16,13 +18,13 @@ import { UsersRepository } from './users.repository';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET') ?? 'fupe-dev-secret-change-me',
+        secret: resolveJwtSecret(config),
         signOptions: { expiresIn: '7d' },
       }),
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, UsersRepository, JwtStrategy],
+  providers: [AuthService, UsersRepository, JwtStrategy, AuthIpThrottleGuard],
   exports: [AuthService, UsersRepository, JwtModule],
 })
 export class AuthModule {}

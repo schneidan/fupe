@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { resolveJwtSecret } from '../common/security';
 import { UsersRepository } from '../auth/users.repository';
 
 export interface AdminJwtUser {
@@ -17,7 +18,7 @@ export interface AdminJwtUser {
 
 /**
  * Guards routes to live DB `role === 'admin'` (not JWT claim alone).
- * Demotion / disable take effect immediately.
+ * Demotion / disable / token_version bump take effect immediately.
  */
 @Injectable()
 export class AdminGuard implements CanActivate {
@@ -40,11 +41,17 @@ export class AdminGuard implements CanActivate {
       throw new UnauthorizedException('Admin endpoints require a Bearer JWT');
     }
 
-    let raw: { id?: string; sub?: string; email?: string; role?: string };
+    let raw: {
+      id?: string;
+      sub?: string;
+      email?: string;
+      role?: string;
+      token_version?: number;
+    };
     try {
-      const secret =
-        this.config.get<string>('JWT_SECRET') ?? 'fupe-dev-secret-change-me';
-      raw = this.jwt.verify(token, { secret });
+      raw = this.jwt.verify(token, {
+        secret: resolveJwtSecret(this.config),
+      });
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
@@ -57,6 +64,9 @@ export class AdminGuard implements CanActivate {
     const user = await this.users.findById(id);
     if (!user || user.disabled_at) {
       throw new UnauthorizedException('Invalid or disabled account');
+    }
+    if ((raw.token_version ?? 0) !== (user.token_version ?? 0)) {
+      throw new UnauthorizedException('Session expired — please sign in again');
     }
     if (user.role !== 'admin') {
       throw new ForbiddenException('Admin role required');

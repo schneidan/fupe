@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.constants';
@@ -58,6 +58,18 @@ export class ApiKeysService {
     name = 'Default',
     tier: ApiKeyTier = 'free',
   ): Promise<{ key: ApiKeyPublic; rawKey: string }> {
+    const maxActive = Number(process.env.MAX_ACTIVE_API_KEYS_PER_USER ?? 5);
+    const { rows: countRows } = await this.pool.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM public.api_keys
+        WHERE user_id = $1 AND revoked_at IS NULL`,
+      [userId],
+    );
+    if (Number(countRows[0]?.n ?? 0) >= maxActive) {
+      throw new BadRequestException(
+        `Active API key limit reached (${maxActive}). Revoke an unused key first.`,
+      );
+    }
+
     const rawKey = this.generateRawKey();
     const keyHash = hashApiKey(rawKey);
     const keyPrefix = rawKey.slice(0, 12);

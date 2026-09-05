@@ -1,6 +1,15 @@
-import { Body, Controller, Delete, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { IsEmail, IsString, MinLength } from 'class-validator';
 import { AuthService, AuthUser } from './auth.service';
+import { AuthIpThrottleGuard } from './auth-ip-throttle.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { SkipApiKey } from '../api-keys/api-key.decorators';
 
@@ -42,6 +51,7 @@ class ResetPasswordDto {
 
 @Controller('auth')
 @SkipApiKey()
+@UseGuards(AuthIpThrottleGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
