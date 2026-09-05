@@ -36,8 +36,11 @@ The app uses a **dark grey UI**. If you see a white screen with `{"message":"Can
 Override:
 
 ```bash
-flutter run --dart-define=API_URL=http://192.168.1.10:3000
+flutter run --dart-define=API_URL=http://192.168.1.10:3000 \
+  --dart-define=FIRST_PARTY_LOOKUP_SECRET=same-as-api-env
 ```
+
+Production IMAGE lookup needs `FIRST_PARTY_LOOKUP_SECRET` matching the API (anonymous third-party IMAGE is blocked). Local API with unset secret still allows IMAGE when `NODE_ENV` is not `production`.
 
 ## Tabs
 

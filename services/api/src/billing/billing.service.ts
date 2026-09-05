@@ -172,36 +172,85 @@ export class BillingService {
       throw new BadRequestException(`Webhook Error: ${message}`);
     }
 
-    await this.logWebhook(event);
+    const isNew = await this.claimWebhookEvent(event);
+    if (!isNew) {
+      this.logger.debug(`Duplicate Stripe event ${event.id} — skipped`);
+      return { received: true };
+    }
 
-    switch (event.type) {
-      case 'checkout.session.completed':
-        await this.onCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
-        break;
-      case 'customer.subscription.updated':
-        await this.onSubscriptionUpdated(event.data.object as Stripe.Subscription);
-        break;
-      case 'customer.subscription.deleted':
-        await this.onSubscriptionDeleted(event.data.object as Stripe.Subscription);
-        break;
-      default:
-        this.logger.debug(`Ignored Stripe event ${event.type}`);
+    try {
+      switch (event.type) {
+        case 'checkout.session.completed':
+          await this.onCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+          break;
+        case 'customer.subscription.updated':
+          await this.onSubscriptionUpdated(event.data.object as Stripe.Subscription);
+          break;
+        case 'customer.subscription.deleted':
+          await this.onSubscriptionDeleted(event.data.object as Stripe.Subscription);
+          break;
+        case 'invoice.payment_failed':
+          await this.onInvoicePaymentFailed(event.data.object as Stripe.Invoice);
+          break;
+        default:
+          this.logger.debug(`Ignored Stripe event ${event.type}`);
+      }
+      await this.markWebhookProcessed(event.id);
+    } catch (err) {
+      // Leave processed_at NULL so a later delivery can retry after ops fix.
+      this.logger.error(
+        `Stripe event ${event.id} failed: ${err instanceof Error ? err.message : err}`,
+      );
+      throw err;
     }
 
     return { received: true };
   }
 
-  private async logWebhook(event: Stripe.Event) {
+  /**
+   * Claim an event for processing. Returns false only when already successfully
+   * processed (`processed_at` set). Duplicate deliveries while still unprocessed
+   * are allowed so a failed handler can retry.
+   */
+  private async claimWebhookEvent(event: Stripe.Event): Promise<boolean> {
     try {
-      await this.pool.query(
+      const inserted = await this.pool.query(
         `INSERT INTO public.stripe_webhook_log (stripe_event_id, event_type)
          VALUES ($1, $2)
-         ON CONFLICT (stripe_event_id) DO UPDATE SET received_at = now()`,
+         ON CONFLICT (stripe_event_id) DO NOTHING
+         RETURNING id`,
         [event.id, event.type],
+      );
+      if ((inserted.rowCount ?? 0) > 0) return true;
+
+      const existing = await this.pool.query<{ processed_at: Date | null }>(
+        `SELECT processed_at FROM public.stripe_webhook_log
+          WHERE stripe_event_id = $1`,
+        [event.id],
+      );
+      if (existing.rows[0]?.processed_at) return false;
+
+      // Prior attempt did not finish — allow retry.
+      return true;
+    } catch (err) {
+      this.logger.warn(
+        `Failed to claim Stripe event ${event.id}: ${err instanceof Error ? err.message : err}`,
+      );
+      throw new ServiceUnavailableException('Could not claim webhook event');
+    }
+  }
+
+  private async markWebhookProcessed(eventId: string) {
+    try {
+      await this.pool.query(
+        `UPDATE public.stripe_webhook_log
+            SET processed_at = now()
+          WHERE stripe_event_id = $1`,
+        [eventId],
       );
     } catch (err) {
       this.logger.warn(
-        `Failed to log Stripe event ${event.id}: ${err instanceof Error ? err.message : err}`,
+        `Failed to mark Stripe event ${eventId} processed: ${err instanceof Error ? err.message : err}`,
       );
     }
   }
@@ -314,6 +363,44 @@ export class BillingService {
       return;
     }
     await this.applyTier(user.id, 'free', 'canceled', null, null);
+  }
+
+  private async onInvoicePaymentFailed(invoice: Stripe.Invoice) {
+    const customerId =
+      typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+    if (!customerId) {
+      this.logger.warn('invoice.payment_failed missing customer');
+      return;
+    }
+
+    const user = await this.users.findByStripeCustomerId(customerId);
+    if (!user) {
+      this.logger.warn(`invoice.payment_failed: no user for customer ${customerId}`);
+      return;
+    }
+    if (user.subscription_status === 'admin_override') {
+      this.logger.log(
+        `Skip invoice.payment_failed for ${user.id}: admin_override`,
+      );
+      return;
+    }
+
+    const subRaw = (invoice as unknown as { subscription?: string | { id: string } | null })
+      .subscription;
+    const subscriptionId =
+      typeof subRaw === 'string'
+        ? subRaw
+        : subRaw?.id ?? user.stripe_subscription_id ?? null;
+
+    // Keep paid tier until cancel/delete, but surface past_due for admin + portal.
+    await this.users.setSubscription({
+      userId: user.id,
+      tier: (user.subscription_tier as ApiKeyTier) ?? 'developer',
+      status: 'past_due',
+      subscriptionId,
+      currentPeriodEnd: user.subscription_current_period_end ?? undefined,
+    });
+    this.logger.warn(`User ${user.id} subscription marked past_due (invoice ${invoice.id})`);
   }
 
   private async applyTier(

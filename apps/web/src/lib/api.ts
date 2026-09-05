@@ -83,8 +83,14 @@ export async function lookupImage(file: File): Promise<LookupResult> {
   form.append('type', 'IMAGE');
   form.append('file', file);
 
-  const res = await fetch('/api/v1/lookup', { method: 'POST', body: form });
-  if (!res.ok) throw new Error('Image lookup failed');
+  // Server route injects first-party secret — do not hit /api/v1/lookup from the browser for IMAGE.
+  const res = await fetch('/api/image-lookup', { method: 'POST', body: form });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg =
+      (err as { message?: string | string[] }).message ?? 'Image lookup failed';
+    throw new Error(Array.isArray(msg) ? msg.join(', ') : String(msg));
+  }
   return res.json();
 }
 

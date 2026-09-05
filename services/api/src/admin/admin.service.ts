@@ -8,13 +8,41 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.constants';
-import { UserRow, UserRole } from '../auth/users.repository';
+import { UserRole } from '../auth/users.repository';
 import { TIER_LIMITS } from '../api-keys/api-keys.service';
 import { writeAdminAudit } from './audit-log';
 
 const WEBHOOK_STALE_MS = 48 * 60 * 60 * 1000;
 
-export interface AdminUserRow extends UserRow {
+/** Safe admin projection — never select password / verify / reset secrets. */
+const ADMIN_USER_COLUMNS = `
+  u.id,
+  u.email,
+  u.trust_score,
+  u.role,
+  u.email_verified_at,
+  u.subscription_tier,
+  u.subscription_status,
+  u.stripe_customer_id,
+  u.stripe_subscription_id,
+  u.subscription_current_period_end,
+  u.disabled_at,
+  u.created_at
+`;
+
+export interface AdminUserRow {
+  id: string;
+  email: string;
+  trust_score: number;
+  role: UserRole;
+  email_verified_at: Date | null;
+  subscription_tier: 'free' | 'developer' | 'business';
+  subscription_status: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  subscription_current_period_end: Date | null;
+  disabled_at: Date | null;
+  created_at: Date;
   api_key_count: number;
   pending_edit_count: number;
 }
@@ -113,7 +141,7 @@ export class AdminService {
     );
 
     const { rows } = await this.pool.query<AdminUserRow>(
-      `SELECT u.*,
+      `SELECT ${ADMIN_USER_COLUMNS},
               (SELECT count(*) FROM public.api_keys k WHERE k.user_id = u.id AND k.revoked_at IS NULL)::int AS api_key_count,
               (SELECT count(*) FROM public.edits_queue e WHERE e.user_id = u.id AND e.status = 'PENDING')::int AS pending_edit_count
          FROM public.users u
@@ -128,7 +156,7 @@ export class AdminService {
 
   async getUser(userId: string): Promise<AdminUserRow> {
     const { rows } = await this.pool.query<AdminUserRow>(
-      `SELECT u.*,
+      `SELECT ${ADMIN_USER_COLUMNS},
               (SELECT count(*) FROM public.api_keys k WHERE k.user_id = u.id AND k.revoked_at IS NULL)::int AS api_key_count,
               (SELECT count(*) FROM public.edits_queue e WHERE e.user_id = u.id AND e.status = 'PENDING')::int AS pending_edit_count
          FROM public.users u
@@ -197,13 +225,12 @@ export class AdminService {
 
     const previous = await this.getUser(userId);
 
-    const { rows } = await this.pool.query<UserRow>(
-      `UPDATE public.users SET ${sets.join(', ')} WHERE id = $1 RETURNING *`,
+    const { rowCount } = await this.pool.query(
+      `UPDATE public.users SET ${sets.join(', ')} WHERE id = $1`,
       values,
     );
-    if (!rows[0]) throw new NotFoundException('User not found');
+    if (!rowCount) throw new NotFoundException('User not found');
 
-    const updated = rows[0];
     await writeAdminAudit(this.pool, {
       actorId,
       action: 'user_update',
@@ -216,10 +243,16 @@ export class AdminService {
         disabled: Boolean(previous.disabled_at),
       },
       newState: {
-        role: updated.role,
-        trust_score: updated.trust_score,
-        email_verified: Boolean(updated.email_verified_at),
-        disabled: Boolean(updated.disabled_at),
+        role: patch.role ?? previous.role,
+        trust_score: patch.trust_score ?? previous.trust_score,
+        email_verified:
+          patch.email_verified !== undefined
+            ? patch.email_verified
+            : Boolean(previous.email_verified_at),
+        disabled:
+          patch.disabled !== undefined
+            ? patch.disabled
+            : Boolean(previous.disabled_at),
       },
     });
 
@@ -436,14 +469,14 @@ export class AdminService {
     userId: string,
     tier: 'free' | 'developer' | 'business',
     note?: string,
-  ): Promise<UserRow> {
+  ): Promise<AdminUserRow> {
     const previous = await this.getUser(userId);
-    const { rows } = await this.pool.query<UserRow>(
+    const { rows } = await this.pool.query<{ id: string }>(
       `UPDATE public.users
           SET subscription_tier = $2,
               subscription_status = 'admin_override'
         WHERE id = $1
-        RETURNING *`,
+        RETURNING id`,
       [userId, tier],
     );
     if (!rows[0]) throw new NotFoundException('User not found');
@@ -471,7 +504,7 @@ export class AdminService {
       note: note?.trim() || null,
     });
 
-    return rows[0];
+    return this.getUser(userId);
   }
 
   // ─── Usage overview ───────────────────────────────────────────────────────

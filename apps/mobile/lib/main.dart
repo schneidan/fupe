@@ -29,13 +29,23 @@ void main() {
     'API_URL',
     defaultValue: '',
   );
+  const firstPartySecret = String.fromEnvironment(
+    'FIRST_PARTY_LOOKUP_SECRET',
+    defaultValue: '',
+  );
   final baseUrl = apiUrl.isNotEmpty ? apiUrl : _defaultApiBaseUrl();
   final auth = AuthService(baseUrl: baseUrl)..load();
 
   runApp(
     MultiProvider(
       providers: [
-        Provider(create: (_) => ApiService(baseUrl: baseUrl)),
+        Provider(
+          create: (_) => ApiService(
+            baseUrl: baseUrl,
+            firstPartySecret:
+                firstPartySecret.isNotEmpty ? firstPartySecret : null,
+          ),
+        ),
         Provider(create: (_) => AdminApiService(baseUrl: baseUrl)),
         ChangeNotifierProvider.value(value: auth),
       ],

@@ -14,9 +14,10 @@ class ApiException implements Exception {
 }
 
 class ApiService {
-  ApiService({required this.baseUrl});
+  ApiService({required this.baseUrl, this.firstPartySecret});
 
   final String baseUrl;
+  final String? firstPartySecret;
 
   Future<LookupResult> lookupText(String query) async {
     final response = await http.post(
@@ -44,6 +45,10 @@ class ApiService {
       Uri.parse('$baseUrl/api/v1/lookup'),
     );
     request.fields['type'] = 'IMAGE';
+    final secret = firstPartySecret?.trim();
+    if (secret != null && secret.isNotEmpty) {
+      request.headers['X-Fupe-First-Party'] = secret;
+    }
     request.files.add(await http.MultipartFile.fromPath('file', file.path));
 
     final streamed = await request.send();

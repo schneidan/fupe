@@ -314,6 +314,9 @@ STRIPE_PRICE_DEVELOPER=price_CHANGE_ME
 # STRIPE_WEBHOOK_SECRET=whsec_CHANGE_ME
 
 REQUIRE_API_KEY=false
+LOOKUP_IP_RATE_LIMIT_PER_MIN=60
+# Same value in apps/web/.env.production — first-party IMAGE (camera) without a paid API key
+FIRST_PARTY_LOOKUP_SECRET=CHANGE_ME_LONG_RANDOM
 
 # --- email: Resend (verify fupe.app in Resend dashboard first) ---
 EMAIL_PROVIDER=resend
@@ -337,6 +340,7 @@ Checklist for this file:
 - [ ] Host is `127.0.0.1:5433` (not a public hostname)
 - [ ] `NODE_ENV=production` (not `development`)
 - [ ] `JWT_SECRET` is a long random string (not `change-me-in-production`)
+- [ ] `FIRST_PARTY_LOOKUP_SECRET` set and mirrored on web (IMAGE gate)
 - [ ] `CORS_ORIGIN` and `NEXT_PUBLIC_SITE_URL` use `https://fupe.app` (no `localhost:3001`)
 - [ ] Stripe test keys filled if you want `/developers` billing + footer later
 - [ ] `BOOTSTRAP_ADMIN_EMAIL` is **your** email (admin on register / next login)
@@ -350,8 +354,10 @@ nano apps/web/.env.production
 ```
 
 ```bash
-# Internal: Next (on this VPS) talks to Nest on loopback — NOT api.fupe.app
 API_URL=http://127.0.0.1:3000
+
+# Same value as services/api FIRST_PARTY_LOOKUP_SECRET (server-only; not NEXT_PUBLIC_)
+FIRST_PARTY_LOOKUP_SECRET=CHANGE_ME_SAME_AS_API
 
 # Public site URL (metadata, absolute links)
 NEXT_PUBLIC_SITE_URL=https://fupe.app
@@ -363,6 +369,7 @@ NEXT_PUBLIC_SUPPORT_URL=https://buy.stripe.com/test_CHANGE_ME
 Checklist:
 
 - [ ] `API_URL` is `http://127.0.0.1:3000` (loopback; nginx/Cloudflare handle public HTTPS)
+- [ ] `FIRST_PARTY_LOOKUP_SECRET` matches the API env (IMAGE camera lookup)
 - [ ] `NEXT_PUBLIC_SITE_URL` is `https://fupe.app` (not `:3001`)
 - [ ] Payment link set (or omit `NEXT_PUBLIC_SUPPORT_URL` to hide the footer line)
 - [ ] After any change to this file → **rebuild** web (`pnpm --filter @fupe/web build`) then restart `fupe-web`
@@ -716,6 +723,15 @@ You can process **test** payments on the real hostname while Stripe account acti
    - `sudo systemctl restart fupe-api`
 
 If webhook delivery fails with timeouts, check Cloudflare **Security** isn’t challenging Stripe (usually fine). Keep cache bypassed on `api.fupe.app`.
+
+### Lookup rate limits (API + Cloudflare)
+
+The Nest API applies an in-process IP throttle on `/lookup` (default **60 req/min/IP**, override with `LOOKUP_IP_RATE_LIMIT_PER_MIN`). IMAGE lookups require either a Developer/Business API key **or** header `X-Fupe-First-Party` matching `FIRST_PARTY_LOOKUP_SECRET` (web injects this via `/api/image-lookup`; mobile via `--dart-define`).
+
+Optional Cloudflare hardening (dashboard → Security → WAF / Rate limiting):
+
+- Rate limit rule on `api.fupe.app/api/v1/lookup*` (e.g. 60–120 / min per IP)
+- Keep `api.fupe.app` **cache bypass** (API responses must not be cached)
 
 When Stripe unlocks live mode later: create **live** Payment Link + prices + webhook, swap `sk_test_` → `sk_live_`, update `NEXT_PUBLIC_SUPPORT_URL`, rebuild web, restart services.
 

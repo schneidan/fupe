@@ -4,7 +4,9 @@ import {
   ForbiddenException,
   Post,
   Req,
+  UnauthorizedException,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
   Get,
   Query,
@@ -26,6 +28,7 @@ import {
   SearchDto,
   UnifiedLookupDto,
 } from './lookup.dto';
+import { LookupIpThrottleGuard } from './lookup-ip-throttle.guard';
 import { LookupService } from './lookup.service';
 
 @ApiTags('Lookup')
@@ -34,8 +37,9 @@ import { LookupService } from './lookup.service';
   name: 'X-API-Key',
   required: false,
   description:
-    'API key (`fupe_…`). Optional for first-party clients unless REQUIRE_API_KEY=true. Required for third-party use; free tier cannot call IMAGE.',
+    'API key (`fupe_…`). Optional for first-party TEXT/BARCODE/VOICE unless REQUIRE_API_KEY=true. IMAGE needs a paid-tier key or X-Fupe-First-Party.',
 })
+@UseGuards(LookupIpThrottleGuard)
 @Controller('lookup')
 export class LookupController {
   constructor(private readonly lookupService: LookupService) {}
@@ -44,7 +48,7 @@ export class LookupController {
   @ApiOperation({
     summary: 'Unified ownership lookup',
     description:
-      'Resolve whether a brand/product/company is PE-backed. JSON body for TEXT/BARCODE; multipart for IMAGE/VOICE with a `file` field.',
+      'Resolve whether a brand/product/company is PE-backed. JSON body for TEXT/BARCODE; multipart for IMAGE/VOICE with a `file` field. IMAGE requires Developer/Business API key or first-party credential.',
   })
   @ApiConsumes('application/json', 'multipart/form-data')
   @ApiBody({ type: UnifiedLookupDto })
@@ -55,10 +59,17 @@ export class LookupController {
     @Body() body: UnifiedLookupDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    if (body.type === 'IMAGE' && req.apiKey) {
-      if (!TIER_ALLOWS_IMAGE[req.apiKey.tier]) {
-        throw new ForbiddenException(
-          'IMAGE lookup requires Developer or Business tier. Upgrade at /developers.',
+    if (body.type === 'IMAGE') {
+      const firstPartyOk = this.isFirstPartyImage(req);
+      if (req.apiKey) {
+        if (!TIER_ALLOWS_IMAGE[req.apiKey.tier]) {
+          throw new ForbiddenException(
+            'IMAGE lookup requires Developer or Business tier. Upgrade at /developers.',
+          );
+        }
+      } else if (!firstPartyOk) {
+        throw new UnauthorizedException(
+          'IMAGE lookup requires a Developer/Business API key, or a first-party client credential.',
         );
       }
     }
@@ -75,6 +86,17 @@ export class LookupController {
   async search(@Query() { q }: SearchDto) {
     const hits = await this.lookupService.fuzzySearchHits(q);
     return { query: q, results: hits, count: hits.length };
+  }
+
+  /** First-party web/mobile may call IMAGE without a paid API key. */
+  private isFirstPartyImage(req: RequestWithApiKey): boolean {
+    const expected = process.env.FIRST_PARTY_LOOKUP_SECRET?.trim();
+    if (!expected) {
+      // Local/dev convenience when secret is unset.
+      return process.env.NODE_ENV !== 'production';
+    }
+    const header = req.header('x-fupe-first-party')?.trim();
+    return Boolean(header && header === expected);
   }
 
   private toLookupInput(
