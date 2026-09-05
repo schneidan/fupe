@@ -34,7 +34,7 @@ export default function ApiTermsPage() {
         page via the Stripe Customer Portal — access continues through the end of
         the paid period, then the key returns to Free limits. Refunds for unused
         time are not guaranteed but we will correct erroneous charges; email{' '}
-        <ObfuscatedEmail user="support" domain="fupe.com" />. Complimentary admin
+        <ObfuscatedEmail user="support" domain="fupe.app" />. Complimentary admin
         overrides are audited and may be revoked.
       </p>
       <LegalH2>4. Attribution</LegalH2>

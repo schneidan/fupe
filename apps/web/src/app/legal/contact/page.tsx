@@ -12,7 +12,7 @@ export default function ContactPage() {
         reduce automated scraping).
       </p>
       <p className="mt-4">
-        <ObfuscatedEmail user="support" domain="fupe.com" />
+        <ObfuscatedEmail user="support" domain="fupe.app" />
       </p>
       <LegalH2>Other topics</LegalH2>
       <ul className="list-disc space-y-2 pl-5">

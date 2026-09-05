@@ -80,7 +80,7 @@ export default function TermsPage() {
       <LegalH2>9. Contact</LegalH2>
       <p>
         Questions:{' '}
-        <ObfuscatedEmail user="support" domain="fupe.com" />{' '}
+        <ObfuscatedEmail user="support" domain="fupe.app" />{' '}
         or see{' '}
         <a href="/legal/contact" className="text-fupe-text hover:underline">
           Contact
