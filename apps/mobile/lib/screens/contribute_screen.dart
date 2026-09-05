@@ -266,7 +266,7 @@ class _ContributeScreenState extends State<ContributeScreen> {
                   final msg = await auth.resendVerification();
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('$msg — check API console for the link')),
+                    SnackBar(content: Text('$msg — check your inbox')),
                   );
                 } catch (e) {
                   if (!mounted) return;
