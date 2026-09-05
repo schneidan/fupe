@@ -315,9 +315,12 @@ STRIPE_PRICE_DEVELOPER=price_CHANGE_ME
 
 REQUIRE_API_KEY=false
 
-# --- email: console until real SMTP ---
-# EMAIL_PROVIDER=console
-AUTO_VERIFY_EMAIL=true
+# --- email: Resend (verify fupe.app in Resend dashboard first) ---
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=re_CHANGE_ME
+EMAIL_FROM=FUPE <noreply@fupe.app>
+# While testing locally without mail: EMAIL_PROVIDER=console
+AUTO_VERIFY_EMAIL=false
 BOOTSTRAP_ADMIN_EMAIL=CHANGE_ME_YOUR_EMAIL@example.com
 # BOOTSTRAP_MODERATOR_EMAIL=CHANGE_ME_YOUR_EMAIL@example.com
 
@@ -801,7 +804,7 @@ Copy dumps off-box occasionally (`scp` or object storage). Provider disk snapsho
 
 | Item | Notes |
 |------|--------|
-| Real email | Set `EMAIL_PROVIDER=smtp` + Resend/Postmark/SES; turn off `AUTO_VERIFY_EMAIL` |
+| Real email (Resend) | `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `EMAIL_FROM=FUPE <noreply@fupe.app>`; verify domain in Resend; set `AUTO_VERIFY_EMAIL=false` |
 | Ingest cron on VPS | Same pattern as local: PATH must include node/pnpm; see `packages/ingest/README.md` |
 | `REQUIRE_API_KEY=true` | Only after first-party clients send keys |
 | Tighten UFW to Cloudflare IPs only | After origin TLS works — see [Cloudflare IPs](https://www.cloudflare.com/ips/) |
