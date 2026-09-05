@@ -1,8 +1,24 @@
 import Link from 'next/link';
 
+const supportUrl = process.env.NEXT_PUBLIC_SUPPORT_URL?.trim();
+
 export function SiteFooter() {
   return (
     <footer className="border-t border-fupe-border px-4 py-6 text-center text-sm text-fupe-muted">
+      {supportUrl ? (
+        <p className="mb-4 text-sm text-fupe-muted">
+          If you found this useful, please consider{' '}
+          <a
+            href={supportUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-fupe-text underline decoration-fupe-border underline-offset-2 transition hover:decoration-fupe-muted"
+          >
+            helping us keep the lights on
+          </a>
+          !
+        </p>
+      ) : null}
       <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
         <Link href="/browse" className="text-fupe-text transition hover:text-fupe-muted">
           Browse
