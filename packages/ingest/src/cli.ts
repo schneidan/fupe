@@ -47,12 +47,14 @@ async function main() {
             exhausted: p.exhausted,
           })),
           stale: result.stale,
+          warnings: result.warnings,
           errors: result.errors,
         },
         null,
         2,
       ),
     );
+    // Soft upstream HTTP (401/403/429/503) → warnings only; hard errors fail cron.
     if (result.errors.length) process.exitCode = 1;
     return;
   }

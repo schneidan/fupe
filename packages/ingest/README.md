@@ -28,10 +28,12 @@ pnpm ingest --schedule --max-pages 1 --dry-run
 | `--max-pages` | `2` | Pages per source/region per run |
 | `--page-size` / `--limit` | `25` | Records per page |
 | `--stale-months` | `6` | Flag citations older than this |
-| `--delay-ms` | `8000` | Pause between pages (be nice to Wikidata/OFF) |
+| `--delay-ms` | `8000` | Pause between pages (be nice to Wikidata) |
 | `--dry-run` | off | Fetch only; no cursor/stale writes |
 
-Default jobs: Wikidata US + EU (offset), Open Food Facts US (page). Cursors live in `public.ingest_cursors`. When a source reports `exhausted`, the next run resets to the start for a refresh pass.
+Default jobs: Wikidata US + EU (offset). **Open Food Facts is disabled** on the cron for now — after page 11 the search API only returned 401/403/503 (still blocked on a live probe). Re-enable in `DEFAULT_SCHEDULE_JOBS` when we have a dump import or an accepted API identity. Manual OFF runs still work via `--source open-food-facts`. Upstream HTTP 401/403/429/503 are soft warnings (cron stays exit 0).
+
+Cursors live in `public.ingest_cursors`. When a source reports `exhausted`, the next run resets to the start for a refresh pass.
 
 Each page logs a diff (`Δentities`, `Δcitations`, matched/queued). After pages, citations with `retrieved_at` older than N months are marked `stale` (shown as “may be outdated” in web/mobile).
 
@@ -73,7 +75,7 @@ pnpm ingest --help
 | Id | Status | What it loads |
 |----|--------|----------------|
 | `wikidata` | **Live** | P749 parent-org edges; PE/VC typed via P31 |
-| `open-food-facts` | **Live** | Products + brand entities + `MANUFACTURED_BY` |
+| `open-food-facts` | **Live** (manual only; off cron) | Products + brand entities + `MANUFACTURED_BY` |
 | `sec-edgar` | Stub (P1) | — |
 | `companies-house` | Stub (P1) | — |
 

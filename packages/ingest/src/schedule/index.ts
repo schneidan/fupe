@@ -42,8 +42,11 @@ export function printScheduleHelpAndExit(code: number): never {
   console.log(`Usage:
   pnpm ingest --schedule [--max-pages N] [--page-size N] [--stale-months N] [--delay-ms N] [--dry-run]
 
-Advances persisted cursors for Wikidata (US/EU) and Open Food Facts (US),
-logs entity/citation diffs per page, then flags citations older than N months.
+Advances persisted cursors for Wikidata (US/EU), logs entity/citation diffs
+per page, then flags citations older than N months.
+
+Open Food Facts is off the default schedule (upstream 401/403/503). Manual:
+  pnpm ingest --source open-food-facts --region US --page 1 --limit 25
 
 Defaults are extra-polite for a ~40min cron: max-pages=2, page-size=25, delay-ms=8000.
 

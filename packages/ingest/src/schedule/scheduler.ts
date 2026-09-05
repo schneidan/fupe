@@ -41,18 +41,31 @@ export interface SchedulePageDiff {
 export interface ScheduleResult {
   pages: SchedulePageDiff[];
   stale: { scanned: number; flagged: number; staleMonths: number };
+  /** Hard failures — schedule exits non-zero when non-empty. */
   errors: string[];
+  /** Upstream HTTP blocks / rate limits — logged, do not fail the cron. */
+  warnings: string[];
   message: string;
 }
 
+/**
+ * Wikidata only for now. Open Food Facts was removed from the default cron after
+ * sustained 401/403/503 on the same search page (no further successful OFF pages
+ * after cursor 11). Re-add when we have a working User-Agent / dump import path:
+ *   { source: 'open-food-facts', region: 'US', cursorKind: 'page', limit: 25 },
+ */
 export const DEFAULT_SCHEDULE_JOBS: ScheduleJob[] = [
   { source: 'wikidata', region: 'US', cursorKind: 'offset', limit: 25 },
   { source: 'wikidata', region: 'EU', cursorKind: 'offset', limit: 25 },
-  { source: 'open-food-facts', region: 'US', cursorKind: 'page', limit: 25 },
 ];
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** OFF/Wikidata throttle or bot challenge — skip the job, don't fail the cron. */
+function isSoftUpstreamError(message: string): boolean {
+  return /\bHTTP (401|403|429|503)\b/.test(message);
 }
 
 /**
@@ -60,20 +73,21 @@ function sleep(ms: number): Promise<void> {
  * then flag stale citations. When a source is exhausted, the next run
  * resets the cursor to start a refresh pass.
  *
- * Defaults are intentionally gentle (≈40min cron): 2 pages × 25 rows,
- * 8s between pages, so Wikidata SPARQL and Open Food Facts stay happy.
+ * Defaults are intentionally gentle (≈40min cron): few pages × 25 rows,
+ * 8s between pages, so Wikidata SPARQL stays happy.
  */
 export async function runSchedule(
   options: ScheduleOptions = {},
 ): Promise<ScheduleResult> {
   const jobs = options.jobs ?? DEFAULT_SCHEDULE_JOBS;
-  // Defaults tuned for a ~40min cron: few pages, long pauses (Wikidata + OFF).
+  // Defaults tuned for a ~40min cron: few pages, long pauses (Wikidata).
   const maxPages = Math.max(options.maxPages ?? 2, 1);
   const pageSize = options.pageSize;
   const delayMs = options.delayMs ?? 8000;
   const staleMonths = options.staleMonths ?? 6;
   const pages: SchedulePageDiff[] = [];
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   const pool = createPool(options.databaseUrl);
 
@@ -166,7 +180,12 @@ export async function runSchedule(
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           const entry = `${label}: ${message}`;
-          errors.push(entry);
+          const soft = isSoftUpstreamError(message);
+          if (soft) {
+            warnings.push(entry);
+          } else {
+            errors.push(entry);
+          }
           pages.push({
             source: job.source,
             region: job.region,
@@ -180,7 +199,10 @@ export async function runSchedule(
             exhausted: false,
             error: message,
           });
-          console.error(`[schedule] ${entry} — skipping remaining pages for this job`);
+          console[soft ? 'warn' : 'error'](
+            `[schedule] ${entry} — skipping remaining pages for this job` +
+              (soft ? ' (soft upstream; cron continues)' : ''),
+          );
           break;
         }
       }
@@ -205,9 +227,11 @@ export async function runSchedule(
       pages,
       stale,
       errors,
+      warnings,
       message:
         `Schedule complete: ${pages.length} page(s), net +${netEntities} entities, ` +
         `stale flagged ${stale.flagged}` +
+        (warnings.length ? `, ${warnings.length} warning(s)` : '') +
         (errors.length ? `, ${errors.length} error(s)` : '') +
         '.',
     };
