@@ -205,7 +205,9 @@ export class MailService {
       port,
       secure,
       auth: user ? { user, pass: pass ?? '' } : undefined,
-      tls: { rejectUnauthorized: false },
+      tls: {
+        rejectUnauthorized: process.env.NODE_ENV === 'production',
+      },
     });
 
     this.logger.log(`SMTP transport ready → ${host}:${port}`);

@@ -14,6 +14,10 @@ import {
 } from '../common/security';
 import { UsersRepository, UserRole, UserRow } from './users.repository';
 
+/** Precomputed bcrypt of a random string — used only to equalize login timing. */
+const DUMMY_PASSWORD_HASH =
+  '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -39,7 +43,9 @@ export class AuthService {
   ): Promise<{ token: string; user: AuthUser }> {
     const existing = await this.usersRepo.findByEmail(email);
     if (existing) {
-      throw new UnauthorizedException('Email already registered');
+      // Match happy-path cost so timing doesn’t reveal whether the email exists.
+      await bcrypt.hash(password, 10);
+      throw new UnauthorizedException('Unable to create account');
     }
 
     const hash = await bcrypt.hash(password, 10);
@@ -81,16 +87,13 @@ export class AuthService {
     password: string,
   ): Promise<{ token: string; user: AuthUser }> {
     const user = await this.usersRepo.findByEmail(email);
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
+    // Always bcrypt so missing users don’t fail faster than bad passwords.
+    const valid = await bcrypt.compare(
+      password,
+      user?.password_hash ?? DUMMY_PASSWORD_HASH,
+    );
 
-    if (user.disabled_at) {
-      throw new UnauthorizedException('This account has been disabled');
-    }
-
-    const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) {
+    if (!user || !valid || user.disabled_at) {
       throw new UnauthorizedException('Invalid credentials');
     }
 

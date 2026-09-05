@@ -145,6 +145,39 @@ export class ApiKeysService {
     );
   }
 
+  /**
+   * Atomically increment today's usage if under the daily limit.
+   * Returns whether the request is allowed and the new count.
+   */
+  async tryConsumeDailyQuota(
+    apiKeyId: string,
+    dailyLimit: number,
+  ): Promise<{ allowed: boolean; used: number }> {
+    const { rows } = await this.pool.query<{ request_count: number }>(
+      `INSERT INTO public.api_key_daily_usage (api_key_id, usage_date, request_count)
+       VALUES ($1, (timezone('utc', now()))::date, 1)
+       ON CONFLICT (api_key_id, usage_date) DO UPDATE
+         SET request_count = public.api_key_daily_usage.request_count + 1
+       WHERE public.api_key_daily_usage.request_count < $2
+       RETURNING request_count`,
+      [apiKeyId, dailyLimit],
+    );
+
+    if (rows[0]) {
+      return { allowed: true, used: rows[0].request_count };
+    }
+
+    const { rows: cur } = await this.pool.query<{ request_count: number }>(
+      `SELECT request_count FROM public.api_key_daily_usage
+        WHERE api_key_id = $1 AND usage_date = (timezone('utc', now()))::date`,
+      [apiKeyId],
+    );
+    return {
+      allowed: false,
+      used: cur[0]?.request_count ?? dailyLimit,
+    };
+  }
+
   async logUsage(params: {
     apiKeyId: string;
     endpoint: string;
@@ -165,10 +198,14 @@ export class ApiKeysService {
 
   async countUsageToday(apiKeyId: string): Promise<number> {
     const { rows } = await this.pool.query<{ n: string }>(
-      `SELECT count(*)::text AS n
-       FROM public.api_usage_log
-       WHERE api_key_id = $1
-         AND created_at >= date_trunc('day', now())`,
+      `SELECT COALESCE(
+         (SELECT request_count::text FROM public.api_key_daily_usage
+           WHERE api_key_id = $1
+             AND usage_date = (timezone('utc', now()))::date),
+         (SELECT count(*)::text FROM public.api_usage_log
+           WHERE api_key_id = $1
+             AND created_at >= date_trunc('day', timezone('utc', now())))
+       ) AS n`,
       [apiKeyId],
     );
     return Number(rows[0]?.n ?? 0);

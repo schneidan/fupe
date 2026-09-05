@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Pool } from 'pg';
 
 export type AdminAuditAction =
@@ -7,6 +8,8 @@ export type AdminAuditAction =
   | 'ingest_resolve'
   | 'edit_review'
   | 'edit_reopen';
+
+const logger = new Logger('AdminAudit');
 
 export async function writeAdminAudit(
   pool: Pool,
@@ -37,7 +40,12 @@ export async function writeAdminAudit(
         params.note ?? null,
       ],
     );
-  } catch {
-    // Audit must not fail the primary action.
+  } catch (err) {
+    logger.error(
+      `Failed to write admin audit (${params.action} → ${params.targetType}/${params.targetId}): ${
+        err instanceof Error ? err.message : err
+      }`,
+    );
+    throw err;
   }
 }

@@ -62,15 +62,20 @@ export class ApiKeyGuard implements CanActivate {
       throw new UnauthorizedException('Invalid or revoked API key');
     }
 
-    const used = await this.apiKeys.countUsageToday(key.id);
-    if (used >= key.rateLimitDaily) {
+    const { allowed } = await this.apiKeys.tryConsumeDailyQuota(
+      key.id,
+      key.rateLimitDaily,
+    );
+    if (!allowed) {
       // Guards throw before interceptors run — log 429 here so usage admin can see hits.
-      await this.apiKeys.logUsage({
-        apiKeyId: key.id,
-        endpoint: req.path ?? req.url ?? '',
-        method: req.method,
-        statusCode: HttpStatus.TOO_MANY_REQUESTS,
-      }).catch(() => undefined);
+      await this.apiKeys
+        .logUsage({
+          apiKeyId: key.id,
+          endpoint: req.path ?? req.url ?? '',
+          method: req.method,
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+        })
+        .catch(() => undefined);
       throw new HttpException(
         `Daily rate limit exceeded (${key.rateLimitDaily}/day for ${key.tier} tier). Upgrade at /developers.`,
         HttpStatus.TOO_MANY_REQUESTS,

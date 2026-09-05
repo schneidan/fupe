@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import {
   assertProductionAuthSafety,
@@ -19,6 +20,20 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   resolveJwtSecret(config);
   assertProductionAuthSafety(config);
+
+  // Cloudflare / nginx terminate TLS — trust X-Forwarded-* for IP throttle + logs
+  const expressApp = app.getHttpAdapter().getInstance() as {
+    set: (k: string, v: unknown) => void;
+  };
+  expressApp.set('trust proxy', 1);
+
+  app.use(
+    helmet({
+      // API is often called cross-origin from the web app; keep CSP off here.
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
   app.enableCors({
     origin: process.env.CORS_ORIGIN?.split(',') ?? ['http://localhost:3001'],
