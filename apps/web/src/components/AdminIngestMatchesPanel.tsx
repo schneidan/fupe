@@ -67,8 +67,8 @@ export function AdminIngestMatchesPanel() {
       <div>
         <h2 className="text-lg font-bold text-fupe-text">Ingest match queue</h2>
         <p className="mt-1 text-sm text-fupe-muted">
-          Low-confidence ETL dedupe candidates ({total} pending). Accept marks
-          for merge review; reject dismisses the match.
+          Low-confidence ETL dedupe candidates ({total} pending). These actions
+          only update the queue — they do not merge entities in the graph yet.
         </p>
       </div>
 
@@ -110,16 +110,18 @@ export function AdminIngestMatchesPanel() {
                   disabled={busyId === m.id}
                   onClick={() => resolve(m.id, 'accepted')}
                   className="rounded-full bg-fupe-text px-3 py-1 text-xs font-semibold text-fupe-bg hover:bg-fupe-muted disabled:opacity-60"
+                  title="Queue status only — does not write to the graph"
                 >
-                  Accept
+                  Keep as match
                 </button>
                 <button
                   type="button"
                   disabled={busyId === m.id}
                   onClick={() => resolve(m.id, 'merged')}
                   className="rounded-full border border-fupe-border px-3 py-1 text-xs text-fupe-text hover:border-fupe-muted disabled:opacity-60"
+                  title="Records that a manual merge was done elsewhere"
                 >
-                  Mark merged
+                  Record as merged
                 </button>
                 <button
                   type="button"
@@ -127,7 +129,7 @@ export function AdminIngestMatchesPanel() {
                   onClick={() => resolve(m.id, 'rejected')}
                   className="rounded-full border border-fupe-border px-3 py-1 text-xs text-fupe-muted hover:text-fupe-text disabled:opacity-60"
                 >
-                  Reject
+                  Dismiss
                 </button>
               </div>
             </li>

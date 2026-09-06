@@ -14,8 +14,8 @@ export default function ContributePage() {
       <h1 className="text-2xl font-bold text-fupe-text">Contribute</h1>
       <p className="mt-3 text-fupe-muted">
         Help fill gaps the ingest pipeline misses. Suggest ownership parents
-        with a public citation — new accounts go to a review queue; high-trust
-        editors auto-commit.
+        with a public citation. New accounts start in the review queue; as your
+        trust score rises, ownership edits can auto-commit.
       </p>
       <ContributeHub />
     </main>

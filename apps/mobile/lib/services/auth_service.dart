@@ -128,6 +128,68 @@ class AuthService extends ChangeNotifier {
     return body['message'] as String? ?? 'Sent';
   }
 
+  Future<String> forgotPassword(String email) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/v1/auth/forgot-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email.trim()}),
+    );
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final msg = body['message'];
+      throw Exception(msg is String ? msg : 'Request failed');
+    }
+    return body['message'] as String? ??
+        'If an account exists for that email, we sent a password reset link.';
+  }
+
+  Future<String> resetPassword({
+    required String token,
+    required String password,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/v1/auth/reset-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'token': token.trim(), 'password': password}),
+    );
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final msg = body['message'];
+      throw Exception(
+        msg is String ? msg : (msg is List ? msg.join(', ') : 'Reset failed'),
+      );
+    }
+    return body['message'] as String? ?? 'Password updated.';
+  }
+
+  Future<Map<String, dynamic>> exportMyData() async {
+    if (_token == null) throw Exception('Not signed in');
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/v1/auth/export'),
+      headers: {'Authorization': 'Bearer $_token'},
+    );
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode != 200) {
+      final msg = body['message'];
+      throw Exception(msg is String ? msg : 'Export failed');
+    }
+    return body;
+  }
+
+  Future<void> deleteAccount() async {
+    if (_token == null) throw Exception('Not signed in');
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/v1/auth/me'),
+      headers: {'Authorization': 'Bearer $_token'},
+    );
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final msg = body['message'];
+      throw Exception(msg is String ? msg : 'Delete failed');
+    }
+    await signOut();
+  }
+
   Future<void> _authPost(String path, String email, String password) async {
     final response = await http.post(
       Uri.parse('$baseUrl$path'),

@@ -1,12 +1,16 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../theme/fupe_theme.dart';
 import 'admin_shell_screen.dart';
-import 'suggest_edit_screen.dart';
 import 'propose_entity_screen.dart';
+import 'reset_password_screen.dart';
+import 'suggest_edit_screen.dart';
 
 class ContributeScreen extends StatefulWidget {
   const ContributeScreen({super.key});
@@ -90,7 +94,8 @@ class _ContributeScreenState extends State<ContributeScreen> {
           const SizedBox(height: 12),
           const Text(
             'Suggest ownership corrections with a citation. '
-            'New accounts go to review; high-trust editors auto-commit.',
+            'New accounts start in review; trust above 50 auto-commits '
+            'ownership edits. New entities are always moderated.',
             style: TextStyle(color: FupeColors.muted, fontSize: 15, height: 1.5),
           ),
           const SizedBox(height: 24),
@@ -235,9 +240,88 @@ class _ContributeScreenState extends State<ContributeScreen> {
                 ? 'Please wait…'
                 : (_registerMode ? 'Create account' : 'Sign in')),
           ),
+          if (!_registerMode) ...[
+            TextButton(
+              onPressed: _busy ? null : _forgotPassword,
+              child: const Text('Forgot password?'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ResetPasswordScreen(),
+                  ),
+                );
+              },
+              child: const Text('Have a reset token?'),
+            ),
+          ],
+          if (_registerMode)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'By creating an account you agree to the Terms and Privacy Policy at fupe.app/legal.',
+                style: TextStyle(color: FupeColors.muted, fontSize: 12, height: 1.4),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _email.text.trim().isNotEmpty
+        ? _email.text.trim()
+        : await _promptEmail();
+    if (email == null || email.isEmpty || !mounted) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final msg = await context.read<AuthService>().forgotPassword(email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '$msg Open the link on the web, or paste the token via “Have a reset token?”',
+          ),
+        ),
+      );
+    } catch (e) {
+      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<String?> _promptEmail() async {
+    final controller = TextEditingController(text: _email.text);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: FupeColors.surface,
+        title: const Text('Reset password'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(labelText: 'Email'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Send link'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
   }
 
   Widget _accountCard(AuthService auth) {
@@ -255,18 +339,29 @@ class _ContributeScreenState extends State<ContributeScreen> {
           const SizedBox(height: 4),
           Text(
             'Trust score ${auth.user!.trustScore}'
+            '${auth.user!.trustScore > 50 ? ' · ownership edits auto-commit' : ' · ownership edits need review'}'
             '${auth.user!.emailVerified ? '' : ' · email unverified'}'
             '${auth.user!.isAdmin ? ' · admin' : (auth.user!.isModerator ? ' · moderator' : '')}',
             style: const TextStyle(color: FupeColors.muted, fontSize: 13),
           ),
-          if (!auth.user!.emailVerified)
+          const SizedBox(height: 8),
+          const Text(
+            'Trust ladder: start at 0 (review queue). +5 approve / −10 reject. '
+            'Above 50 auto-commits ownership edits. New entities always reviewed.',
+            style: TextStyle(color: FupeColors.muted, fontSize: 12, height: 1.4),
+          ),
+          if (!auth.user!.emailVerified) ...[
             TextButton(
               onPressed: () async {
                 try {
                   final msg = await auth.resendVerification();
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('$msg — check your inbox')),
+                    SnackBar(
+                      content: Text(
+                        '$msg Open the link in the email (fupe.app) to verify.',
+                      ),
+                    ),
                   );
                 } catch (e) {
                   if (!mounted) return;
@@ -281,6 +376,18 @@ class _ContributeScreenState extends State<ContributeScreen> {
               },
               child: const Text('Resend verification email'),
             ),
+          ],
+          TextButton(
+            onPressed: () => _exportData(auth),
+            child: const Text('Download my data'),
+          ),
+          TextButton(
+            onPressed: () => _deleteAccount(auth),
+            child: const Text(
+              'Delete account',
+              style: TextStyle(color: FupeColors.verdictYes),
+            ),
+          ),
           TextButton(
             onPressed: () async {
               await auth.signOut();
@@ -294,6 +401,73 @@ class _ContributeScreenState extends State<ContributeScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _exportData(AuthService auth) async {
+    try {
+      final data = await auth.exportMyData();
+      final pretty = const JsonEncoder.withIndent('  ').convert(data);
+      await Clipboard.setData(ClipboardData(text: pretty));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account export copied to clipboard as JSON.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteAccount(AuthService auth) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: FupeColors.surface,
+        title: const Text('Delete account?'),
+        content: const Text(
+          'Permanently delete your account and personal data? This cannot be undone.',
+          style: TextStyle(color: FupeColors.muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: FupeColors.verdictYes),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await auth.deleteAccount();
+      if (!mounted) return;
+      setState(() {
+        _edits = [];
+        _editsRequested = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Account deleted.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
   }
 
   Widget _editTile(QueueEdit edit) {

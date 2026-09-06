@@ -38,9 +38,30 @@ export function ContributeHub() {
               Trust score {user.trust_score}
               {user.trust_score > 50
                 ? ' · ownership edits auto-commit'
-                : ' · edits need review'}
+                : ' · ownership edits need review'}
               {isModerator(user) ? ' · moderator' : ''}
             </p>
+            <details className="rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-sm text-fupe-muted">
+              <summary className="cursor-pointer text-fupe-text">
+                How trust works
+              </summary>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed">
+                <li>New accounts start at 0 — edits go to the moderator queue.</li>
+                <li>
+                  Approved ownership edits: <span className="text-fupe-text">+5</span>.
+                  Rejected: <span className="text-fupe-text">−10</span>.
+                </li>
+                <li>
+                  Score above <span className="text-fupe-text">50</span>: ownership
+                  parent edits auto-commit (still need a citation).
+                </li>
+                <li>
+                  Proposing a <span className="text-fupe-text">new entity</span> is
+                  always reviewed, regardless of trust.
+                </li>
+                <li>Max 5 pending edits per account at a time.</li>
+              </ul>
+            </details>
             {!user.email_verified ? (
               <div className="rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-sm">
                 <p className="text-fupe-muted">

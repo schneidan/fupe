@@ -46,12 +46,26 @@ async function authJson<T>(path: string, init: RequestInit & { token: string }) 
 
 export function DevelopersBilling() {
   const searchParams = useSearchParams();
-  const checkout = searchParams.get('checkout');
+  const [checkoutFlash, setCheckoutFlash] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [newKeySecret, setNewKeySecret] = useState<string | null>(null);
+
+  useEffect(() => {
+    const c = searchParams.get('checkout');
+    if (c === 'success' || c === 'cancel') {
+      setCheckoutFlash(c);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('checkout');
+      window.history.replaceState(
+        {},
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     void fetchMe().then((me) => setUser(me ?? getStoredUser()));
@@ -65,7 +79,7 @@ export function DevelopersBilling() {
       .catch((e) =>
         setError(e instanceof Error ? e.message : 'Failed to load billing'),
       );
-  }, [user?.id, checkout]);
+  }, [user?.id, checkoutFlash]);
 
   async function startCheckout(tier: 'developer' | 'business' = 'developer') {
     const token = getToken();
@@ -127,17 +141,88 @@ export function DevelopersBilling() {
   }
 
   const tier = status?.subscription_tier ?? 'free';
+  const paidActive =
+    checkoutFlash === 'success' &&
+    (tier === 'developer' || tier === 'business') &&
+    (status?.subscription_status === 'active' ||
+      status?.subscription_status === 'trialing' ||
+      status?.subscription_status === 'admin_override');
 
   return (
     <div className="mt-10 space-y-10">
-      {checkout === 'success' ? (
-        <p className="rounded-lg border border-fupe-border bg-fupe-surface px-4 py-3 text-sm text-fupe-text">
-          Payment received — your keys will move to the paid tier once Stripe
-          confirms (usually a few seconds). Refresh if needed.
-        </p>
+      {checkoutFlash === 'success' ? (
+        <section className="rounded-xl border border-fupe-text/40 bg-fupe-surface px-5 py-5 space-y-3">
+          <h2 className="text-lg font-semibold text-fupe-text">
+            {paidActive ? 'You’re on a paid plan' : 'Payment received'}
+          </h2>
+          <p className="text-sm text-fupe-muted">
+            {paidActive
+              ? `Your account is on the ${tier} tier. Create an API key below to use higher limits and IMAGE lookup.`
+              : 'Stripe is confirming your subscription — usually a few seconds. This page will show your new tier when the webhook lands; you can also refresh.'}
+          </p>
+          <div className="flex flex-wrap gap-3 pt-1">
+            {user ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void createKey()}
+                className="rounded-full bg-fupe-text px-5 py-2 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted disabled:opacity-60"
+              >
+                Create API key
+              </button>
+            ) : (
+              <Link
+                href="/login?next=/developers"
+                className="rounded-full bg-fupe-text px-5 py-2 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted"
+              >
+                Sign in to create a key
+              </Link>
+            )}
+            <a
+              href="#api-keys"
+              className="rounded-full border border-fupe-border px-5 py-2 text-sm text-fupe-text hover:border-fupe-muted"
+            >
+              Jump to API keys
+            </a>
+            <button
+              type="button"
+              onClick={() => setCheckoutFlash(null)}
+              className="text-sm text-fupe-muted hover:text-fupe-text"
+            >
+              Dismiss
+            </button>
+          </div>
+        </section>
       ) : null}
-      {checkout === 'cancel' ? (
-        <p className="text-sm text-fupe-muted">Checkout canceled.</p>
+      {checkoutFlash === 'cancel' ? (
+        <section className="rounded-xl border border-fupe-border bg-fupe-surface px-5 py-5 space-y-3">
+          <h2 className="text-lg font-semibold text-fupe-text">
+            Checkout canceled
+          </h2>
+          <p className="text-sm text-fupe-muted">
+            No charge was made. You can stay on Free or start checkout again
+            whenever you’re ready.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              disabled={busy || status?.stripe_configured === false}
+              onClick={() => startCheckout('developer')}
+              className="rounded-full bg-fupe-text px-5 py-2 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted disabled:opacity-50"
+            >
+              {status?.stripe_configured === false
+                ? 'Stripe not configured'
+                : 'Try Developer again'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setCheckoutFlash(null)}
+              className="text-sm text-fupe-muted hover:text-fupe-text"
+            >
+              Dismiss
+            </button>
+          </div>
+        </section>
       ) : null}
 
       <section className="grid gap-4 sm:grid-cols-3">
@@ -206,7 +291,10 @@ export function DevelopersBilling() {
         })}
       </section>
 
-      <section className="rounded-xl border border-fupe-border bg-fupe-surface p-6 space-y-4">
+      <section
+        id="api-keys"
+        className="rounded-xl border border-fupe-border bg-fupe-surface p-6 space-y-4"
+      >
         <h2 className="font-semibold text-fupe-text">API keys</h2>
         {!user ? (
           <p className="text-sm text-fupe-muted">
