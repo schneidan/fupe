@@ -1,0 +1,29 @@
+# Staging Postgres + Apache AGE (same VPS as prod, different port/volume)
+
+# Usage (from repo root that contains this file — often PROD_ROOT or STAGING_ROOT):
+#   docker compose -f docker-compose.staging.yml up -d
+#
+# Host port 5434 → container 5432. Do not conflict with prod on 5433.
+
+services:
+  postgres-staging:
+    image: apache/age:latest
+    container_name: fupe-postgres-staging
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5434:5432"
+    environment:
+      POSTGRES_USER: fupe
+      # Change before first start — then keep stable (volume remembers init password)
+      POSTGRES_PASSWORD: CHANGE_ME_STAGING_DB_PASSWORD
+      POSTGRES_DB: fupe
+    volumes:
+      - fupe_pgdata_staging:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fupe -d fupe"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  fupe_pgdata_staging:
