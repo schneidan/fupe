@@ -1,9 +1,10 @@
 # Staging Postgres + Apache AGE (same VPS as prod, different port/volume)
 
-# Usage (from repo root that contains this file — often PROD_ROOT or STAGING_ROOT):
-#   docker compose -f docker-compose.staging.yml up -d
+# Usage (same project name always — avoids container_name conflicts across dirs):
+#   docker compose -p fupe-staging -f docker-compose.staging.yml up -d
 #
 # Host port 5434 → container 5432. Do not conflict with prod on 5433.
+# Never use --remove-orphans on this file (prod compose may share the host).
 
 services:
   postgres-staging:

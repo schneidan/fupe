@@ -45,16 +45,41 @@ if [[ "${DATABASE_URL}" != *":5434"* && "${DATABASE_URL}" != *"5434/"* ]]; then
   exit 1
 fi
 
-echo "==> Ensure staging Postgres is up (if compose file present)"
-if [[ -f "${ROOT}/docker-compose.staging.yml" ]]; then
-  docker compose -f docker-compose.staging.yml up -d
-  docker compose -f docker-compose.staging.yml exec -T postgres-staging pg_isready -U fupe -d fupe >/dev/null
-elif [[ -f "${ROOT}/../fupe/docker-compose.staging.yml" ]]; then
-  # Sibling layout: staging tree next to prod that owns the compose file
-  true
-else
-  echo "(No docker-compose.staging.yml in this tree — assuming postgres-staging already running)"
-fi
+echo "==> Ensure staging Postgres is up"
+# Fixed container_name in compose; if it already exists (often created from
+# PROD_ROOT with a different Compose project), do not `compose up` again —
+# that conflicts on the name. Never --remove-orphans (would risk prod).
+ensure_staging_postgres() {
+  if docker ps -a --format '{{.Names}}' | grep -qx 'fupe-postgres-staging'; then
+    echo "Container fupe-postgres-staging already exists — starting if needed"
+    docker start fupe-postgres-staging >/dev/null
+    for _ in $(seq 1 30); do
+      if docker exec fupe-postgres-staging pg_isready -U fupe -d fupe >/dev/null 2>&1; then
+        return 0
+      fi
+      sleep 1
+    done
+    echo "ERROR: fupe-postgres-staging did not become ready" >&2
+    exit 1
+  fi
+
+  local compose_file=""
+  if [[ -f "${ROOT}/docker-compose.staging.yml" ]]; then
+    compose_file="${ROOT}/docker-compose.staging.yml"
+  elif [[ -f "${ROOT}/../fupe/docker-compose.staging.yml" ]]; then
+    compose_file="${ROOT}/../fupe/docker-compose.staging.yml"
+  else
+    echo "ERROR: fupe-postgres-staging missing and no docker-compose.staging.yml found" >&2
+    exit 1
+  fi
+
+  echo "Creating staging Postgres via ${compose_file} (-p fupe-staging)"
+  docker compose -p fupe-staging -f "${compose_file}" up -d
+  docker compose -p fupe-staging -f "${compose_file}" exec -T postgres-staging \
+    pg_isready -U fupe -d fupe >/dev/null
+}
+
+ensure_staging_postgres
 
 echo "==> pnpm install"
 pnpm install
