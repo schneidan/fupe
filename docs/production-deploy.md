@@ -832,6 +832,7 @@ Copy dumps off-box occasionally (`scp` or object storage). Provider disk snapsho
 | Ingest cron on VPS | Same pattern as local: PATH must include node/pnpm; see `packages/ingest/README.md` |
 | `REQUIRE_API_KEY=true` | Only after first-party clients send keys |
 | Tighten UFW to Cloudflare IPs only | After origin TLS works — see [Cloudflare IPs](https://www.cloudflare.com/ips/) |
+| Same-VPS staging | See [`docs/staging-deploy.md`](./staging-deploy.md) |
 | Separate CDN / Vercel for web | Possible later; API+AGE stay on this VPS (you already have CF in front) |
 | Live Stripe | After domain proves out and Stripe activates the account |
 
