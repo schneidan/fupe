@@ -94,6 +94,14 @@ echo "==> Build web"
 pnpm --filter @fupe/web build
 
 echo "==> Restart staging systemd units"
+if ! systemctl cat fupe-api-staging >/dev/null 2>&1 \
+  || ! systemctl cat fupe-web-staging >/dev/null 2>&1; then
+  echo "ERROR: staging systemd units not installed yet." >&2
+  echo "Create fupe-api-staging / fupe-web-staging (§6 in docs/staging-deploy.md)," >&2
+  echo "then: systemctl daemon-reload && systemctl enable --now fupe-api-staging fupe-web-staging" >&2
+  echo "Migrate/build already ran; you do not need to re-run this whole script." >&2
+  exit 1
+fi
 systemctl restart fupe-api-staging fupe-web-staging
 systemctl --no-pager --full status fupe-api-staging fupe-web-staging || true
 

@@ -426,6 +426,8 @@ SQL
 
 ### F. Migrate + restart staging apps
 
+**Order:** if `systemctl cat fupe-api-staging` fails, jump to **§6**, enable the units, then come back.
+
 If the staging systemd units already exist (§6), prefer the helper — it installs, migrates (aborting unless `DATABASE_URL` looks like **:5434**), builds API + web, restarts **only** `fupe-api-staging` / `fupe-web-staging`, and curls staging health:
 
 ```bash
@@ -482,7 +484,7 @@ WantedBy=multi-user.target
 
 Adjust `User=` / paths if your deploy user isn’t `root`.
 
-- [ ] Unit file saved
+- [x] Unit file saved
 
 ### 6b. Web staging
 
@@ -501,6 +503,7 @@ User=root
 WorkingDirectory=/root/fupe-staging/apps/web
 EnvironmentFile=/root/fupe-staging/apps/web/.env.production
 Environment=PORT=3003
+# package.json start uses ${PORT:-3001} — PORT must be 3003 here (or EADDRINUSE on prod :3001)
 ExecStart=/usr/bin/pnpm start
 Restart=on-failure
 RestartSec=5
@@ -509,7 +512,7 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-- [ ] Unit file saved
+- [x] Unit file saved
 
 ```bash
 sudo systemctl daemon-reload
@@ -668,18 +671,19 @@ git pull
 ## Troubleshooting
 
 
-| Symptom                         | Check                                                                             |
-| ------------------------------- | --------------------------------------------------------------------------------- |
-| Staging web calls prod API      | Rebuild web after setting `API_URL=http://127.0.0.1:3002`                         |
-| Migrate hit prod                | `echo $DATABASE_URL` — must be `:5434`                                            |
-| 502 on staging hosts            | `systemctl status fupe-*-staging`; nginx `proxy_pass` ports                       |
-| 526 SSL                         | Origin cert missing staging hostnames; Full (strict)                              |
-| IMAGE 401 on staging            | `FIRST_PARTY_LOOKUP_SECRET` mismatch web ↔ API                                    |
-| OOM / slow VPS                  | Stop staging units; avoid full prod restore on staging while building             |
-| Cypher OID error after restore  | Re-run §5b E (AGE OID repair) on **staging**                                      |
-| `already exists` during restore | Staging wasn’t empty — §5b C: `DROP DATABASE fupe` / recreate, then restore again |
+| Symptom                            | Check                                                                               |
+| ---------------------------------- | ----------------------------------------------------------------------------------- |
+| Staging web calls prod API         | Rebuild web after setting `API_URL=http://127.0.0.1:3002`                           |
+| Migrate hit prod                   | `echo $DATABASE_URL` — must be `:5434`                                              |
+| 502 on staging hosts               | `systemctl status fupe-*-staging`; nginx `proxy_pass` ports                         |
+| Web staging crash-loop             | `journalctl -u fupe-web-staging -n 50`; **EADDRINUSE :3001** → set `PORT=3003` (start script uses `${PORT:-3001}`) |
+| 526 SSL                            | Origin cert missing staging hostnames; Full (strict)                                |
+| IMAGE 401 on staging               | `FIRST_PARTY_LOOKUP_SECRET` mismatch web ↔ API                                      |
+| OOM / slow VPS                     | Stop staging units; avoid full prod restore on staging while building               |
+| Cypher OID error after restore     | Re-run §5b E (AGE OID repair) on **staging**                                        |
+| `already exists` during restore    | Staging wasn’t empty — §5b C: `DROP DATABASE fupe` / recreate, then restore again   |
 | `Conflict … fupe-postgres-staging` | Container already exists — `docker start fupe-postgres-staging`; do **not** `rm` it |
-| Real emails on staging          | Re-run §5b D scrub; confirm container is staging                                  |
+| Real emails on staging             | Re-run §5b D scrub; confirm container is staging                                    |
 
 
 ---
