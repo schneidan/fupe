@@ -15,6 +15,7 @@ import { EntityType } from '../graph/graph.types';
 import { AuthService, AuthUser } from '../auth/auth.service';
 import { UsersRepository } from '../auth/users.repository';
 import { writeAdminAudit } from '../admin/audit-log';
+import { MailService } from '../mail/mail.service';
 
 export type EditStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -67,6 +68,7 @@ export class EditsService {
     private readonly graphRepo: GraphRepository,
     private readonly usersRepo: UsersRepository,
     private readonly authService: AuthService,
+    private readonly mail: MailService,
   ) {}
 
   async submitEdit(user: AuthUser, dto: SubmitEditDto) {
@@ -276,6 +278,16 @@ export class EditsService {
       newState: { status: decision },
       note,
     });
+
+    const submitter = await this.usersRepo.findById(edit.user_id);
+    if (submitter?.email) {
+      await this.mail.sendSafe('edit_review', () =>
+        this.mail.sendEditReviewEmail(submitter.email, {
+          decision,
+          reviewNote: note,
+        }),
+      );
+    }
 
     return updated[0];
   }

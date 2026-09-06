@@ -10,6 +10,7 @@ import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.constants';
 import { UserRole } from '../auth/users.repository';
 import { TIER_LIMITS } from '../api-keys/api-keys.service';
+import { MailService } from '../mail/mail.service';
 import { writeAdminAudit } from './audit-log';
 
 const WEBHOOK_STALE_MS = 48 * 60 * 60 * 1000;
@@ -101,6 +102,7 @@ export class AdminService {
   constructor(
     @Inject(DATABASE_POOL) private readonly pool: Pool,
     private readonly config: ConfigService,
+    private readonly mail: MailService,
   ) {}
 
   // ─── Users ────────────────────────────────────────────────────────────────
@@ -509,6 +511,12 @@ export class AdminService {
       },
       note: note?.trim() || null,
     });
+
+    if (tier !== 'free') {
+      await this.mail.sendSafe('complimentary_tier', () =>
+        this.mail.sendComplimentaryTierEmail(previous.email, tier, note),
+      );
+    }
 
     return this.getUser(userId);
   }

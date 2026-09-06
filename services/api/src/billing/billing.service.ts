@@ -14,6 +14,7 @@ import {
 } from '../api-keys/api-keys.service';
 import { UsersRepository, UserRow } from '../auth/users.repository';
 import { DATABASE_POOL } from '../database/database.constants';
+import { MailService } from '../mail/mail.service';
 
 function unixToDate(n: unknown): Date | null {
   return typeof n === 'number' && n > 0 ? new Date(n * 1000) : null;
@@ -40,6 +41,7 @@ export class BillingService {
     private readonly config: ConfigService,
     private readonly users: UsersRepository,
     private readonly apiKeys: ApiKeysService,
+    private readonly mail: MailService,
     @Inject(DATABASE_POOL) private readonly pool: Pool,
   ) {
     const secret = this.config.get<string>('STRIPE_SECRET_KEY')?.trim();
@@ -298,6 +300,13 @@ export class BillingService {
     if (session.customer && typeof session.customer === 'string') {
       await this.users.setStripeCustomerId(userId, session.customer);
     }
+
+    const user = await this.users.findById(userId);
+    if (user?.email) {
+      await this.mail.sendSafe('subscription_started', () =>
+        this.mail.sendSubscriptionStartedEmail(user.email, tier),
+      );
+    }
   }
 
   private async onSubscriptionUpdated(sub: Stripe.Subscription) {
@@ -363,6 +372,9 @@ export class BillingService {
       return;
     }
     await this.applyTier(user.id, 'free', 'canceled', null, null);
+    await this.mail.sendSafe('subscription_canceled', () =>
+      this.mail.sendSubscriptionCanceledEmail(user.email),
+    );
   }
 
   private async onInvoicePaymentFailed(invoice: Stripe.Invoice) {
@@ -401,6 +413,9 @@ export class BillingService {
       currentPeriodEnd: user.subscription_current_period_end ?? undefined,
     });
     this.logger.warn(`User ${user.id} subscription marked past_due (invoice ${invoice.id})`);
+    await this.mail.sendSafe('payment_failed', () =>
+      this.mail.sendPaymentFailedEmail(user.email),
+    );
   }
 
   private async applyTier(

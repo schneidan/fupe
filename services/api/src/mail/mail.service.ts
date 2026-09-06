@@ -2,6 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import nodemailer = require('nodemailer');
 import type { Transporter } from 'nodemailer';
+import {
+  escapeHtml,
+  renderBrandedEmail,
+  siteBaseUrl,
+} from './email-layout';
 
 export interface OutboundEmail {
   to: string;
@@ -15,15 +20,6 @@ export interface OutboundEmail {
  * - EMAIL_PROVIDER=console (default): log the message (dev)
  * - EMAIL_PROVIDER=smtp (or SMTP_HOST set): nodemailer SMTP
  * - EMAIL_PROVIDER=resend: Resend HTTP API (https://resend.com)
- *
- * Resend:
- *   EMAIL_PROVIDER=resend
- *   RESEND_API_KEY=re_...
- *   EMAIL_FROM=FUPE <noreply@fupe.app>   # domain must be verified in Resend
- *
- * Resend via SMTP (alternative): EMAIL_PROVIDER=smtp,
- *   SMTP_HOST=smtp.resend.com SMTP_PORT=465 SMTP_SECURE=true
- *   SMTP_USER=resend SMTP_PASS=$RESEND_API_KEY
  */
 @Injectable()
 export class MailService {
@@ -33,6 +29,7 @@ export class MailService {
   constructor(private readonly config: ConfigService) {}
 
   async sendVerificationEmail(to: string, verifyUrl: string): Promise<void> {
+    const site = this.siteUrl();
     await this.send({
       to,
       subject: 'Verify your FUPE email',
@@ -42,16 +39,25 @@ export class MailService {
         `Open this link: ${verifyUrl}`,
         '',
         'If you did not create an account, you can ignore this email.',
+        '',
+        `Support: support@fupe.app · ${site}`,
       ].join('\n'),
-      html: `
-      <p>Verify your FUPE account to submit ownership edits.</p>
-      <p><a href="${verifyUrl}">Verify email</a></p>
-      <p style="color:#666;font-size:12px">Or paste: ${verifyUrl}</p>
-    `,
+      html: renderBrandedEmail(
+        {
+          preheader: 'Confirm your email to contribute ownership edits.',
+          headline: 'Verify your email',
+          bodyHtml: `<p style="margin:0 0 12px">Thanks for joining FUPE. Confirm your address so you can submit ownership edits and manage your account.</p>`,
+          cta: { label: 'Verify email', url: verifyUrl },
+          footnoteHtml:
+            'If you did not create a FUPE account, you can ignore this email.',
+        },
+        { siteUrl: site },
+      ),
     });
   }
 
   async sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
+    const site = this.siteUrl();
     await this.send({
       to,
       subject: 'Reset your FUPE password',
@@ -61,17 +67,191 @@ export class MailService {
         `Open this link to choose a new password: ${resetUrl}`,
         '',
         'This link expires in one hour. If you did not request a reset, you can ignore this email.',
+        '',
+        `Support: support@fupe.app · ${site}`,
       ].join('\n'),
-      html: `
-      <p>We received a request to reset your FUPE password.</p>
-      <p><a href="${resetUrl}">Choose a new password</a></p>
-      <p style="color:#666;font-size:12px">Or paste: ${resetUrl}</p>
-      <p style="color:#666;font-size:12px">This link expires in one hour. If you did not request a reset, ignore this email.</p>
-    `,
+      html: renderBrandedEmail(
+        {
+          preheader: 'Choose a new password — link expires in one hour.',
+          headline: 'Reset your password',
+          bodyHtml: `<p style="margin:0 0 12px">We received a request to reset the password for this FUPE account.</p>`,
+          cta: { label: 'Choose a new password', url: resetUrl },
+          footnoteHtml:
+            'This link expires in one hour. If you did not request a reset, you can ignore this email.',
+        },
+        { siteUrl: site },
+      ),
     });
   }
 
-  /** Shared send path for verification, password reset, etc. */
+  async sendEditReviewEmail(
+    to: string,
+    params: {
+      decision: 'APPROVED' | 'REJECTED';
+      reviewNote?: string | null;
+    },
+  ): Promise<void> {
+    const site = this.siteUrl();
+    const approved = params.decision === 'APPROVED';
+    const headline = approved
+      ? 'Your edit was approved'
+      : 'Your edit was not approved';
+    const note = params.reviewNote?.trim();
+    const body = approved
+      ? `<p style="margin:0 0 12px">A moderator accepted your ownership contribution. Thank you for helping keep the graph accurate.</p>`
+      : `<p style="margin:0 0 12px">A moderator reviewed your ownership contribution and did not approve it this time.</p>${
+          note
+            ? `<p style="margin:0 0 12px;padding:12px;background:#1c1c1c;border:1px solid #3a3a3a;border-radius:8px;color:#d4d4d4"><strong style="color:#ffffff">Note:</strong> ${escapeHtml(note)}</p>`
+            : ''
+        }`;
+
+    await this.send({
+      to,
+      subject: approved
+        ? 'FUPE: your edit was approved'
+        : 'FUPE: your edit was not approved',
+      text: [
+        headline + '.',
+        note ? `Note: ${note}` : '',
+        '',
+        `View your contributions: ${site}/contribute`,
+        `Support: support@fupe.app`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      html: renderBrandedEmail(
+        {
+          preheader: headline,
+          headline,
+          bodyHtml: body,
+          cta: { label: 'View contributions', url: `${site}/contribute` },
+        },
+        { siteUrl: site },
+      ),
+    });
+  }
+
+  async sendSubscriptionStartedEmail(
+    to: string,
+    tier: string,
+  ): Promise<void> {
+    const site = this.siteUrl();
+    const tierLabel = tier.charAt(0).toUpperCase() + tier.slice(1);
+    await this.send({
+      to,
+      subject: `Welcome to FUPE ${tierLabel}`,
+      text: [
+        `Your ${tierLabel} subscription is active.`,
+        '',
+        `Manage billing: ${site}/developers`,
+        `Support: support@fupe.app`,
+      ].join('\n'),
+      html: renderBrandedEmail(
+        {
+          preheader: `${tierLabel} subscription is active.`,
+          headline: `${tierLabel} is active`,
+          bodyHtml: `<p style="margin:0 0 12px">Thanks for supporting FUPE. Your API keys now use the ${escapeHtml(tierLabel)} rate limits${tier !== 'free' ? ' (including IMAGE lookup where applicable)' : ''}.</p>`,
+          cta: { label: 'Open Developers', url: `${site}/developers` },
+        },
+        { siteUrl: site },
+      ),
+    });
+  }
+
+  async sendSubscriptionCanceledEmail(to: string): Promise<void> {
+    const site = this.siteUrl();
+    await this.send({
+      to,
+      subject: 'Your FUPE subscription ended',
+      text: [
+        'Your paid FUPE subscription has ended. Your account is back on the Free tier.',
+        '',
+        `Resubscribe anytime: ${site}/developers`,
+        `Support: support@fupe.app`,
+      ].join('\n'),
+      html: renderBrandedEmail(
+        {
+          preheader: 'Your account is back on the Free tier.',
+          headline: 'Subscription ended',
+          bodyHtml: `<p style="margin:0 0 12px">Your paid FUPE subscription has ended. Active API keys are on the Free tier limits. You can upgrade again anytime from Developers.</p>`,
+          cta: { label: 'Manage subscription', url: `${site}/developers` },
+        },
+        { siteUrl: site },
+      ),
+    });
+  }
+
+  async sendPaymentFailedEmail(to: string): Promise<void> {
+    const site = this.siteUrl();
+    await this.send({
+      to,
+      subject: 'FUPE payment failed — action needed',
+      text: [
+        'We could not process a payment for your FUPE subscription.',
+        'Update your payment method to keep Developer/Business access.',
+        '',
+        `Billing portal: ${site}/developers`,
+        `Support: support@fupe.app`,
+      ].join('\n'),
+      html: renderBrandedEmail(
+        {
+          preheader: 'Update your payment method to keep your plan.',
+          headline: 'Payment failed',
+          bodyHtml: `<p style="margin:0 0 12px">We could not process a payment for your FUPE subscription. Please update your payment method so you don’t lose paid-tier access.</p>`,
+          cta: { label: 'Update billing', url: `${site}/developers` },
+        },
+        { siteUrl: site },
+      ),
+    });
+  }
+
+  async sendComplimentaryTierEmail(
+    to: string,
+    tier: string,
+    note?: string | null,
+  ): Promise<void> {
+    const site = this.siteUrl();
+    const tierLabel = tier.charAt(0).toUpperCase() + tier.slice(1);
+    const noteHtml = note?.trim()
+      ? `<p style="margin:12px 0 0;color:#737373">${escapeHtml(note.trim())}</p>`
+      : '';
+    await this.send({
+      to,
+      subject: `FUPE ${tierLabel} access granted`,
+      text: [
+        `An admin granted you complimentary ${tierLabel} access on FUPE.`,
+        note?.trim() ? `Note: ${note.trim()}` : '',
+        '',
+        `Open Developers: ${site}/developers`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      html: renderBrandedEmail(
+        {
+          preheader: `Complimentary ${tierLabel} access.`,
+          headline: `${tierLabel} access granted`,
+          bodyHtml: `<p style="margin:0 0 12px">An admin granted you complimentary <strong style="color:#ffffff">${escapeHtml(tierLabel)}</strong> access on FUPE.${noteHtml}</p>`,
+          cta: { label: 'Open Developers', url: `${site}/developers` },
+        },
+        { siteUrl: site },
+      ),
+    });
+  }
+
+  /** Soft-fail wrapper — never break the primary action if mail fails. */
+  async sendSafe(
+    label: string,
+    fn: () => Promise<void>,
+  ): Promise<void> {
+    try {
+      await fn();
+    } catch (err) {
+      this.logger.warn(
+        `Email ${label} failed: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+
   async send(message: OutboundEmail): Promise<void> {
     const provider = this.resolveProvider();
     const from = this.fromAddress();
@@ -108,6 +288,13 @@ export class MailService {
     );
     this.logger.log(
       `[email:console] to=${message.to} subject=${message.subject}\n${message.text}`,
+    );
+  }
+
+  private siteUrl(): string {
+    return siteBaseUrl(
+      this.config.get<string>('NEXT_PUBLIC_SITE_URL') ??
+        this.config.get<string>('SITE_URL'),
     );
   }
 
