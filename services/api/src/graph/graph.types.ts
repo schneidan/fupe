@@ -95,5 +95,6 @@ export interface FuzzySearchHit {
   name: string;
   type?: string;
   gtin?: string;
+  slug?: string;
   score: number;
 }

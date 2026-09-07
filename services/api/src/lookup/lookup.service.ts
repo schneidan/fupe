@@ -4,10 +4,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { GraphRepository } from '../graph/graph.repository';
-import { LookupResult } from '../graph/graph.types';
+import { FuzzySearchHit, LookupResult } from '../graph/graph.types';
+import { normalizeNameKey, toSlug } from '../common/slug';
 import { OpenFoodFactsService } from './open-food-facts.service';
 import { OcrService } from './ocr.service';
 import { WhisperService } from './whisper.service';
+
+/** Auto-navigate / TEXT resolve only when the top hit clears this bar. */
+const AUTO_MATCH_SCORE = 0.42;
+/** Top hit must beat #2 by this much unless it's an exact/normalized name match. */
+const AUTO_MATCH_GAP = 0.1;
 
 export type LookupInputType = 'BARCODE' | 'TEXT' | 'IMAGE' | 'VOICE';
 
@@ -82,9 +88,15 @@ export class LookupService {
       throw new BadRequestException('query is required for TEXT lookup');
     }
 
-    const hits = await this.graphRepo.fuzzySearch(query.trim(), 1);
+    const hits = await this.graphRepo.fuzzySearch(query.trim(), 8);
     if (!hits.length) {
       throw new NotFoundException(`No matches for "${query}"`);
+    }
+
+    if (!this.isConfidentMatch(query.trim(), hits)) {
+      throw new NotFoundException(
+        `No clear match for "${query}". Try a more specific name, browse the directory, or suggest an addition.`,
+      );
     }
 
     const top = hits[0];
@@ -98,6 +110,32 @@ export class LookupService {
     }
 
     return this.graphRepo.resolveFromEntity(entity);
+  }
+
+  /**
+   * Exact / near-exact names always win. Typos need a strong trgm score and a
+   * clear gap over the runner-up so "starbucks" never resolves to "Arby's".
+   */
+  private isConfidentMatch(query: string, hits: FuzzySearchHit[]): boolean {
+    const top = hits[0];
+    if (!top) return false;
+
+    const qKey = normalizeNameKey(query);
+    const topKey = normalizeNameKey(top.name);
+    if (qKey && topKey && qKey === topKey) return true;
+    if (query.trim().toLowerCase() === top.name.trim().toLowerCase()) return true;
+    if (top.slug && top.slug === toSlug(query)) {
+      return true;
+    }
+
+    if (top.score < AUTO_MATCH_SCORE) return false;
+
+    const second = hits[1];
+    if (!second) return true;
+    if (top.score - second.score >= AUTO_MATCH_GAP) return true;
+
+    // Two near-ties at very high score still ok only if top is clearly the name stem
+    return top.score >= 0.72 && top.score - second.score >= 0.05;
   }
 
   private async resolveImage(

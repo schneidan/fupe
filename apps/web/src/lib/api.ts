@@ -118,8 +118,19 @@ export async function lookupImage(
   return res.json();
 }
 
-export async function searchHits(q: string) {
+export async function searchHits(q: string): Promise<
+  Array<{
+    kind: 'entity' | 'product';
+    id: string;
+    name: string;
+    type?: string;
+    gtin?: string;
+    slug?: string;
+    score: number;
+  }>
+> {
   const res = await fetch(`/api/v1/lookup/search?q=${encodeURIComponent(q)}`);
+  if (!res.ok) return [];
   const data = await res.json();
   return data.results ?? [];
 }

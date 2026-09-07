@@ -49,12 +49,16 @@ export class GraphRepository {
   ) {}
 
   async fuzzySearch(query: string, limit = 10): Promise<FuzzySearchHit[]> {
+    const q = query.trim();
+    if (!q) return [];
+
     const { rows } = await this.pool.query<{
       kind: string;
       id: string;
       name: string;
       type: string | null;
       gtin: string | null;
+      slug: string | null;
       score: number;
     }>(
       `
@@ -65,9 +69,33 @@ export class GraphRepository {
             properties::jsonb->>'name' AS name,
             properties::jsonb->>'type' AS type,
             NULL::text AS gtin,
-            similarity((properties::jsonb->>'name'), $1) AS score
+            properties::jsonb->>'slug' AS slug,
+            GREATEST(
+              similarity(properties::jsonb->>'name', $1),
+              CASE
+                WHEN lower(properties::jsonb->>'name') = lower($1) THEN 1.0
+                WHEN lower(btrim(properties::jsonb->>'name')) = lower(btrim($1)) THEN 1.0
+                WHEN lower(properties::jsonb->>'slug') = lower(regexp_replace(lower($1), '[^a-z0-9]+', '-', 'g'))
+                  THEN 0.98
+                WHEN lower(properties::jsonb->>'name') LIKE lower($1) || '%' THEN 0.85
+                WHEN lower(properties::jsonb->>'name') LIKE '%' || lower($1) || '%' THEN 0.55
+                ELSE 0
+              END,
+              COALESCE((
+                SELECT MAX(similarity(alias.value, $1))
+                FROM jsonb_array_elements_text(
+                  CASE
+                    WHEN jsonb_typeof(properties::jsonb->'aliases') = 'array'
+                      THEN properties::jsonb->'aliases'
+                    WHEN properties::jsonb->>'aliases' IS NOT NULL
+                      AND left(btrim(properties::jsonb->>'aliases'), 1) = '['
+                      THEN (properties::jsonb->>'aliases')::jsonb
+                    ELSE '[]'::jsonb
+                  END
+                ) AS alias(value)
+              ), 0)
+            ) AS score
           FROM fupe_graph."Entity"
-          WHERE similarity((properties::jsonb->>'name'), $1) > 0.1
 
           UNION ALL
 
@@ -77,14 +105,22 @@ export class GraphRepository {
             properties::jsonb->>'name' AS name,
             NULL::text AS type,
             properties::jsonb->>'gtin' AS gtin,
-            similarity((properties::jsonb->>'name'), $1) AS score
+            NULL::text AS slug,
+            GREATEST(
+              similarity(properties::jsonb->>'name', $1),
+              CASE
+                WHEN lower(properties::jsonb->>'name') = lower($1) THEN 1.0
+                WHEN lower(properties::jsonb->>'name') LIKE lower($1) || '%' THEN 0.85
+                ELSE 0
+              END
+            ) AS score
           FROM fupe_graph."Product"
-          WHERE similarity((properties::jsonb->>'name'), $1) > 0.1
         ) hits
-        ORDER BY score DESC
+        WHERE score >= $3
+        ORDER BY score DESC, name ASC
         LIMIT $2
       `,
-      [query, limit],
+      [q, limit, 0.25],
     );
 
     return rows.map((r) => ({
@@ -93,7 +129,8 @@ export class GraphRepository {
       name: r.name,
       type: r.type ?? undefined,
       gtin: r.gtin ?? undefined,
-      score: r.score,
+      slug: r.slug ?? undefined,
+      score: Number(r.score),
     }));
   }
 

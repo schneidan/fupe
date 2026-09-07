@@ -8,7 +8,7 @@ import {
   useState,
   type ChangeEvent,
 } from 'react';
-import { lookup, lookupImage, type LookupResult } from '@/lib/api';
+import { lookup, lookupImage, searchHits, type LookupResult } from '@/lib/api';
 import {
   decodeBarcodeFromFile,
   normalizeGtin,
@@ -17,6 +17,10 @@ import {
 } from '@/lib/barcode';
 import { resizeImageForLookup } from '@/lib/image';
 import { entityPath } from '@/lib/slug';
+import {
+  isConfidentSearchMatch,
+  pathForSearchHit,
+} from '@/lib/search';
 import { ImageLookupResults } from '@/components/ImageLookupResults';
 
 type Mode = 'IMAGE' | 'BARCODE' | 'VOICE';
@@ -326,7 +330,28 @@ export function SearchByModes() {
       if (finalText.trim()) {
         setListening(false);
         recognitionRef.current = null;
-        router.push(entityPath(finalText.trim()));
+        const q = finalText.trim();
+        void (async () => {
+          setLoading(true);
+          setStatus('Looking that up…');
+          try {
+            const hits = await searchHits(q);
+            if (hits.length && isConfidentSearchMatch(q, hits)) {
+              router.push(pathForSearchHit(hits[0]));
+              return;
+            }
+            setError(
+              hits.length
+                ? `Several close matches for “${q}” — try typing it in the search box to pick one.`
+                : `No clear match for “${q}”. Try typing the name, or browse the directory.`,
+            );
+          } catch {
+            setError('Could not look up that name.');
+          } finally {
+            setLoading(false);
+            setStatus(null);
+          }
+        })();
       }
     };
 
