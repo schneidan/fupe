@@ -149,6 +149,10 @@ AUTO_VERIFY_EMAIL=false
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_PRICE_DEVELOPER=price_...
 # STRIPE_WEBHOOK_SECRET=whsec_...   # fill after §8b
+
+# Vision for IMAGE (logos / storefronts / packaging) — without this, OCR-only fallback is weak
+# OPENAI_API_KEY=sk-...
+# OPENAI_VISION_MODEL=gpt-4o-mini
 ```
 
 Checklist:
@@ -159,7 +163,7 @@ Checklist:
 - [x] `FIRST_PARTY_LOOKUP_SECRET` ≠ prod (or at least intentional)
 - [x] `AUTO_VERIFY_EMAIL=false`
 - [x] No live `sk_live_` keys here
-
+- [ ] `OPENAI_API_KEY` set if you want strong IMAGE (logo/storefront) results
 ### 4b. Web — `STAGING_ROOT/apps/web/.env.production`
 
 ```bash
@@ -632,34 +636,36 @@ Payment Links (footer donations): **Payment links** → **+ New** → pick produ
 
 Stripe’s old “Add endpoint” flow is now **event destinations**. Prod’s destination (name e.g. `FUPE prod API (test)`, URL `https://api.fupe.app/api/v1/billing/webhook`) stays as-is — you should end with **two** Test-mode destinations.
 
-- [ ] Open **[Workbench → Webhooks](https://dashboard.stripe.com/test/workbench/webhooks)** (or Dashboard → **Developers** → **Webhooks**); confirm **Test mode**
-- [ ] **Add destination** / **Create destination**
-- [ ] **Events from:** **Your account** (not Connected accounts)
-- [ ] **API version:** leave the account default unless you know you need otherwise
-- [ ] **Payload / format:** **Snapshot events** (full classic `Event` with `data.object`) — do **not** choose **Thin events** (Nest uses `constructEvent` + types like `checkout.session.completed`)
-- [ ] Select events, then **Continue**: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
-- [ ] **Destination type:** **Webhook** / **Webhook endpoint** (HTTPS) — skip EventBridge, Azure, CLI, other clouds
-- [ ] **Name:** `FUPE staging API (test)`
-- [ ] **Description:** `Nest billing on api-staging.fupe.app — Developers Checkout + subscription lifecycle. Separate destination/secret from prod.`
-- [ ] **Endpoint URL:** `https://api-staging.fupe.app/api/v1/billing/webhook`
-- [ ] **Create destination** → open it → **Reveal** / copy **Signing secret** (`whsec_…`)
-- [ ] Set staging `services/api/.env` → `STRIPE_WEBHOOK_SECRET=whsec_...` (must **not** be prod’s `whsec_`)
-- [ ] `sudo systemctl restart fupe-api-staging`
-- [ ] After a test Checkout, Workbench shows successful deliveries to the staging destination
+- [x] Open **[Workbench → Webhooks](https://dashboard.stripe.com/test/workbench/webhooks)** (or Dashboard → **Developers** → **Webhooks**); confirm **Test mode**
+- [x] **Add destination** / **Create destination**
+- [x] **Events from:** **Your account** (not Connected accounts)
+- [x] **API version:** leave the account default unless you know you need otherwise
+- [x] **Payload / format:** **Snapshot events** (full classic `Event` with `data.object`) — do **not** choose **Thin events** (Nest uses `constructEvent` + types like `checkout.session.completed`)
+- [x] Select events, then **Continue**: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
+- [x] **Destination type:** **Webhook** / **Webhook endpoint** (HTTPS) — skip EventBridge, Azure, CLI, other clouds
+- [x] **Name:** `FUPE staging API (test)`
+- [x] **Description:** `Nest billing on api-staging.fupe.app — Developers Checkout + subscription lifecycle. Separate destination/secret from prod.`
+- [x] **Endpoint URL:** `https://api-staging.fupe.app/api/v1/billing/webhook`
+- [x] **Create destination** → open it → **Reveal** / copy **Signing secret** (`whsec_…`)
+- [x] Set staging `services/api/.env` → `STRIPE_WEBHOOK_SECRET=whsec_...` (must **not** be prod’s `whsec_`)
+- [x] `sudo systemctl restart fupe-api-staging`
+- [x] After a test Checkout, Workbench shows successful deliveries to the staging destination
 
 ---
 
 ## 9. Smoke checklist
 
-- [ ] `https://staging.fupe.app` — padlock, branding
-- [ ] Homepage lookup (e.g. Panera)
-- [ ] Register / login / verify email (Resend)
-- [ ] Forgot / reset password
-- [ ] `/developers` — create API key
-- [ ] Checkout (test card `4242…`) → success UX; event destination updates tier
-- [ ] IMAGE lookup via site (first-party secret)
-- [ ] Admin login still works if you bootstrap a staging admin
-- [ ] Confirm you did **not** break `https://fupe.app`
+- [x] `https://staging.fupe.app` — padlock, branding
+- [x] Homepage lookup (e.g. Panera)
+- [x] Register / login / verify email (Resend)
+- [x] Forgot / reset password
+- [x] `/developers` — create API key
+- [x] Checkout (test card `4242…`) → success UX; event destination updates tier
+- [ ] IMAGE lookup via site (first-party secret + optional `OPENAI_API_KEY` for vision)
+- [ ] BARCODE: camera / photo / manual digits
+- [ ] VOICE: mic listens and shows interim transcript
+- [x] Admin login still works if you bootstrap a staging admin
+- [x] Confirm you did **not** break `https://fupe.app`
 
 Mobile (optional):
 
@@ -684,9 +690,9 @@ git pull
 
 `[rebuild-staging.sh](../rebuild-staging.sh)` (from staging repo root): install → migrate (staging `DATABASE_URL`) → build → restart `fupe-api-staging` / `fupe-web-staging` → curl `:3002` / `:3003`.
 
-- [ ] Script exists and is executable (`chmod +x rebuild-staging.sh`)
-- [ ] Never run staging migrate with prod `DATABASE_URL`
-- [ ] Prod deploys stay in `PROD_ROOT` with `./rebuild.sh`
+- [x] Script exists and is executable (`chmod +x rebuild-staging.sh`)
+- [x] Never run staging migrate with prod `DATABASE_URL`
+- [x] Prod deploys stay in `PROD_ROOT` with `./rebuild.sh`
 
 ---
 
@@ -710,6 +716,7 @@ git pull
 | Web staging crash-loop              | `journalctl -u fupe-web-staging -n 50`; **EADDRINUSE :3001** → set `PORT=3003` (start script uses `${PORT:-3001}`)       |
 | 526 SSL                             | Origin cert missing staging hostnames; Full (strict)                                                                     |
 | IMAGE 401 on staging                | `FIRST_PARTY_LOOKUP_SECRET` mismatch web ↔ API                                                                           |
+| IMAGE weak / “could not identify”   | Set `OPENAI_API_KEY` on staging API; confirm web uses `/api/image-lookup` not raw Nest                                  |
 | OOM / slow VPS                      | Stop staging units; avoid full prod restore on staging while building                                                    |
 | Cypher OID error after restore      | Re-run §5b E (AGE OID repair) on **staging**                                                                             |
 | `already exists` during restore     | Staging wasn’t empty — §5b C: `DROP DATABASE fupe` / recreate, then restore again                                        |

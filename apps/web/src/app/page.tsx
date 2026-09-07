@@ -1,5 +1,5 @@
 import { PeSearchForm } from '@/components/PeSearchForm';
-import { LookupMore } from '@/components/LookupMore';
+import { SearchByModes } from '@/components/SearchByModes';
 import { FupeLogo } from '@/components/FupeLogo';
 
 export default function HomePage() {
@@ -11,7 +11,7 @@ export default function HomePage() {
 
       <div className="w-full max-w-2xl text-center">
         <PeSearchForm autoFocus size="home" />
-        <LookupMore />
+        <SearchByModes />
       </div>
     </main>
   );

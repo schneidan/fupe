@@ -34,6 +34,16 @@ const config: Config = {
       spacing: {
         double: '2rem',
       },
+      keyframes: {
+        'mic-pulse': {
+          '0%': { transform: 'scale(1)', opacity: '0.7' },
+          '70%': { transform: 'scale(1.35)', opacity: '0' },
+          '100%': { transform: 'scale(1.35)', opacity: '0' },
+        },
+      },
+      animation: {
+        'mic-pulse': 'mic-pulse 1.4s ease-out infinite',
+      },
     },
   },
   plugins: [],

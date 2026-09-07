@@ -82,6 +82,10 @@ export interface LookupResult {
   ownership_chain: ChainNode[];
   citations: CitationDto[];
   related?: RelatedEntities;
+  /** Present on IMAGE lookups — what the photo appears to show. */
+  interpretation?: string;
+  /** Present on IMAGE lookups — all resolved ownership hits (may be 1). */
+  results?: LookupResult[];
 }
 
 export interface FuzzySearchHit {

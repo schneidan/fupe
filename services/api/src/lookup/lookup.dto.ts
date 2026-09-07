@@ -121,4 +121,18 @@ export class LookupResultDto {
 
   @ApiPropertyOptional({ type: RelatedEntitiesDto })
   related?: RelatedEntitiesDto;
+
+  @ApiPropertyOptional({
+    example: 'a Panera storefront',
+    description: 'IMAGE only — short description of what the photo appears to show.',
+  })
+  interpretation?: string;
+
+  @ApiPropertyOptional({
+    type: 'array',
+    items: { type: 'object' },
+    description:
+      'IMAGE only — all ownership matches (one per distinct brand). Top-level fields mirror the first hit for older clients.',
+  })
+  results?: LookupResultDto[];
 }

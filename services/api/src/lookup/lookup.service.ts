@@ -97,12 +97,55 @@ export class LookupService {
       throw new BadRequestException('image is required for IMAGE lookup');
     }
 
-    const text = await this.ocrService.extractText(image);
-    if (!text) {
-      throw new NotFoundException('Could not extract text from image');
+    const scene = await this.ocrService.identifyScene(image);
+    const interpretation = scene.caption.trim() || 'something in your photo';
+    const candidates = this.dedupeCandidates(scene.candidates);
+
+    if (!candidates.length) {
+      throw new NotFoundException(
+        `It looks like ${interpretation}, but we could not identify a brand or company to look up.`,
+      );
     }
 
-    return this.resolveText(text);
+    const results: LookupResult[] = [];
+    const seenIds = new Set<string>();
+
+    for (const candidate of candidates) {
+      try {
+        const hit = await this.resolveText(candidate);
+        const key = hit.entity_id ?? hit.matched_item.toLowerCase();
+        if (seenIds.has(key)) continue;
+        seenIds.add(key);
+        results.push(hit);
+      } catch {
+        // Candidate did not match the graph — try next
+      }
+      if (results.length >= 5) break;
+    }
+
+    if (!results.length) {
+      throw new NotFoundException(
+        `It looks like ${interpretation}, but we couldn't match anything in our directory yet.`,
+      );
+    }
+
+    const primary = results[0];
+    return {
+      ...primary,
+      interpretation,
+      results,
+    };
+  }
+
+  private dedupeCandidates(candidates: string[]): string[] {
+    const out: string[] = [];
+    for (const raw of candidates) {
+      const c = raw.trim();
+      if (!c) continue;
+      if (out.some((x) => x.toLowerCase() === c.toLowerCase())) continue;
+      out.push(c);
+    }
+    return out.slice(0, 5);
   }
 
   private async resolveVoice(

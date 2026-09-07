@@ -30,6 +30,10 @@ export interface LookupResult {
   ownership_chain: ChainNode[];
   citations: CitationDto[];
   related?: RelatedEntities;
+  /** IMAGE: short description of what the photo appears to show. */
+  interpretation?: string;
+  /** IMAGE: all ownership matches (top-level fields mirror the first hit). */
+  results?: LookupResult[];
 }
 
 export interface EntitySummary {
