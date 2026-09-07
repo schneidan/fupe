@@ -53,7 +53,14 @@ export class LookupController {
   @ApiConsumes('application/json', 'multipart/form-data')
   @ApiBody({ type: UnifiedLookupDto })
   @ApiOkResponse({ type: LookupResultDto })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      // Nest/multer default is memory storage (file.buffer). Keep limits only —
+      // do not import `multer` directly (not a top-level package dependency).
+      // 5MB covers short VOICE clips and phone photos; wav/flac can still fit a short utterance.
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
   async lookup(
     @Req() req: RequestWithApiKey,
     @Body() body: UnifiedLookupDto,
@@ -116,6 +123,7 @@ export class LookupController {
           transcript: body.transcript,
           audio: file?.buffer,
           audioMimeType: file?.mimetype,
+          audioFilename: file?.originalname,
         };
       default:
         return body;

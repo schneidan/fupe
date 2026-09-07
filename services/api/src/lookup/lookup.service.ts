@@ -19,6 +19,7 @@ export interface LookupInput {
   image?: Buffer;
   audio?: Buffer;
   audioMimeType?: string;
+  audioFilename?: string;
 }
 
 @Injectable()
@@ -39,7 +40,12 @@ export class LookupService {
       case 'IMAGE':
         return this.resolveImage(input.image!);
       case 'VOICE':
-        return this.resolveVoice(input.transcript, input.audio, input.audioMimeType);
+        return this.resolveVoice(
+          input.transcript,
+          input.audio,
+          input.audioMimeType,
+          input.audioFilename,
+        );
       default:
         throw new BadRequestException(`Unknown lookup type: ${input.type}`);
     }
@@ -152,16 +158,23 @@ export class LookupService {
     transcript?: string,
     audio?: Buffer,
     audioMimeType?: string,
+    audioFilename?: string,
   ): Promise<LookupResult> {
     let text = transcript?.trim() ?? '';
 
     if (!text && audio?.length) {
-      text = await this.whisperService.transcribe(audio, audioMimeType);
+      text = await this.whisperService.transcribe(
+        audio,
+        audioMimeType,
+        audioFilename,
+      );
     }
 
     if (!text) {
       throw new BadRequestException(
-        'transcript or audio is required for VOICE lookup',
+        audio?.length
+          ? 'Could not get a transcript from the audio file'
+          : 'VOICE lookup needs a transcript field or an audio file (multipart field `file`)',
       );
     }
 
