@@ -9,6 +9,9 @@ export interface AuthUser {
   role: UserRole;
   email_verified: boolean;
   display_name?: string | null;
+  organization?: string | null;
+  location?: string | null;
+  pending_email?: string | null;
   email_updates_opt_in?: boolean;
 }
 
@@ -125,6 +128,8 @@ export async function updateMe(
   token: string,
   patch: {
     display_name?: string | null;
+    organization?: string | null;
+    location?: string | null;
     email_updates_opt_in?: boolean;
   },
 ): Promise<AuthUser> {
@@ -146,6 +151,66 @@ export async function updateMe(
   localStorage.setItem(USER_KEY, JSON.stringify(user));
   window.dispatchEvent(new Event('fupe-auth'));
   return user;
+}
+
+export async function requestEmailChange(
+  token: string,
+  email: string,
+  password: string,
+): Promise<{ message: string; user: AuthUser }> {
+  const res = await fetch('/api/v1/auth/change-email', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ email, password }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      (body as { message?: string | string[] }).message ?? 'Request failed';
+    throw new Error(Array.isArray(msg) ? msg.join(', ') : String(msg));
+  }
+  const result = body as { message: string; user: AuthUser };
+  localStorage.setItem(USER_KEY, JSON.stringify(result.user));
+  window.dispatchEvent(new Event('fupe-auth'));
+  return result;
+}
+
+export async function cancelEmailChange(token: string): Promise<AuthUser> {
+  const res = await fetch('/api/v1/auth/change-email/cancel', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      (body as { message?: string | string[] }).message ?? 'Cancel failed';
+    throw new Error(Array.isArray(msg) ? msg.join(', ') : String(msg));
+  }
+  const user = (body as { user: AuthUser }).user;
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  window.dispatchEvent(new Event('fupe-auth'));
+  return user;
+}
+
+export async function confirmEmailChangeToken(token: string): Promise<AuthUser> {
+  const res = await fetch('/api/v1/auth/confirm-email-change', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      (body as { message?: string | string[] }).message ?? 'Confirmation failed';
+    throw new Error(Array.isArray(msg) ? msg.join(', ') : String(msg));
+  }
+  return (body as { user: AuthUser }).user;
 }
 
 export async function verifyEmailToken(token: string): Promise<AuthUser> {

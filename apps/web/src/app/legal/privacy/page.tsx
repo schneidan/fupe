@@ -14,9 +14,10 @@ export default function PrivacyPage() {
       <ul className="list-disc space-y-2 pl-5">
         <li>
           <span className="text-fupe-text">Account data:</span> email address,
-          optional display name, password hash, role, trust score, email
-          verification status, optional product-update email preference, optional
-          Stripe customer / subscription identifiers.
+          optional display name / organization / location, password hash, role,
+          trust score, email verification status, optional product-update email
+          preference, optional pending email-change address, optional Stripe
+          customer / subscription identifiers.
         </li>
         <li>
           <span className="text-fupe-text">Contribution data:</span> edit

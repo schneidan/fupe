@@ -68,8 +68,32 @@ class UpdateMeDto {
   display_name?: string | null;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  organization?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  location?: string | null;
+
+  @IsOptional()
   @IsBoolean()
   email_updates_opt_in?: boolean;
+}
+
+class RequestEmailChangeDto {
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @MinLength(8)
+  password!: string;
+}
+
+class ConfirmEmailChangeDto {
+  @IsString()
+  token!: string;
 }
 
 @Controller('auth')
@@ -112,6 +136,32 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   updateMe(@Req() req: { user: AuthUser }, @Body() body: UpdateMeDto) {
     return this.authService.updateMe(req.user.id, body);
+  }
+
+  @Post('change-email')
+  @UseGuards(JwtAuthGuard)
+  requestEmailChange(
+    @Req() req: { user: AuthUser },
+    @Body() { email, password }: RequestEmailChangeDto,
+  ) {
+    return this.authService.requestEmailChange(req.user.id, email, password);
+  }
+
+  @Post('change-email/cancel')
+  @UseGuards(JwtAuthGuard)
+  cancelEmailChange(@Req() req: { user: AuthUser }) {
+    return this.authService.cancelEmailChange(req.user.id).then((user) => ({
+      message: 'Email change cancelled',
+      user,
+    }));
+  }
+
+  @Post('confirm-email-change')
+  confirmEmailChange(@Body() { token }: ConfirmEmailChangeDto) {
+    return this.authService.confirmEmailChange(token).then((user) => ({
+      message: 'Email updated',
+      user,
+    }));
   }
 
   @Post('verify-email')

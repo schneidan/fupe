@@ -3,11 +3,13 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import {
+  cancelEmailChange,
   clearSession,
   fetchMe,
   getStoredUser,
   getToken,
   isModerator,
+  requestEmailChange,
   resendVerification,
   updateMe,
   type AuthUser,
@@ -17,28 +19,32 @@ import { AccountPrivacyPanel } from '@/components/AccountPrivacyPanel';
 export function AccountHub() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [displayName, setDisplayName] = useState('');
+  const [organization, setOrganization] = useState('');
+  const [location, setLocation] = useState('');
   const [updatesOptIn, setUpdatesOptIn] = useState(false);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [emailMsg, setEmailMsg] = useState<string | null>(null);
+  const [emailBusy, setEmailBusy] = useState(false);
 
   useEffect(() => {
-    const sync = () => {
-      const u = getStoredUser();
+    const apply = (u: AuthUser | null) => {
       setUser(u);
       if (u) {
         setDisplayName(u.display_name ?? '');
+        setOrganization(u.organization ?? '');
+        setLocation(u.location ?? '');
         setUpdatesOptIn(Boolean(u.email_updates_opt_in));
       }
     };
-    sync();
+    apply(getStoredUser());
     void fetchMe().then((me) => {
-      if (me) {
-        setUser(me);
-        setDisplayName(me.display_name ?? '');
-        setUpdatesOptIn(Boolean(me.email_updates_opt_in));
-      }
+      if (me) apply(me);
     });
+    const sync = () => apply(getStoredUser());
     window.addEventListener('fupe-auth', sync);
     return () => window.removeEventListener('fupe-auth', sync);
   }, []);
@@ -55,6 +61,8 @@ export function AccountHub() {
     try {
       const updated = await updateMe(token, {
         display_name: displayName.trim() || null,
+        organization: organization.trim() || null,
+        location: location.trim() || null,
         email_updates_opt_in: updatesOptIn,
       });
       setUser(updated);
@@ -63,6 +71,44 @@ export function AccountHub() {
       setSaveMsg(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function onRequestEmailChange(e: FormEvent) {
+    e.preventDefault();
+    const token = getToken();
+    if (!token) {
+      setEmailMsg('Sign in again.');
+      return;
+    }
+    setEmailBusy(true);
+    setEmailMsg(null);
+    try {
+      const res = await requestEmailChange(token, newEmail.trim(), emailPassword);
+      setUser(res.user);
+      setEmailMsg(res.message);
+      setNewEmail('');
+      setEmailPassword('');
+    } catch (err) {
+      setEmailMsg(err instanceof Error ? err.message : 'Request failed');
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
+  async function onCancelEmailChange() {
+    const token = getToken();
+    if (!token) return;
+    setEmailBusy(true);
+    setEmailMsg(null);
+    try {
+      const updated = await cancelEmailChange(token);
+      setUser(updated);
+      setEmailMsg('Pending email change cancelled.');
+    } catch (err) {
+      setEmailMsg(err instanceof Error ? err.message : 'Cancel failed');
+    } finally {
+      setEmailBusy(false);
     }
   }
 
@@ -189,17 +235,26 @@ export function AccountHub() {
           />
         </label>
         <label className="block text-sm">
-          <span className="text-fupe-muted">Email</span>
+          <span className="text-fupe-muted">Organization (optional)</span>
           <input
-            type="email"
-            disabled
-            value={user.email}
-            className="mt-1 w-full rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-fupe-muted outline-none"
+            type="text"
+            maxLength={120}
+            value={organization}
+            onChange={(e) => setOrganization(e.target.value)}
+            placeholder="Company, newsroom, school…"
+            className="mt-1 w-full rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-fupe-text outline-none focus:border-fupe-muted"
           />
-          <span className="mt-1 block text-xs text-fupe-muted">
-            Email changes aren’t supported yet — contact support if you need a
-            different address.
-          </span>
+        </label>
+        <label className="block text-sm">
+          <span className="text-fupe-muted">Location (optional)</span>
+          <input
+            type="text"
+            maxLength={120}
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="City, region, or country"
+            className="mt-1 w-full rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-fupe-text outline-none focus:border-fupe-muted"
+          />
         </label>
         <label className="flex items-start gap-2 text-sm text-fupe-muted">
           <input
@@ -227,6 +282,63 @@ export function AccountHub() {
         </button>
         {saveMsg ? <p className="text-xs text-fupe-muted">{saveMsg}</p> : null}
       </form>
+
+      <div className="rounded-xl border border-fupe-border bg-fupe-surface p-6 space-y-4">
+        <h2 className="font-semibold text-fupe-text">Email address</h2>
+        <p className="text-sm text-fupe-muted">
+          Current: <span className="text-fupe-text">{user.email}</span>
+        </p>
+        {user.pending_email ? (
+          <div className="rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-sm">
+            <p className="text-fupe-muted">
+              Pending change to{' '}
+              <span className="text-fupe-text">{user.pending_email}</span>. Check
+              that inbox for the confirmation link.
+            </p>
+            <button
+              type="button"
+              disabled={emailBusy}
+              onClick={() => void onCancelEmailChange()}
+              className="mt-2 text-fupe-text underline-offset-2 hover:underline disabled:opacity-60"
+            >
+              Cancel pending change
+            </button>
+          </div>
+        ) : null}
+        <form onSubmit={onRequestEmailChange} className="space-y-3">
+          <label className="block text-sm">
+            <span className="text-fupe-muted">New email</span>
+            <input
+              type="email"
+              required
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              autoComplete="email"
+              className="mt-1 w-full rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-fupe-text outline-none focus:border-fupe-muted"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="text-fupe-muted">Current password</span>
+            <input
+              type="password"
+              required
+              minLength={8}
+              value={emailPassword}
+              onChange={(e) => setEmailPassword(e.target.value)}
+              autoComplete="current-password"
+              className="mt-1 w-full rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-fupe-text outline-none focus:border-fupe-muted"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={emailBusy}
+            className="rounded-full border border-fupe-border px-5 py-2 text-sm text-fupe-text hover:border-fupe-muted disabled:opacity-60"
+          >
+            {emailBusy ? 'Sending…' : 'Send confirmation to new email'}
+          </button>
+        </form>
+        {emailMsg ? <p className="text-xs text-fupe-muted">{emailMsg}</p> : null}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Link

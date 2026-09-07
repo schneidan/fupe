@@ -603,4 +603,234 @@ export class AdminService {
     });
     return rows[0];
   }
+
+  // ─── Product email updates ────────────────────────────────────────────────
+
+  async listEmailUpdateSubscribers(params: {
+    q?: string;
+    page: number;
+    limit: number;
+  }): Promise<{
+    subscribers: Array<{
+      id: string;
+      email: string;
+      display_name: string | null;
+      organization: string | null;
+      location: string | null;
+      email_updates_opt_in_at: Date | null;
+      email_verified_at: Date | null;
+      created_at: Date;
+    }>;
+    total: number;
+  }> {
+    const { q, page, limit } = params;
+    const offset = (page - 1) * limit;
+    const conditions = [
+      `u.email_updates_opt_in = true`,
+      `u.disabled_at IS NULL`,
+    ];
+    const values: unknown[] = [];
+    let i = 1;
+
+    if (q?.trim()) {
+      conditions.push(
+        `(u.email ILIKE $${i} OR u.display_name ILIKE $${i} OR u.organization ILIKE $${i})`,
+      );
+      values.push(`%${q.trim()}%`);
+      i++;
+    }
+
+    const where = `WHERE ${conditions.join(' AND ')}`;
+
+    const countRes = await this.pool.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM public.users u ${where}`,
+      values,
+    );
+
+    const { rows } = await this.pool.query(
+      `SELECT u.id, u.email, u.display_name, u.organization, u.location,
+              u.email_updates_opt_in_at, u.email_verified_at, u.created_at
+         FROM public.users u
+         ${where}
+         ORDER BY COALESCE(u.email_updates_opt_in_at, u.created_at) DESC
+         LIMIT $${i++} OFFSET $${i}`,
+      [...values, limit, offset],
+    );
+
+    return {
+      subscribers: rows,
+      total: Number(countRes.rows[0]?.n ?? 0),
+    };
+  }
+
+  async exportEmailUpdateSubscribersCsv(): Promise<string> {
+    const { rows } = await this.pool.query<{
+      id: string;
+      email: string;
+      display_name: string | null;
+      organization: string | null;
+      location: string | null;
+      email_updates_opt_in_at: Date | null;
+      email_verified_at: Date | null;
+      created_at: Date;
+    }>(
+      `SELECT u.id, u.email, u.display_name, u.organization, u.location,
+              u.email_updates_opt_in_at, u.email_verified_at, u.created_at
+         FROM public.users u
+        WHERE u.email_updates_opt_in = true
+          AND u.disabled_at IS NULL
+        ORDER BY COALESCE(u.email_updates_opt_in_at, u.created_at) DESC`,
+    );
+
+    const header = [
+      'id',
+      'email',
+      'display_name',
+      'organization',
+      'location',
+      'opted_in_at',
+      'email_verified_at',
+      'created_at',
+    ];
+    const escape = (v: string | null | undefined) => {
+      const s = v ?? '';
+      if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+    const iso = (d: Date | null) =>
+      d ? new Date(d).toISOString() : '';
+
+    const lines = [
+      header.join(','),
+      ...rows.map((r) =>
+        [
+          r.id,
+          escape(r.email),
+          escape(r.display_name),
+          escape(r.organization),
+          escape(r.location),
+          iso(r.email_updates_opt_in_at),
+          iso(r.email_verified_at),
+          iso(r.created_at),
+        ].join(','),
+      ),
+    ];
+    return `\uFEFF${lines.join('\n')}\n`;
+  }
+
+  async sendProductUpdate(
+    actorId: string,
+    params: { subject: string; body: string; dry_run?: boolean },
+  ): Promise<{
+    dry_run: boolean;
+    total: number;
+    sent: number;
+    failed: number;
+    failures: Array<{ email: string; error: string }>;
+  }> {
+    const subject = params.subject.trim();
+    const body = params.body.trim();
+    if (!subject || subject.length > 200) {
+      throw new BadRequestException('Subject is required (max 200 chars)');
+    }
+    if (!body || body.length > 20000) {
+      throw new BadRequestException('Body is required (max 20,000 chars)');
+    }
+
+    const dryRun = Boolean(params.dry_run);
+    const { rows } = await this.pool.query<{ id: string; email: string }>(
+      `SELECT id, email FROM public.users
+        WHERE email_updates_opt_in = true
+          AND disabled_at IS NULL
+        ORDER BY email ASC`,
+    );
+
+    if (dryRun) {
+      await writeAdminAudit(this.pool, {
+        actorId,
+        action: 'email_updates_dry_run',
+        targetType: 'email_updates',
+        targetId: 'list',
+        previousState: null,
+        newState: { subject, recipient_count: rows.length },
+        note: body.slice(0, 500),
+      });
+      return {
+        dry_run: true,
+        total: rows.length,
+        sent: 0,
+        failed: 0,
+        failures: [],
+      };
+    }
+
+    const bodyHtml = plainTextToEmailHtml(body);
+    const emailSubject = subject.startsWith('FUPE')
+      ? subject
+      : `FUPE: ${subject}`;
+
+    let sent = 0;
+    let failed = 0;
+    const failures: Array<{ email: string; error: string }> = [];
+
+    // Sequential sends keep SMTP/Resend polite; console provider is fine too.
+    for (const row of rows) {
+      try {
+        await this.mail.sendProductUpdateEmail(row.email, {
+          subject: emailSubject,
+          bodyText: body,
+          bodyHtml,
+        });
+        sent++;
+      } catch (err) {
+        failed++;
+        failures.push({
+          email: row.email,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    await writeAdminAudit(this.pool, {
+      actorId,
+      action: 'email_updates_send',
+      targetType: 'email_updates',
+      targetId: 'list',
+      previousState: null,
+      newState: {
+        subject: emailSubject,
+        recipient_count: rows.length,
+        sent,
+        failed,
+      },
+      note: body.slice(0, 500),
+    });
+
+    return {
+      dry_run: false,
+      total: rows.length,
+      sent,
+      failed,
+      failures: failures.slice(0, 25),
+    };
+  }
+}
+
+function plainTextToEmailHtml(text: string): string {
+  const escape = (s: string) =>
+    s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map(
+      (p) =>
+        `<p style="margin:0 0 12px">${escape(p).replace(/\n/g, '<br/>')}</p>`,
+    );
+  return paragraphs.join('') || `<p style="margin:0 0 12px">${escape(text)}</p>`;
 }

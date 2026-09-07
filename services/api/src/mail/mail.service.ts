@@ -84,6 +84,97 @@ export class MailService {
     });
   }
 
+  async sendEmailChangeConfirmEmail(
+    to: string,
+    confirmUrl: string,
+    params: { currentEmail: string },
+  ): Promise<void> {
+    const site = this.siteUrl();
+    await this.send({
+      to,
+      subject: 'Confirm your new FUPE email',
+      text: [
+        'Confirm this address to finish changing your FUPE account email.',
+        `Current email: ${params.currentEmail}`,
+        '',
+        `Open this link: ${confirmUrl}`,
+        '',
+        'This link expires in 24 hours. If you did not request this, ignore this email.',
+        '',
+        `Support: support@fupe.app · ${site}`,
+      ].join('\n'),
+      html: renderBrandedEmail(
+        {
+          preheader: 'Confirm your new email address for FUPE.',
+          headline: 'Confirm your new email',
+          bodyHtml: `<p style="margin:0 0 12px">Someone (hopefully you) asked to change a FUPE account email from <strong style="color:#ffffff">${escapeHtml(params.currentEmail)}</strong> to this address.</p>`,
+          cta: { label: 'Confirm new email', url: confirmUrl },
+          footnoteHtml:
+            'This link expires in 24 hours. If you did not request this, you can ignore this email.',
+        },
+        { siteUrl: site },
+      ),
+    });
+  }
+
+  async sendEmailChangeNoticeEmail(
+    to: string,
+    pendingEmail: string,
+  ): Promise<void> {
+    const site = this.siteUrl();
+    await this.send({
+      to,
+      subject: 'FUPE email change requested',
+      text: [
+        'A request was made to change the email on your FUPE account.',
+        `Pending new email: ${pendingEmail}`,
+        '',
+        'If you did not request this, sign in and cancel the change from your account page, or contact support@fupe.app.',
+        '',
+        `Account: ${site}/account`,
+      ].join('\n'),
+      html: renderBrandedEmail(
+        {
+          preheader: 'Email change requested on your FUPE account.',
+          headline: 'Email change requested',
+          bodyHtml: `<p style="margin:0 0 12px">A request was made to change your FUPE account email to <strong style="color:#ffffff">${escapeHtml(pendingEmail)}</strong>. A confirmation link was sent to that address.</p><p style="margin:0 0 12px">If this wasn&apos;t you, cancel the pending change on your account page or contact support.</p>`,
+          cta: { label: 'Open account', url: `${site}/account` },
+        },
+        { siteUrl: site },
+      ),
+    });
+  }
+
+  async sendProductUpdateEmail(
+    to: string,
+    params: { subject: string; bodyText: string; bodyHtml: string },
+  ): Promise<void> {
+    const site = this.siteUrl();
+    await this.send({
+      to,
+      subject: params.subject,
+      text: [
+        params.bodyText,
+        '',
+        '—',
+        'You’re receiving this because you opted in to occasional FUPE updates.',
+        `Manage preferences: ${site}/account`,
+        `Support: support@fupe.app`,
+      ].join('\n'),
+      html: renderBrandedEmail(
+        {
+          preheader: params.subject,
+          headline: params.subject.replace(/^FUPE:\s*/i, '') || 'FUPE update',
+          bodyHtml: params.bodyHtml,
+          cta: { label: 'Manage email preferences', url: `${site}/account` },
+          footnoteHtml:
+            'You’re receiving this because you opted in to occasional FUPE product updates. You can turn this off anytime on your account page.',
+        },
+        { siteUrl: site },
+      ),
+    });
+  }
+
   async sendEditReceivedEmail(
     to: string,
     params: { status: 'queued' | 'committed'; summary?: string },

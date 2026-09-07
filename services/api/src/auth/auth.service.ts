@@ -25,6 +25,9 @@ export interface AuthUser {
   role: UserRole;
   email_verified: boolean;
   display_name?: string | null;
+  organization?: string | null;
+  location?: string | null;
+  pending_email?: string | null;
   email_updates_opt_in?: boolean;
 }
 
@@ -280,6 +283,9 @@ export class AuthService {
       role: user.role ?? 'user',
       email_verified: Boolean(user.email_verified_at),
       display_name: user.display_name ?? null,
+      organization: user.organization ?? null,
+      location: user.location ?? null,
+      pending_email: user.pending_email ?? null,
       email_updates_opt_in: Boolean(user.email_updates_opt_in),
     };
   }
@@ -294,9 +300,100 @@ export class AuthService {
 
   async updateMe(
     userId: string,
-    patch: { display_name?: string | null; email_updates_opt_in?: boolean },
+    patch: {
+      display_name?: string | null;
+      organization?: string | null;
+      location?: string | null;
+      email_updates_opt_in?: boolean;
+    },
   ): Promise<AuthUser> {
     const user = await this.usersRepo.updateAccountPrefs(userId, patch);
     return this.toAuthUser(user);
+  }
+
+  async requestEmailChange(
+    userId: string,
+    newEmail: string,
+    password: string,
+  ): Promise<{ message: string; user: AuthUser }> {
+    const user = await this.usersRepo.findById(userId);
+    if (!user || user.disabled_at) {
+      throw new UnauthorizedException('Not authenticated');
+    }
+
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) {
+      throw new UnauthorizedException('Incorrect password');
+    }
+
+    const normalized = newEmail.toLowerCase().trim();
+    if (!normalized || !normalized.includes('@')) {
+      throw new BadRequestException('Enter a valid email address');
+    }
+    if (normalized === user.email) {
+      throw new BadRequestException('That is already your email address');
+    }
+
+    const taken = await this.usersRepo.findByEmail(normalized);
+    if (taken) {
+      throw new BadRequestException('That email is already in use');
+    }
+    const pendingTaken = await this.usersRepo.findByPendingEmail(normalized);
+    if (pendingTaken && pendingTaken.id !== userId) {
+      throw new BadRequestException('That email is already in use');
+    }
+
+    const raw = newOpaqueToken();
+    const expires = new Date(Date.now() + 1000 * 60 * 60 * 24);
+    const updated = await this.usersRepo.setPendingEmailChange(
+      userId,
+      normalized,
+      hashOpaqueToken(raw),
+      expires,
+    );
+
+    const site =
+      this.config.get<string>('NEXT_PUBLIC_SITE_URL') ??
+      this.config.get<string>('SITE_URL') ??
+      'http://localhost:3001';
+    const confirmUrl = `${site.replace(/\/$/, '')}/confirm-email-change?token=${raw}`;
+
+    await this.mail.sendEmailChangeConfirmEmail(normalized, confirmUrl, {
+      currentEmail: user.email,
+    });
+    await this.mail.sendSafe('email_change_notice', () =>
+      this.mail.sendEmailChangeNoticeEmail(user.email, normalized),
+    );
+
+    return {
+      message: `Confirmation link sent to ${normalized}. Open it to finish the change.`,
+      user: this.toAuthUser(updated),
+    };
+  }
+
+  async cancelEmailChange(userId: string): Promise<AuthUser> {
+    const user = await this.usersRepo.clearPendingEmailChange(userId);
+    return this.toAuthUser(user);
+  }
+
+  async confirmEmailChange(token: string): Promise<AuthUser> {
+    const user = await this.usersRepo.findByEmailChangeToken(
+      hashOpaqueToken(token),
+    );
+    if (!user?.pending_email) {
+      throw new BadRequestException('Invalid or expired email change link');
+    }
+
+    const taken = await this.usersRepo.findByEmail(user.pending_email);
+    if (taken && taken.id !== user.id) {
+      await this.usersRepo.clearPendingEmailChange(user.id);
+      throw new BadRequestException('That email is already in use');
+    }
+
+    const updated = await this.usersRepo.confirmEmailChange(user.id);
+    if (!updated) {
+      throw new BadRequestException('Unable to confirm email change');
+    }
+    return this.toAuthUser(updated);
   }
 }

@@ -2,11 +2,13 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Patch,
   Post,
   Query,
   Req,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -14,6 +16,7 @@ import {
   ApiSecurity,
   ApiTags,
   ApiBearerAuth,
+  ApiProduces,
 } from '@nestjs/swagger';
 import {
   IsBoolean,
@@ -24,6 +27,7 @@ import {
   Max,
   MaxLength,
   Min,
+  MinLength,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { AdminGuard, AdminJwtUser } from './admin.guard';
@@ -84,6 +88,29 @@ class IngestListQuery {
   @IsOptional() @IsString() status?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number = 1;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) limit?: number = 50;
+}
+
+class EmailUpdatesListQuery {
+  @IsOptional() @IsString() q?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number = 1;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) limit?: number = 50;
+}
+
+class SendProductUpdateBody {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  subject!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(20000)
+  body!: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  dry_run?: boolean;
 }
 
 @ApiTags('Admin')
@@ -150,6 +177,49 @@ export class AdminController {
     return this.adminService
       .revokeKeyAdmin(req.adminUser.id, id)
       .then(() => ({ revoked: true }));
+  }
+
+  // ── Product email updates ─────────────────────────────────────────────────
+
+  @Get('email-updates/subscribers')
+  @ApiOperation({ summary: 'List users opted in to product updates' })
+  listEmailUpdateSubscribers(@Query() query: EmailUpdatesListQuery) {
+    return this.adminService.listEmailUpdateSubscribers({
+      q: query.q,
+      page: query.page ?? 1,
+      limit: query.limit ?? 50,
+    });
+  }
+
+  @Get('email-updates/subscribers.csv')
+  @ApiOperation({ summary: 'CSV export of product-update subscribers' })
+  @ApiProduces('text/csv')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="fupe-email-updates-subscribers.csv"',
+  )
+  async exportEmailUpdateSubscribersCsv() {
+    const csv = await this.adminService.exportEmailUpdateSubscribersCsv();
+    return new StreamableFile(Buffer.from(csv, 'utf8'), {
+      type: 'text/csv; charset=utf-8',
+      disposition: 'attachment; filename="fupe-email-updates-subscribers.csv"',
+    });
+  }
+
+  @Post('email-updates/send')
+  @ApiOperation({
+    summary: 'Send (or dry-run) a product update to opted-in users',
+  })
+  sendProductUpdate(
+    @Body() body: SendProductUpdateBody,
+    @Req() req: { adminUser: AdminJwtUser },
+  ) {
+    return this.adminService.sendProductUpdate(req.adminUser.id, {
+      subject: body.subject,
+      body: body.body,
+      dry_run: body.dry_run,
+    });
   }
 
   // ── Subscriptions ─────────────────────────────────────────────────────────

@@ -23,8 +23,13 @@ export interface UserRow {
   disabled_at?: Date | null;
   token_version?: number;
   display_name?: string | null;
+  organization?: string | null;
+  location?: string | null;
   email_updates_opt_in?: boolean;
   email_updates_opt_in_at?: Date | null;
+  pending_email?: string | null;
+  email_change_token?: string | null;
+  email_change_expires_at?: Date | null;
   created_at: Date;
 }
 
@@ -96,6 +101,8 @@ export class UsersRepository {
     userId: string,
     patch: {
       display_name?: string | null;
+      organization?: string | null;
+      location?: string | null;
       email_updates_opt_in?: boolean;
     },
   ): Promise<UserRow> {
@@ -106,6 +113,14 @@ export class UsersRepository {
       patch.display_name !== undefined
         ? patch.display_name?.trim() || null
         : current.display_name ?? null;
+    const organization =
+      patch.organization !== undefined
+        ? patch.organization?.trim() || null
+        : current.organization ?? null;
+    const location =
+      patch.location !== undefined
+        ? patch.location?.trim() || null
+        : current.location ?? null;
     const optIn =
       patch.email_updates_opt_in !== undefined
         ? patch.email_updates_opt_in
@@ -117,11 +132,83 @@ export class UsersRepository {
     const { rows } = await this.pool.query<UserRow>(
       `UPDATE public.users
        SET display_name = $2,
-           email_updates_opt_in = $3,
-           email_updates_opt_in_at = $4
+           organization = $3,
+           location = $4,
+           email_updates_opt_in = $5,
+           email_updates_opt_in_at = $6
        WHERE id = $1
        RETURNING *`,
-      [userId, displayName, optIn, optInAt],
+      [userId, displayName, organization, location, optIn, optInAt],
+    );
+    return rows[0];
+  }
+
+  async findByPendingEmail(email: string): Promise<UserRow | null> {
+    const { rows } = await this.pool.query<UserRow>(
+      `SELECT * FROM public.users WHERE lower(pending_email) = $1`,
+      [email.toLowerCase()],
+    );
+    return rows[0] ?? null;
+  }
+
+  async findByEmailChangeToken(tokenHash: string): Promise<UserRow | null> {
+    const { rows } = await this.pool.query<UserRow>(
+      `SELECT * FROM public.users
+       WHERE email_change_token = $1
+         AND email_change_expires_at > now()
+         AND pending_email IS NOT NULL
+         AND disabled_at IS NULL`,
+      [tokenHash],
+    );
+    return rows[0] ?? null;
+  }
+
+  async setPendingEmailChange(
+    userId: string,
+    pendingEmail: string,
+    tokenHash: string,
+    expiresAt: Date,
+  ): Promise<UserRow> {
+    const { rows } = await this.pool.query<UserRow>(
+      `UPDATE public.users
+       SET pending_email = $2,
+           email_change_token = $3,
+           email_change_expires_at = $4
+       WHERE id = $1
+       RETURNING *`,
+      [userId, pendingEmail.toLowerCase(), tokenHash, expiresAt],
+    );
+    return rows[0];
+  }
+
+  async clearPendingEmailChange(userId: string): Promise<UserRow> {
+    const { rows } = await this.pool.query<UserRow>(
+      `UPDATE public.users
+       SET pending_email = NULL,
+           email_change_token = NULL,
+           email_change_expires_at = NULL
+       WHERE id = $1
+       RETURNING *`,
+      [userId],
+    );
+    return rows[0];
+  }
+
+  async confirmEmailChange(userId: string): Promise<UserRow> {
+    const { rows } = await this.pool.query<UserRow>(
+      `UPDATE public.users
+       SET email = pending_email,
+           pending_email = NULL,
+           email_change_token = NULL,
+           email_change_expires_at = NULL,
+           email_verified_at = now(),
+           email_verify_token = NULL,
+           email_verify_expires_at = NULL,
+           token_version = COALESCE(token_version, 0) + 1
+       WHERE id = $1
+         AND pending_email IS NOT NULL
+       RETURNING *`,
+      [userId],
     );
     return rows[0];
   }
@@ -320,6 +407,9 @@ export class UsersRepository {
         id: user.id,
         email: user.email,
         display_name: user.display_name ?? null,
+        organization: user.organization ?? null,
+        location: user.location ?? null,
+        pending_email: user.pending_email ?? null,
         role: user.role,
         trust_score: user.trust_score,
         email_verified_at: user.email_verified_at,

@@ -230,3 +230,68 @@ export function resolveIngestMatch(
     body: JSON.stringify({ decision }),
   });
 }
+
+export interface EmailUpdateSubscriber {
+  id: string;
+  email: string;
+  display_name: string | null;
+  organization: string | null;
+  location: string | null;
+  email_updates_opt_in_at: string | null;
+  email_verified_at: string | null;
+  created_at: string;
+}
+
+export interface ProductUpdateSendResult {
+  dry_run: boolean;
+  total: number;
+  sent: number;
+  failed: number;
+  failures: Array<{ email: string; error: string }>;
+}
+
+export function fetchEmailUpdateSubscribers(params?: {
+  q?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const qs = new URLSearchParams();
+  if (params?.q) qs.set('q', params.q);
+  if (params?.page) qs.set('page', String(params.page));
+  if (params?.limit) qs.set('limit', String(params.limit));
+  return adminFetch<{ subscribers: EmailUpdateSubscriber[]; total: number }>(
+    `/email-updates/subscribers?${qs}`,
+  );
+}
+
+/** Download CSV via authenticated fetch (admin JWT). */
+export async function downloadEmailUpdateSubscribersCsv(): Promise<void> {
+  const token = getToken();
+  const res = await fetch(`${BASE}/email-updates/subscribers.csv`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const msg =
+      (body as { message?: string | string[] }).message ?? 'CSV export failed';
+    throw new Error(Array.isArray(msg) ? msg.join(', ') : String(msg));
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `fupe-email-updates-subscribers-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function sendProductUpdate(params: {
+  subject: string;
+  body: string;
+  dry_run?: boolean;
+}) {
+  return adminFetch<ProductUpdateSendResult>('/email-updates/send', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
