@@ -374,6 +374,18 @@ export function SearchByModes() {
                       Use camera
                     </button>
                   </div>
+                  <p className="text-center text-xs leading-relaxed text-fupe-accentDim">
+                    Photos are analyzed by a third-party AI to identify brands.
+                    We request zero data retention (not stored or used for
+                    training). See{' '}
+                    <a
+                      href="/legal/privacy"
+                      className="text-fupe-muted underline decoration-fupe-border underline-offset-2 hover:text-fupe-text"
+                    >
+                      Privacy
+                    </a>
+                    .
+                  </p>
                   <input
                     ref={libraryInputRef}
                     type="file"
