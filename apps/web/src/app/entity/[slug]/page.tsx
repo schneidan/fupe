@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { ResultView } from '@/components/ResultView';
+import { EntityView } from '@/components/EntityView';
 import { lookupServer } from '@/lib/lookup-server';
 import { slugToQuery } from '@/lib/slug';
 import { FupeLogo } from '@/components/FupeLogo';
@@ -9,7 +9,7 @@ type PageProps = {
   params: Promise<{ slug: string }>;
 };
 
-function buildResultMetadata(
+function buildEntityMetadata(
   matchedItem: string,
   isPe: boolean,
   ultimateParent: string | null,
@@ -48,7 +48,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   try {
     const result = await lookupServer('TEXT', { query });
-    return buildResultMetadata(
+    return buildEntityMetadata(
       result.matched_item,
       result.is_private_equity_owned,
       result.ultimate_parent?.name ?? null,
@@ -62,7 +62,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default async function ResultSlugPage({ params }: PageProps) {
+export default async function EntitySlugPage({ params }: PageProps) {
   const { slug } = await params;
 
   return (
@@ -75,7 +75,7 @@ export default async function ResultSlugPage({ params }: PageProps) {
           <div className="py-20 text-center text-fupe-muted">Loading…</div>
         }
       >
-        <ResultView slug={slug} />
+        <EntityView slug={slug} />
       </Suspense>
     </main>
   );

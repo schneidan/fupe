@@ -10,13 +10,18 @@ import { CitationsList } from '@/components/CitationsList';
 import { DidYouKnow } from '@/components/DidYouKnow';
 import { SuggestEditLink } from '@/components/SuggestEditLink';
 import { lookup, type LookupResult } from '@/lib/api';
-import { resultPath, slugToQuery, toSlug } from '@/lib/slug';
+import { entityPath, slugToQuery, toSlug } from '@/lib/slug';
 
-interface ResultViewProps {
+interface EntityViewProps {
   slug: string;
 }
 
-export function ResultView({ slug }: ResultViewProps) {
+/**
+ * Single entity detail surface for search and browse.
+ * Resolves via TEXT lookup so fuzzy/search-origin slugs still work, then
+ * canonicalizes the URL to the matched entity slug.
+ */
+export function EntityView({ slug }: EntityViewProps) {
   const router = useRouter();
   const query = slugToQuery(slug);
   const [result, setResult] = useState<LookupResult | null>(null);
@@ -40,7 +45,7 @@ export function ResultView({ slug }: ResultViewProps) {
         setResult(data);
         const canonical = toSlug(data.matched_item);
         if (canonical && canonical !== slug) {
-          router.replace(resultPath(data.matched_item));
+          router.replace(entityPath(data.matched_item));
         }
       })
       .catch((e) => {

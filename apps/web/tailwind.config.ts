@@ -26,6 +26,12 @@ const config: Config = {
       fontFamily: {
         display: ['var(--font-inter)', 'system-ui', 'sans-serif'],
       },
+      // Small type bump: +1px or +8% (whichever greater) vs Tailwind defaults
+      // xs 12→13px, sm 14→~15.1px. Leave base/lg+ alone.
+      fontSize: {
+        xs: ['0.8125rem', { lineHeight: '1.125rem' }],
+        sm: ['0.945rem', { lineHeight: '1.375rem' }],
+      },
       boxShadow: {
         accent: '0 0 40px -8px rgba(255, 255, 255, 0.12)',
         yes: '0 0 60px -10px rgba(239, 68, 68, 0.5)',

@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { listEntities, type EntitySummary } from '@/lib/api';
-import { resultPath } from '@/lib/slug';
+import { entityPath } from '@/lib/slug';
 
 const ENTITY_TYPES = [
   { value: '', label: 'All types' },
@@ -144,7 +144,7 @@ export function BrowseDirectory() {
                 key={entity.id}
                 className="flex items-center justify-between gap-4 px-4 py-3 transition hover:bg-fupe-elevated"
               >
-                <Link href={`/browse/${entity.slug}`} className="min-w-0 flex-1">
+                <Link href={entityPath(entity.slug)} className="min-w-0 flex-1">
                   <p className="font-medium text-fupe-text">{entity.name}</p>
                   <p className="text-xs text-fupe-muted">
                     {entity.type.replace(/_/g, ' ')}
@@ -159,12 +159,6 @@ export function BrowseDirectory() {
                   ) : (
                     <span className="text-xs text-fupe-accentDim">—</span>
                   )}
-                  <Link
-                    href={resultPath(entity.slug)}
-                    className="text-xs text-fupe-muted hover:text-fupe-text"
-                  >
-                    Lookup
-                  </Link>
                 </div>
               </li>
             ))}

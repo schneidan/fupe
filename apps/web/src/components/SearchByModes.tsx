@@ -16,7 +16,7 @@ import {
   type BarcodeScanHandle,
 } from '@/lib/barcode';
 import { resizeImageForLookup } from '@/lib/image';
-import { resultPath } from '@/lib/slug';
+import { entityPath } from '@/lib/slug';
 import { ImageLookupResults } from '@/components/ImageLookupResults';
 
 type Mode = 'IMAGE' | 'BARCODE' | 'VOICE';
@@ -119,7 +119,7 @@ export function SearchByModes() {
 
     if (results.length === 1) {
       setMulti(null);
-      router.push(resultPath(results[0].matched_item));
+      router.push(entityPath(results[0].matched_item));
       return;
     }
 
@@ -222,7 +222,7 @@ export function SearchByModes() {
       setGtin(decoded);
       setStatus(`Found ${decoded} — looking up…`);
       const data = await lookup('BARCODE', { gtin: decoded });
-      router.push(resultPath(data.matched_item));
+      router.push(entityPath(data.matched_item));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Barcode lookup failed');
     } finally {
@@ -326,7 +326,7 @@ export function SearchByModes() {
       if (finalText.trim()) {
         setListening(false);
         recognitionRef.current = null;
-        router.push(resultPath(finalText.trim()));
+        router.push(entityPath(finalText.trim()));
       }
     };
 

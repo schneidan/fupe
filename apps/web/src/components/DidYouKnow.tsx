@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { LookupResult } from '@/lib/api';
+import { entityPath } from '@/lib/slug';
 
 interface DidYouKnowProps {
   result: LookupResult;
@@ -31,7 +32,7 @@ export function DidYouKnow({ result }: DidYouKnowProps) {
           {siblings.map((entity) => (
             <li key={entity.id}>
               <Link
-                href={`/browse/${entity.slug}`}
+                href={entityPath(entity.slug)}
                 className="rounded-full border border-fupe-border px-3 py-1 text-sm text-fupe-text transition hover:border-fupe-muted"
               >
                 {entity.name}
@@ -78,7 +79,7 @@ export function DidYouKnow({ result }: DidYouKnowProps) {
           {similar.slice(0, 6).map((entity) => (
             <li key={entity.id}>
               <Link
-                href={`/browse/${entity.slug}`}
+                href={entityPath(entity.slug)}
                 className="rounded-full border border-fupe-border px-3 py-1 text-sm text-fupe-text transition hover:border-fupe-muted"
               >
                 {entity.name}

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { resultPath } from '@/lib/slug';
+import { entityPath } from '@/lib/slug';
 import type { LookupResult } from '@/lib/api';
 
 interface ImageLookupResultsProps {
@@ -38,7 +38,7 @@ export function ImageLookupResults({
           {results.map((r) => (
             <li key={r.entity_id ?? r.matched_item}>
               <Link
-                href={resultPath(r.matched_item)}
+                href={entityPath(r.matched_item)}
                 className="flex items-baseline justify-between gap-4 py-4 transition hover:bg-fupe-surface/60"
               >
                 <span className="text-lg text-fupe-text">{r.matched_item}</span>

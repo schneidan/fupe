@@ -5,12 +5,12 @@ type PageProps = {
   searchParams: Promise<{ q?: string }>;
 };
 
-/** Redirect legacy ?q= URLs to clean /result/[slug] paths. */
-export default async function ResultLegacyPage({ searchParams }: PageProps) {
+/** Allow /entity?q=Name → /entity/slug (handy for bookmarks / old links). */
+export default async function EntityQueryPage({ searchParams }: PageProps) {
   const { q } = await searchParams;
 
   if (q?.trim()) {
-    redirect(`/result/${toSlug(q.trim())}`);
+    redirect(`/entity/${toSlug(q.trim())}`);
   }
 
   redirect('/');

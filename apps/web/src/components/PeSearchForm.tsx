@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { resultPath } from '@/lib/slug';
+import { entityPath } from '@/lib/slug';
 
 interface PeSearchFormProps {
   defaultQuery?: string;
@@ -22,7 +22,7 @@ export function PeSearchForm({
     e.preventDefault();
     const trimmed = query.trim();
     if (!trimmed) return;
-    router.push(resultPath(trimmed));
+    router.push(entityPath(trimmed));
   }
 
   const isHome = size === 'home';

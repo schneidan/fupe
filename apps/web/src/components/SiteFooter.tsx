@@ -45,7 +45,7 @@ export function SiteFooter() {
           Contact
         </Link>
       </nav>
-      <p className="mx-auto mt-4 max-w-2xl text-xs leading-relaxed">
+      <p className="mx-auto mt-4 w-[80%] max-w-none text-xs leading-relaxed">
         Ownership data is sourced from public records &amp; community edits.
         Not legal or financial advice. Results may be incomplete — check{' '}
         <Link href="/legal/sources" className="text-fupe-text hover:underline">

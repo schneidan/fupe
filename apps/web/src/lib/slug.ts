@@ -9,11 +9,12 @@ export function toSlug(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-/** Best-effort query string from a result slug. */
+/** Best-effort query string from an entity slug. */
 export function slugToQuery(slug: string): string {
   return decodeURIComponent(slug).replace(/-/g, ' ').trim();
 }
 
-export function resultPath(nameOrSlug: string): string {
-  return `/result/${toSlug(nameOrSlug)}`;
+/** Canonical entity detail URL (search + browse both land here). */
+export function entityPath(nameOrSlug: string): string {
+  return `/entity/${toSlug(nameOrSlug)}`;
 }
