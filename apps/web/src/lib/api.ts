@@ -82,10 +82,14 @@ export async function lookup(
   return res.json();
 }
 
-export async function lookupImage(file: File): Promise<LookupResult> {
+export async function lookupImage(
+  file: File,
+  options: { useAi?: boolean } = {},
+): Promise<LookupResult> {
   const form = new FormData();
   form.append('type', 'IMAGE');
   form.append('file', file);
+  form.append('use_ai', options.useAi === false ? 'false' : 'true');
 
   // Server route injects first-party secret — do not hit /api/v1/lookup from the browser for IMAGE.
   const res = await fetch('/api/image-lookup', { method: 'POST', body: form });

@@ -17,6 +17,8 @@ export interface LookupInput {
   query?: string;
   transcript?: string;
   image?: Buffer;
+  /** IMAGE: when false, Tesseract OCR only (no third-party vision). Default true. */
+  useAi?: boolean;
   audio?: Buffer;
   audioMimeType?: string;
   audioFilename?: string;
@@ -38,7 +40,7 @@ export class LookupService {
       case 'TEXT':
         return this.resolveText(input.query!);
       case 'IMAGE':
-        return this.resolveImage(input.image!);
+        return this.resolveImage(input.image!, input.useAi !== false);
       case 'VOICE':
         return this.resolveVoice(
           input.transcript,
@@ -98,12 +100,15 @@ export class LookupService {
     return this.graphRepo.resolveFromEntity(entity);
   }
 
-  private async resolveImage(image: Buffer): Promise<LookupResult> {
+  private async resolveImage(
+    image: Buffer,
+    useAi = true,
+  ): Promise<LookupResult> {
     if (!image?.length) {
       throw new BadRequestException('image is required for IMAGE lookup');
     }
 
-    const scene = await this.ocrService.identifyScene(image);
+    const scene = await this.ocrService.identifyScene(image, { useAi });
     const interpretation = scene.caption.trim() || 'something in your photo';
     const candidates = this.dedupeCandidates(scene.candidates);
 

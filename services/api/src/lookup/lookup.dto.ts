@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsEnum,
   IsNotEmpty,
   IsOptional,
@@ -7,6 +9,15 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { LookupInputType } from './lookup.service';
+
+function toOptionalBoolean(value: unknown): boolean | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value === 'boolean') return value;
+  const s = String(value).trim().toLowerCase();
+  if (['false', '0', 'no', 'off'].includes(s)) return false;
+  if (['true', '1', 'yes', 'on'].includes(s)) return true;
+  return undefined;
+}
 
 export class UnifiedLookupDto {
   @ApiProperty({
@@ -44,6 +55,17 @@ export class UnifiedLookupDto {
   @IsOptional()
   @IsString()
   transcript?: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'IMAGE only (JSON or multipart). When false, skip third-party vision and use on-server OCR only. Default true when omitted.',
+  })
+  @ValidateIf((o: UnifiedLookupDto) => o.type === 'IMAGE')
+  @IsOptional()
+  @Transform(({ value }) => toOptionalBoolean(value))
+  @IsBoolean()
+  use_ai?: boolean;
 }
 
 export class SearchDto {

@@ -150,9 +150,14 @@ STRIPE_SECRET_KEY=sk_test_...
 STRIPE_PRICE_DEVELOPER=price_...
 # STRIPE_WEBHOOK_SECRET=whsec_...   # fill after §8b
 
-# Vision for IMAGE (logos / storefronts / packaging) — without this, OCR-only fallback is weak
-# OPENAI_API_KEY=sk-...
-# OPENAI_VISION_MODEL=gpt-4o-mini
+# OpenRouter — IMAGE vision + API VOICE STT (preferred). Without this, IMAGE is OCR-only.
+OPENROUTER_API_KEY=sk-or-...
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_HTTP_REFERER=https://staging.fupe.app
+OPENROUTER_APP_TITLE=FUPE Staging
+VISION_MODEL=google/gemini-2.5-flash-lite
+STT_MODEL=openai/whisper-large-v3-turbo
+# Also enable ZDR in the OpenRouter privacy dashboard for this account.
 ```
 
 Checklist:
@@ -163,7 +168,7 @@ Checklist:
 - [x] `FIRST_PARTY_LOOKUP_SECRET` ≠ prod (or at least intentional)
 - [x] `AUTO_VERIFY_EMAIL=false`
 - [x] No live `sk_live_` keys here
-- [ ] `OPENAI_API_KEY` set if you want strong IMAGE (logo/storefront) results
+- [ ] `OPENROUTER_API_KEY` set if you want strong IMAGE (logo/storefront) + API VOICE STT
 ### 4b. Web — `STAGING_ROOT/apps/web/.env.production`
 
 ```bash
@@ -661,7 +666,7 @@ Stripe’s old “Add endpoint” flow is now **event destinations**. Prod’s d
 - [x] Forgot / reset password
 - [x] `/developers` — create API key
 - [x] Checkout (test card `4242…`) → success UX; event destination updates tier
-- [ ] IMAGE lookup via site (first-party secret + optional `OPENAI_API_KEY` for vision)
+- [ ] IMAGE lookup via site (first-party secret + optional `OPENROUTER_API_KEY` for vision; site offers OCR-only checkbox)
 - [ ] BARCODE: camera / photo / manual digits
 - [ ] VOICE: mic listens and shows interim transcript
 - [x] Admin login still works if you bootstrap a staging admin
@@ -716,7 +721,7 @@ git pull
 | Web staging crash-loop              | `journalctl -u fupe-web-staging -n 50`; **EADDRINUSE :3001** → set `PORT=3003` (start script uses `${PORT:-3001}`)       |
 | 526 SSL                             | Origin cert missing staging hostnames; Full (strict)                                                                     |
 | IMAGE 401 on staging                | `FIRST_PARTY_LOOKUP_SECRET` mismatch web ↔ API                                                                           |
-| IMAGE weak / “could not identify”   | Set `OPENAI_API_KEY` on staging API; confirm web uses `/api/image-lookup` not raw Nest                                  |
+| IMAGE weak / “could not identify”   | Set `OPENROUTER_API_KEY` on staging API; confirm ZDR allows your `VISION_MODEL`; web uses `/api/image-lookup`            |
 | OOM / slow VPS                      | Stop staging units; avoid full prod restore on staging while building                                                    |
 | Cypher OID error after restore      | Re-run §5b E (AGE OID repair) on **staging**                                                                             |
 | `already exists` during restore     | Staging wasn’t empty — §5b C: `DROP DATABASE fupe` / recreate, then restore again                                        |

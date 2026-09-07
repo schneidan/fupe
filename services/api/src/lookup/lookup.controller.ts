@@ -48,7 +48,7 @@ export class LookupController {
   @ApiOperation({
     summary: 'Unified ownership lookup',
     description:
-      'Resolve whether a brand/product/company is PE-backed. JSON body for TEXT/BARCODE; multipart for IMAGE/VOICE with a `file` field. IMAGE requires Developer/Business API key or first-party credential.',
+      'Resolve whether a brand/product/company is PE-backed. JSON body for TEXT/BARCODE; multipart for IMAGE/VOICE with a `file` field (≤5MB). IMAGE: optional `use_ai=false` for on-server OCR only. IMAGE requires Developer/Business API key or first-party credential.',
   })
   @ApiConsumes('application/json', 'multipart/form-data')
   @ApiBody({ type: UnifiedLookupDto })
@@ -116,7 +116,11 @@ export class LookupController {
       case 'TEXT':
         return { type: body.type, query: body.query! };
       case 'IMAGE':
-        return { type: body.type, image: file?.buffer };
+        return {
+          type: body.type,
+          image: file?.buffer,
+          useAi: body.use_ai !== false,
+        };
       case 'VOICE':
         return {
           type: body.type,

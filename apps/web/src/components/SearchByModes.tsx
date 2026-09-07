@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   useEffect,
@@ -14,6 +15,7 @@ import {
   startBarcodeCamera,
   type BarcodeScanHandle,
 } from '@/lib/barcode';
+import { resizeImageForLookup } from '@/lib/image';
 import { resultPath } from '@/lib/slug';
 import { ImageLookupResults } from '@/components/ImageLookupResults';
 
@@ -26,11 +28,15 @@ const MODES: { id: Mode; label: string }[] = [
 ];
 
 export function SearchByModes() {
+  /** Controls open/close animation (null = collapsed). */
   const [mode, setMode] = useState<Mode | null>(null);
+  /** Content shown inside the panel — kept during close so the collapse animates. */
+  const [panelMode, setPanelMode] = useState<Mode | null>(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [useAi, setUseAi] = useState(true);
   const [multi, setMulti] = useState<{
     interpretation: string;
     results: LookupResult[];
@@ -49,6 +55,7 @@ export function SearchByModes() {
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
 
   const router = useRouter();
+  const panelOpen = mode !== null;
 
   useEffect(() => {
     return () => {
@@ -58,12 +65,30 @@ export function SearchByModes() {
     };
   }, [previewUrl]);
 
+  useEffect(() => {
+    if (mode) setPanelMode(mode);
+  }, [mode]);
+
+  useEffect(() => {
+    if (!panelOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closePanel();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // closePanel is stable enough via refs; include panelOpen only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelOpen]);
+
   function clearFeedback() {
     setError(null);
     setStatus(null);
   }
 
-  function selectMode(next: Mode) {
+  function stopSideEffects() {
     scanHandleRef.current?.stop();
     scanHandleRef.current = null;
     setScanning(false);
@@ -71,6 +96,16 @@ export function SearchByModes() {
     recognitionRef.current = null;
     setListening(false);
     setTranscript('');
+  }
+
+  function closePanel() {
+    stopSideEffects();
+    clearFeedback();
+    setMode(null);
+  }
+
+  function selectMode(next: Mode) {
+    stopSideEffects();
     clearFeedback();
     setMode((m) => (m === next ? null : next));
   }
@@ -129,8 +164,18 @@ export function SearchByModes() {
         return;
       }
 
-      setStatus('Looking at your photo…');
-      const data = await lookupImage(file);
+      setStatus(
+        useAi
+          ? 'Preparing photo…'
+          : 'Preparing photo (OCR only)…',
+      );
+      const prepared = await resizeImageForLookup(file);
+      setStatus(
+        useAi
+          ? 'Looking at your photo…'
+          : 'Reading text in your photo…',
+      );
+      const data = await lookupImage(prepared, { useAi });
       handleImageResult(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Image lookup failed');
@@ -337,13 +382,31 @@ export function SearchByModes() {
 
       <div
         className={`grid w-full transition-[grid-template-rows] duration-300 ease-out ${
-          mode ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+          panelOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
         }`}
       >
         <div className="overflow-hidden">
-          {mode && (
-            <div className="mt-5 w-full space-y-4 border border-fupe-border bg-fupe-surface/80 px-5 py-5">
-              {mode === 'IMAGE' && (
+          {panelMode && (
+            <div className="relative mt-5 w-full space-y-4 border border-fupe-border bg-fupe-surface/80 px-5 py-5 pr-12">
+              <button
+                type="button"
+                onClick={closePanel}
+                aria-label="Close"
+                className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded text-fupe-muted transition hover:bg-fupe-elevated hover:text-fupe-text"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden
+                >
+                  <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+                </svg>
+              </button>
+
+              {panelMode === 'IMAGE' && (
                 <>
                   <p className="text-center text-sm text-fupe-muted">
                     Search by image — packaging, logos, storefronts, or signs.
@@ -374,17 +437,50 @@ export function SearchByModes() {
                       Use camera
                     </button>
                   </div>
+                  <label className="mx-auto flex max-w-md cursor-pointer items-start gap-2.5 text-left text-sm text-fupe-muted">
+                    <input
+                      type="checkbox"
+                      checked={useAi}
+                      disabled={loading}
+                      onChange={(e) => setUseAi(e.target.checked)}
+                      className="mt-1 h-4 w-4 shrink-0 accent-fupe-text"
+                    />
+                    <span>
+                      Use AI vision to identify brands (recommended). Uncheck for
+                      on-server text OCR only — weaker for logos and storefronts,
+                      but the photo never leaves FUPE.
+                    </span>
+                  </label>
                   <p className="text-center text-xs leading-relaxed text-fupe-accentDim">
-                    Photos are analyzed by a third-party AI to identify brands.
-                    We request zero data retention (not stored or used for
-                    training). See{' '}
-                    <a
-                      href="/legal/privacy"
-                      className="text-fupe-muted underline decoration-fupe-border underline-offset-2 hover:text-fupe-text"
-                    >
-                      Privacy
-                    </a>
-                    .
+                    {useAi ? (
+                      <>
+                        With AI on, we send a resized copy of your photo through
+                        OpenRouter to a vision model. We configure every request
+                        for zero data retention (ZDR) so providers should not
+                        store or train on it. We do not keep your photo after the
+                        lookup. Details:{' '}
+                        <Link
+                          href="/legal/privacy"
+                          className="text-fupe-muted underline decoration-fupe-border underline-offset-2 hover:text-fupe-text"
+                        >
+                          Privacy
+                        </Link>
+                        .
+                      </>
+                    ) : (
+                      <>
+                        OCR-only mode runs on our servers. No third-party AI sees
+                        this photo. Accuracy is limited to readable printed text.
+                        See{' '}
+                        <Link
+                          href="/legal/privacy"
+                          className="text-fupe-muted underline decoration-fupe-border underline-offset-2 hover:text-fupe-text"
+                        >
+                          Privacy
+                        </Link>
+                        .
+                      </>
+                    )}
                   </p>
                   <input
                     ref={libraryInputRef}
@@ -404,7 +500,7 @@ export function SearchByModes() {
                 </>
               )}
 
-              {mode === 'BARCODE' && (
+              {panelMode === 'BARCODE' && (
                 <>
                   <p className="text-center text-sm text-fupe-muted">
                     Scan with the camera, upload a barcode photo, or type the digits.
@@ -464,7 +560,7 @@ export function SearchByModes() {
                 </>
               )}
 
-              {mode === 'VOICE' && (
+              {panelMode === 'VOICE' && (
                 <div className="flex flex-col items-center gap-4 py-2">
                   <button
                     type="button"
@@ -504,6 +600,18 @@ export function SearchByModes() {
                       &ldquo;{transcript}&rdquo;
                     </p>
                   )}
+                  <p className="max-w-sm text-center text-xs leading-relaxed text-fupe-accentDim">
+                    On the website, speech stays in your browser (Web Speech API).
+                    API clients that upload audio use our speech-to-text path with
+                    the same ZDR controls — see{' '}
+                    <Link
+                      href="/legal/privacy"
+                      className="text-fupe-muted underline decoration-fupe-border underline-offset-2 hover:text-fupe-text"
+                    >
+                      Privacy
+                    </Link>
+                    .
+                  </p>
                 </div>
               )}
 

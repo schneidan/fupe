@@ -7,7 +7,7 @@ Fill these into **App Store Connect → App Privacy** and **Google Play → App 
 | Data | Collected? | Linked to identity? | Used for tracking? | Purpose |
 |------|------------|---------------------|--------------------|---------|
 | Search / lookup queries (brand name, barcode) | Yes (sent to FUPE API) | No for guests; yes if signed in | No | App functionality |
-| Photos / camera (barcode or packaging) | Transient — used for lookup, not stored in-app as a gallery | No | No | App functionality |
+| Photos / camera (barcode or packaging) | Transient — used for lookup, not stored in-app as a gallery. Packaging photos may be sent via FUPE → OpenRouter vision (ZDR); barcode-only paths stay on-device/FUPE. | No | No | App functionality |
 | Email / account credentials | Yes (Contribute: register, login, verify, password reset) | Yes | No | Account / App functionality |
 | Trust score, edit submissions, API keys (if created on web) | Yes (server-side) | Yes | No | App functionality |
 | Device ID / Advertising ID | No | — | No | — |
@@ -17,7 +17,7 @@ Fill these into **App Store Connect → App Privacy** and **Google Play → App 
 **Apple “Used for Tracking”:** No  
 **Apple “Privacy Nutrition Label” tracking:** None today  
 **Google Data safety — “Data is collected”:** Yes (product interaction + account email when the user registers)  
-**Google — “Data is shared with third parties”:** Only as needed to run the product (your API; email via Resend for verify/reset). No ad networks. Say “not shared for advertising” until ads ship.
+**Google — “Data is shared with third parties”:** Only as needed to run the product (your API; email via Resend for verify/reset; OpenRouter + model hosts for optional AI image identify / API speech-to-text under ZDR). No ad networks. Say “not shared for advertising” until ads ship. Point to `https://fupe.app/legal/privacy` for AI / ZDR detail.
 
 **User rights:** Export and delete account from Contribute (matches web GDPR panel). Privacy Policy: `https://fupe.app/legal/privacy`.
 

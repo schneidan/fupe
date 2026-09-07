@@ -335,10 +335,18 @@ AUTO_VERIFY_EMAIL=false
 
 # --- optional ---
 OPEN_FOOD_FACTS_URL=https://world.openfoodfacts.org/api/v2/product
-# OPENAI_API_KEY=
-# OPENAI_VISION_MODEL=gpt-4o-mini
-# WHISPER_MODEL=whisper-1
+
+# OpenRouter — IMAGE vision + API VOICE STT. Without OPENROUTER_API_KEY, IMAGE is OCR-only.
+OPENROUTER_API_KEY=sk-or-CHANGE_ME
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_HTTP_REFERER=https://fupe.app
+OPENROUTER_APP_TITLE=FUPE
+VISION_MODEL=google/gemini-2.5-flash-lite
+STT_MODEL=openai/whisper-large-v3-turbo
+# Enable ZDR in https://openrouter.ai/settings/privacy (account + request-level provider.zdr).
+# Multipart IMAGE/VOICE uploads are capped at 5MB. Web IMAGE can pass use_ai=false for OCR-only.
 ```
+
 
 Checklist for this file:
 
@@ -352,6 +360,7 @@ Checklist for this file:
 - [ ] `CORS_ORIGIN` and `NEXT_PUBLIC_SITE_URL` use `https://fupe.app` (no `localhost:3001`)
 - [ ] Stripe test keys filled if you want `/developers` billing + footer later
 - [ ] Unset `BOOTSTRAP_ADMIN_EMAIL` once you already have an admin account
+- [ ] `OPENROUTER_API_KEY` set (and OpenRouter ZDR enabled) if you want AI IMAGE + API VOICE STT
 
 ### 8b. Web — `apps/web/.env.production`
 
@@ -777,6 +786,8 @@ Do **not** reuse the Test destination’s signing secret in Live (or vice versa)
 ### Lookup rate limits (API + Cloudflare)
 
 The Nest API applies an in-process IP throttle on `/lookup` (default **60 req/min/IP**, override with `LOOKUP_IP_RATE_LIMIT_PER_MIN`). IMAGE lookups require either a Developer/Business API key **or** header `X-Fupe-First-Party` matching `FIRST_PARTY_LOOKUP_SECRET` (web injects this via `/api/image-lookup`; mobile via `--dart-define`).
+
+IMAGE may call OpenRouter vision unless the client sends `use_ai=false` (OCR-only). API VOICE audio uploads use OpenRouter STT (`STT_MODEL`). Both paths set `provider.zdr: true`. Keep OpenRouter account privacy/ZDR aligned; see `/legal/privacy`.
 
 Optional Cloudflare hardening (dashboard → Security → WAF / Rate limiting):
 

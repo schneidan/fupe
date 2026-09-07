@@ -28,7 +28,19 @@ export default function ApiTermsPage() {
         results in your product is fine; republishing the entire directory is not
         without written permission.
       </p>
-      <LegalH2>3. Billing, cancellation &amp; refunds</LegalH2>
+      <LegalH2>3. IMAGE &amp; VOICE media</LegalH2>
+      <p>
+        IMAGE lookups may send a resized image to a third-party vision model via
+        OpenRouter unless you pass <code className="text-fupe-text">use_ai=false</code>{' '}
+        (on-server OCR only). VOICE multipart audio may be transcribed via
+        OpenRouter. We request zero data retention (ZDR) on those calls; see the{' '}
+        <a href="/legal/privacy" className="text-fupe-text hover:underline">
+          Privacy Policy
+        </a>
+        . Do not upload images or audio that you are not allowed to process.
+        Uploads are size-capped (currently 5MB).
+      </p>
+      <LegalH2>4. Billing, cancellation &amp; refunds</LegalH2>
       <p>
         Paid tiers are billed through Stripe. Cancel anytime from the Developers
         page via the Stripe Customer Portal — access continues through the end of
@@ -37,13 +49,13 @@ export default function ApiTermsPage() {
         <ObfuscatedEmail user="support" domain="fupe.app" />. Complimentary admin
         overrides are audited and may be revoked.
       </p>
-      <LegalH2>4. Attribution</LegalH2>
+      <LegalH2>5. Attribution</LegalH2>
       <p>
         If you display FUPE ownership verdicts to end users, include a clear
         attribution such as &quot;Ownership data by FUPE&quot; with a link to
         fupe.app (or your production domain) when practical.
       </p>
-      <LegalH2>5. Suspension</LegalH2>
+      <LegalH2>6. Suspension</LegalH2>
       <p>
         We may revoke keys or throttle traffic that threatens Service stability
         or violates these Terms.
