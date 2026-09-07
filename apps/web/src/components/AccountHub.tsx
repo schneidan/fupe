@@ -151,11 +151,11 @@ export function AccountHub() {
             : ' · ownership edits need review'}
           {isModerator(user) ? ` · ${user.role}` : ''}
         </p>
-        <details className="rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-sm text-fupe-muted">
+        <details className="rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-base text-fupe-muted">
           <summary className="cursor-pointer text-fupe-text">
             How trust works
           </summary>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed">
+          <ul className="mt-2 list-disc space-y-1.5 pl-5 text-lg leading-relaxed">
             <li>New accounts start at 0 — edits go to the moderator queue.</li>
             <li>
               Approved ownership edits: <span className="text-fupe-text">+5</span>.
