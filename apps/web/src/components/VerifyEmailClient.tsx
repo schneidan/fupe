@@ -65,10 +65,10 @@ export function VerifyEmailClient() {
           Suggest an edit
         </Link>
         <Link
-          href="/contribute"
+          href="/account"
           className="rounded-full border border-fupe-border px-5 py-2 text-sm text-fupe-text"
         >
-          Contribute
+          Account
         </Link>
       </div>
       {!getStoredUser() && status === 'ok' ? (

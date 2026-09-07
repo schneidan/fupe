@@ -24,6 +24,8 @@ export interface AuthUser {
   trust_score: number;
   role: UserRole;
   email_verified: boolean;
+  display_name?: string | null;
+  email_updates_opt_in?: boolean;
 }
 
 @Injectable()
@@ -40,6 +42,7 @@ export class AuthService {
   async register(
     email: string,
     password: string,
+    opts: { emailUpdatesOptIn?: boolean } = {},
   ): Promise<{ token: string; user: AuthUser }> {
     const existing = await this.usersRepo.findByEmail(email);
     if (existing) {
@@ -67,6 +70,7 @@ export class AuthService {
       emailVerifiedAt: autoVerify ? new Date() : null,
       verifyToken: rawVerify ? hashOpaqueToken(rawVerify) : null,
       verifyExpiresAt: verifyExpires,
+      emailUpdatesOptIn: opts.emailUpdatesOptIn,
     });
 
     if (rawVerify) {
@@ -275,6 +279,24 @@ export class AuthService {
       trust_score: user.trust_score,
       role: user.role ?? 'user',
       email_verified: Boolean(user.email_verified_at),
+      display_name: user.display_name ?? null,
+      email_updates_opt_in: Boolean(user.email_updates_opt_in),
     };
+  }
+
+  async getMe(userId: string): Promise<AuthUser> {
+    const user = await this.usersRepo.findById(userId);
+    if (!user || user.disabled_at) {
+      throw new UnauthorizedException('Not authenticated');
+    }
+    return this.toAuthUser(user);
+  }
+
+  async updateMe(
+    userId: string,
+    patch: { display_name?: string | null; email_updates_opt_in?: boolean },
+  ): Promise<AuthUser> {
+    const user = await this.usersRepo.updateAccountPrefs(userId, patch);
+    return this.toAuthUser(user);
   }
 }

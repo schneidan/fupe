@@ -19,7 +19,7 @@ export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
   const pathname = usePathname();
   const next =
     searchParams.get('next') ||
-    (pathname.startsWith('/admin') ? '/admin' : '/contribute');
+    (pathname.startsWith('/admin') ? '/admin' : '/account');
 
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState('');
@@ -28,6 +28,7 @@ export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
   const [busy, setBusy] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [emailUpdatesOptIn, setEmailUpdatesOptIn] = useState(false);
 
   useEffect(() => {
     setUser(getStoredUser());
@@ -46,7 +47,9 @@ export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
           setBusy(false);
           return;
         }
-        await register(email.trim(), password);
+        await register(email.trim(), password, {
+          email_updates_opt_in: emailUpdatesOptIn,
+        });
       }
       router.push(next);
       router.refresh();
@@ -86,10 +89,10 @@ export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
             </Link>
           ) : (
             <Link
-              href="/contribute"
+              href="/account"
               className="rounded-full border border-fupe-border px-5 py-2 text-sm text-fupe-text hover:border-fupe-muted"
             >
-              Contribute
+              Account
             </Link>
           )}
           <button
@@ -169,33 +172,48 @@ export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
           </p>
         ) : null}
         {mode === 'register' ? (
-          <label className="flex items-start gap-2 text-sm text-fupe-muted">
-            <input
-              type="checkbox"
-              className="mt-1"
-              checked={acceptedTerms}
-              onChange={(e) => setAcceptedTerms(e.target.checked)}
-              required
-            />
-            <span>
-              I agree to the{' '}
-              <Link href="/legal/terms" className="text-fupe-text hover:underline">
-                Terms
-              </Link>
-              ,{' '}
-              <Link href="/legal/privacy" className="text-fupe-text hover:underline">
-                Privacy Policy
-              </Link>
-              , and{' '}
-              <Link
-                href="/legal/contributor"
-                className="text-fupe-text hover:underline"
-              >
-                Contributor License
-              </Link>
-              .
-            </span>
-          </label>
+          <>
+            <label className="flex items-start gap-2 text-sm text-fupe-muted">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                required
+              />
+              <span>
+                I agree to the{' '}
+                <Link href="/legal/terms" className="text-fupe-text hover:underline">
+                  Terms
+                </Link>
+                ,{' '}
+                <Link href="/legal/privacy" className="text-fupe-text hover:underline">
+                  Privacy Policy
+                </Link>
+                , and{' '}
+                <Link
+                  href="/legal/contributor"
+                  className="text-fupe-text hover:underline"
+                >
+                  Contributor License
+                </Link>
+                .
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-fupe-muted">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={emailUpdatesOptIn}
+                onChange={(e) => setEmailUpdatesOptIn(e.target.checked)}
+              />
+              <span>
+                Receive occasional updates from FUPE (major features and product
+                news). Optional — you can change this anytime on your account
+                page.
+              </span>
+            </label>
+          </>
         ) : null}
         {error ? <p className="text-sm text-verdict-yes">{error}</p> : null}
         <button

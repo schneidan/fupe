@@ -54,10 +54,14 @@ function MyEditsInner() {
   if (!getToken()) {
     return (
       <p className="text-sm text-fupe-muted">
-        <Link href="/login?next=/contribute/edits" className="text-fupe-text hover:underline">
-          Sign in
+        <Link href="/register?next=/account/edits" className="text-fupe-text hover:underline">
+          Create a free account
         </Link>{' '}
-        to track pending, approved, and rejected suggestions.
+        (or{' '}
+        <Link href="/login?next=/account/edits" className="text-fupe-text hover:underline">
+          sign in
+        </Link>
+        ) to track pending, approved, and rejected suggestions.
       </p>
     );
   }

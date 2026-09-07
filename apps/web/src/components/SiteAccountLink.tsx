@@ -23,10 +23,10 @@ export function SiteAccountLink() {
   if (!user) {
     return (
       <Link
-        href={`/login?next=${encodeURIComponent(pathname || '/')}`}
+        href="/account"
         className="fixed right-4 top-4 z-50 text-xs text-fupe-muted transition hover:text-fupe-text"
       >
-        Sign in
+        Account
       </Link>
     );
   }
@@ -43,7 +43,7 @@ export function SiteAccountLink() {
         </Link>
       ) : null}
       <Link
-        href="/contribute"
+        href="/account"
         className="max-w-[10rem] truncate text-fupe-muted hover:text-fupe-text"
         title={user.email}
       >

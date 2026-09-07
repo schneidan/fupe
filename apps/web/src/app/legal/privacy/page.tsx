@@ -14,7 +14,8 @@ export default function PrivacyPage() {
       <ul className="list-disc space-y-2 pl-5">
         <li>
           <span className="text-fupe-text">Account data:</span> email address,
-          password hash, role, trust score, email verification status, optional
+          optional display name, password hash, role, trust score, email
+          verification status, optional product-update email preference, optional
           Stripe customer / subscription identifiers.
         </li>
         <li>
@@ -41,7 +42,8 @@ export default function PrivacyPage() {
       </ul>
       <LegalH2>2. How we use data</LegalH2>
       <p>
-        To operate accounts, send verification email, moderate contributions,
+        To operate accounts, send verification and contribution-status email,
+        optional product-update notices you opt into, moderate contributions,
         enforce API rate limits, process subscriptions (via Stripe), improve the
         directory, fulfill lookups you request, and comply with law.
       </p>
@@ -102,7 +104,8 @@ export default function PrivacyPage() {
       <p>
         Contract (providing the Service you request), legitimate interests
         (security, abuse prevention, product improvement), and consent where
-        required (e.g. marketing email if we ever send it — we do not today).
+        required (optional product-update email — off by default; transactional
+        mail about your account and edit reviews is sent as part of the service).
         Optional AI vision on IMAGE is disclosed in-product; you can decline it
         via the OCR-only control.
       </p>

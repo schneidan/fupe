@@ -8,6 +8,8 @@ export interface AuthUser {
   trust_score: number;
   role: UserRole;
   email_verified: boolean;
+  display_name?: string | null;
+  email_updates_opt_in?: boolean;
 }
 
 export interface AuthSession {
@@ -73,11 +75,16 @@ async function parseAuthResponse(res: Response): Promise<AuthSession> {
 export async function register(
   email: string,
   password: string,
+  opts: { email_updates_opt_in?: boolean } = {},
 ): Promise<AuthSession> {
   const res = await fetch('/api/v1/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({
+      email,
+      password,
+      email_updates_opt_in: Boolean(opts.email_updates_opt_in),
+    }),
   });
   const session = await parseAuthResponse(res);
   setSession(session);
@@ -109,6 +116,33 @@ export async function fetchMe(): Promise<AuthUser | null> {
     return null;
   }
   const user = (await res.json()) as AuthUser;
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  window.dispatchEvent(new Event('fupe-auth'));
+  return user;
+}
+
+export async function updateMe(
+  token: string,
+  patch: {
+    display_name?: string | null;
+    email_updates_opt_in?: boolean;
+  },
+): Promise<AuthUser> {
+  const res = await fetch('/api/v1/auth/me', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(patch),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      (body as { message?: string | string[] }).message ?? 'Update failed';
+    throw new Error(Array.isArray(msg) ? msg.join(', ') : String(msg));
+  }
+  const user = body as AuthUser;
   localStorage.setItem(USER_KEY, JSON.stringify(user));
   window.dispatchEvent(new Event('fupe-auth'));
   return user;

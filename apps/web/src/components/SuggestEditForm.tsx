@@ -45,6 +45,12 @@ export function SuggestEditForm() {
   const [busy, setBusy] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
 
+  const registerHref = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('next', `/contribute/suggest?${searchParams.toString()}`);
+    return `/register?${params.toString()}`;
+  }, [searchParams]);
+
   const loginHref = useMemo(() => {
     const params = new URLSearchParams();
     params.set('next', `/contribute/suggest?${searchParams.toString()}`);
@@ -121,7 +127,7 @@ export function SuggestEditForm() {
 
     const token = getToken();
     if (!token || !getStoredUser()) {
-      router.push(loginHref);
+      router.push(registerHref);
       return;
     }
     if (!targetId.trim()) {
@@ -148,7 +154,7 @@ export function SuggestEditForm() {
           ? 'Edit committed. Thanks — the graph was updated.'
           : 'Edit submitted for review. Track it on My edits.',
       );
-      setTimeout(() => router.push('/contribute/edits'), 1200);
+      setTimeout(() => router.push('/account/edits'), 1200);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Submit failed');
     } finally {
@@ -310,21 +316,35 @@ export function SuggestEditForm() {
       {success ? <p className="text-sm text-fupe-text">{success}</p> : null}
 
       {!signedIn ? (
-        <p className="text-sm text-fupe-muted">
-          You need an account to submit.{' '}
-          <Link
-            href={loginHref}
-            className="text-fupe-text underline-offset-2 hover:underline"
-          >
-            Sign in
-          </Link>
-        </p>
+        <div className="rounded-lg border border-fupe-border bg-fupe-bg px-4 py-3 text-sm text-fupe-muted">
+          <p className="font-medium text-fupe-text">
+            Create a free account to suggest your edit
+          </p>
+          <p className="mt-1">
+            We&apos;ll email you when it&apos;s received and when it&apos;s
+            reviewed.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link
+              href={registerHref}
+              className="rounded-full bg-fupe-text px-4 py-1.5 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted"
+            >
+              Create free account
+            </Link>
+            <Link
+              href={loginHref}
+              className="rounded-full border border-fupe-border px-4 py-1.5 text-sm text-fupe-text hover:border-fupe-muted"
+            >
+              Sign in
+            </Link>
+          </div>
+        </div>
       ) : getStoredUser() && !getStoredUser()!.email_verified ? (
         <p className="text-sm text-fupe-muted">
           Verify your email before submitting. Check your inbox for the link, or
           resend from{' '}
-          <Link href="/contribute" className="text-fupe-text hover:underline">
-            Contribute
+          <Link href="/account" className="text-fupe-text hover:underline">
+            Account
           </Link>
           .
         </p>

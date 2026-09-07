@@ -3,19 +3,14 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
-  clearSession,
   fetchMe,
   getStoredUser,
-  getToken,
   isModerator,
-  resendVerification,
   type AuthUser,
 } from '@/lib/auth';
-import { AccountPrivacyPanel } from '@/components/AccountPrivacyPanel';
 
 export function ContributeHub() {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [resendMsg, setResendMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const sync = () => setUser(getStoredUser());
@@ -29,109 +24,36 @@ export function ContributeHub() {
 
   return (
     <div className="mt-10 space-y-8">
-      <div className="rounded-xl border border-fupe-border bg-fupe-surface p-6">
-        {user ? (
-          <div className="space-y-3">
-            <p className="text-sm text-fupe-muted">Signed in as</p>
-            <p className="font-medium text-fupe-text">{user.email}</p>
-            <p className="text-xs text-fupe-muted">
-              Trust score {user.trust_score}
-              {user.trust_score > 50
-                ? ' · ownership edits auto-commit'
-                : ' · ownership edits need review'}
-              {isModerator(user) ? ' · moderator' : ''}
-            </p>
-            <details className="rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-sm text-fupe-muted">
-              <summary className="cursor-pointer text-fupe-text">
-                How trust works
-              </summary>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed">
-                <li>New accounts start at 0 — edits go to the moderator queue.</li>
-                <li>
-                  Approved ownership edits: <span className="text-fupe-text">+5</span>.
-                  Rejected: <span className="text-fupe-text">−10</span>.
-                </li>
-                <li>
-                  Score above <span className="text-fupe-text">50</span>: ownership
-                  parent edits auto-commit (still need a citation).
-                </li>
-                <li>
-                  Proposing a <span className="text-fupe-text">new entity</span> is
-                  always reviewed, regardless of trust.
-                </li>
-                <li>Max 5 pending edits per account at a time.</li>
-              </ul>
-            </details>
-            {!user.email_verified ? (
-              <div className="rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-sm">
-                <p className="text-fupe-muted">
-                  Verify your email before submitting edits. Check your inbox
-                  (and spam) for the link from FUPE.
-                </p>
-                <button
-                  type="button"
-                  className="mt-2 text-fupe-text underline-offset-2 hover:underline"
-                  onClick={async () => {
-                    const token = getToken();
-                    if (!token) {
-                      setResendMsg('Sign in again, then retry.');
-                      return;
-                    }
-                    setResendMsg('Sending…');
-                    try {
-                      const msg = await resendVerification(token);
-                      setResendMsg(`${msg} — check your inbox.`);
-                      await fetchMe();
-                    } catch (e) {
-                      setResendMsg(
-                        e instanceof Error ? e.message : 'Resend failed',
-                      );
-                    }
-                  }}
-                >
-                  Resend verification
-                </button>
-                {resendMsg ? (
-                  <p className="mt-1 text-xs text-fupe-muted">{resendMsg}</p>
-                ) : null}
-              </div>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                clearSession();
-                setUser(null);
-              }}
-              className="text-sm text-fupe-muted hover:text-fupe-text"
+      {!user ? (
+        <div className="rounded-xl border border-fupe-border bg-fupe-surface p-6 space-y-3">
+          <p className="text-sm text-fupe-muted">
+            Create a free account to suggest corrections. You can browse the
+            forms below; submitting requires sign-in.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/register?next=/contribute"
+              className="rounded-full bg-fupe-text px-5 py-2 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted"
             >
-              Sign out
-            </button>
-            <div className="pt-2">
-              <AccountPrivacyPanel onDeleted={() => setUser(null)} />
-            </div>
+              Create free account
+            </Link>
+            <Link
+              href="/login?next=/contribute"
+              className="rounded-full border border-fupe-border px-5 py-2 text-sm text-fupe-text hover:border-fupe-muted"
+            >
+              Sign in
+            </Link>
           </div>
-        ) : (
-          <div className="space-y-3">
-            <p className="text-sm text-fupe-muted">
-              Create a free account to suggest corrections.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/register?next=/contribute"
-                className="rounded-full bg-fupe-text px-5 py-2 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted"
-              >
-                Create account
-              </Link>
-              <Link
-                href="/login?next=/contribute"
-                className="rounded-full border border-fupe-border px-5 py-2 text-sm text-fupe-text hover:border-fupe-muted"
-              >
-                Sign in
-              </Link>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <p className="text-sm text-fupe-muted">
+          Signed in as {user.email}. Manage profile and edit history on your{' '}
+          <Link href="/account" className="text-fupe-text hover:underline">
+            account
+          </Link>{' '}
+          page.
+        </p>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Link
@@ -152,15 +74,6 @@ export function ContributeHub() {
             Add a missing brand or company — always reviewed by a moderator.
           </p>
         </Link>
-        <Link
-          href="/contribute/edits"
-          className="rounded-xl border border-fupe-border bg-fupe-surface p-5 transition hover:border-fupe-muted sm:col-span-2"
-        >
-          <h2 className="font-semibold text-fupe-text">My edits</h2>
-          <p className="mt-2 text-sm text-fupe-muted">
-            Track pending, approved, and rejected suggestions.
-          </p>
-        </Link>
         {isModerator(user) ? (
           <Link
             href="/admin/edits"
@@ -177,7 +90,11 @@ export function ContributeHub() {
       <p className="text-sm text-fupe-muted">
         Tip: open any entity or lookup result and tap{' '}
         <span className="text-fupe-text">Suggest an edit</span> to prefill the
-        target. Max 5 pending edits per account.
+        target. Max 5 pending edits per account. Track submissions from{' '}
+        <Link href="/account/edits" className="text-fupe-text hover:underline">
+          My edits
+        </Link>
+        .
       </p>
     </div>
   );

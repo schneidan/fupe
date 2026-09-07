@@ -22,6 +22,9 @@ export interface UserRow {
   subscription_current_period_end?: Date | null;
   disabled_at?: Date | null;
   token_version?: number;
+  display_name?: string | null;
+  email_updates_opt_in?: boolean;
+  email_updates_opt_in_at?: Date | null;
   created_at: Date;
 }
 
@@ -63,13 +66,16 @@ export class UsersRepository {
     emailVerifiedAt?: Date | null;
     verifyToken?: string | null;
     verifyExpiresAt?: Date | null;
+    emailUpdatesOptIn?: boolean;
   }): Promise<UserRow> {
+    const optIn = Boolean(params.emailUpdatesOptIn);
     const { rows } = await this.pool.query<UserRow>(
       `INSERT INTO public.users (
          email, password_hash, trust_score, role,
-         email_verified_at, email_verify_token, email_verify_expires_at
+         email_verified_at, email_verify_token, email_verify_expires_at,
+         email_updates_opt_in, email_updates_opt_in_at
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         params.email.toLowerCase(),
@@ -79,11 +85,46 @@ export class UsersRepository {
         params.emailVerifiedAt ?? null,
         params.verifyToken ?? null,
         params.verifyExpiresAt ?? null,
+        optIn,
+        optIn ? new Date() : null,
       ],
     );
     return rows[0];
   }
 
+  async updateAccountPrefs(
+    userId: string,
+    patch: {
+      display_name?: string | null;
+      email_updates_opt_in?: boolean;
+    },
+  ): Promise<UserRow> {
+    const current = await this.findById(userId);
+    if (!current) throw new Error('User not found');
+
+    const displayName =
+      patch.display_name !== undefined
+        ? patch.display_name?.trim() || null
+        : current.display_name ?? null;
+    const optIn =
+      patch.email_updates_opt_in !== undefined
+        ? patch.email_updates_opt_in
+        : Boolean(current.email_updates_opt_in);
+    const optInAt = optIn
+      ? current.email_updates_opt_in_at ?? new Date()
+      : null;
+
+    const { rows } = await this.pool.query<UserRow>(
+      `UPDATE public.users
+       SET display_name = $2,
+           email_updates_opt_in = $3,
+           email_updates_opt_in_at = $4
+       WHERE id = $1
+       RETURNING *`,
+      [userId, displayName, optIn, optInAt],
+    );
+    return rows[0];
+  }
   async setVerifyToken(
     userId: string,
     tokenHash: string,
@@ -278,9 +319,12 @@ export class UsersRepository {
       account: {
         id: user.id,
         email: user.email,
+        display_name: user.display_name ?? null,
         role: user.role,
         trust_score: user.trust_score,
         email_verified_at: user.email_verified_at,
+        email_updates_opt_in: Boolean(user.email_updates_opt_in),
+        email_updates_opt_in_at: user.email_updates_opt_in_at ?? null,
         subscription_tier: user.subscription_tier ?? 'free',
         subscription_status: user.subscription_status ?? null,
         created_at: user.created_at,

@@ -94,7 +94,9 @@ export class EditsService {
     // New entities always require moderator approval (Phase 5.3).
     if (!this.isNewEntitySubmission(normalized)) {
       if (user.trust_score > TRUST_AUTO_COMMIT_THRESHOLD) {
-        return this.commitEdit(user.id, normalized);
+        const result = await this.commitEdit(user.id, normalized);
+        await this.notifyEditReceived(user, 'committed');
+        return result;
       }
     }
 
@@ -110,7 +112,20 @@ export class EditsService {
       ],
     );
 
+    await this.notifyEditReceived(user, 'queued');
     return { status: 'queued', edit: rows[0] };
+  }
+
+  private async notifyEditReceived(
+    user: AuthUser,
+    status: 'queued' | 'committed',
+  ) {
+    const row = await this.usersRepo.findById(user.id);
+    const email = row?.email ?? user.email;
+    if (!email) return;
+    await this.mail.sendSafe('edit_received', () =>
+      this.mail.sendEditReceivedEmail(email, { status }),
+    );
   }
 
   async listPending() {

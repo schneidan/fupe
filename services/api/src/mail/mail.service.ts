@@ -84,6 +84,49 @@ export class MailService {
     });
   }
 
+  async sendEditReceivedEmail(
+    to: string,
+    params: { status: 'queued' | 'committed'; summary?: string },
+  ): Promise<void> {
+    const site = this.siteUrl();
+    const queued = params.status === 'queued';
+    const headline = queued
+      ? 'We got your suggestion'
+      : 'Your suggestion was applied';
+    const detail = params.summary?.trim();
+    const body = queued
+      ? `<p style="margin:0 0 12px">Thanks for contributing to FUPE. Your suggestion is in the review queue — we&apos;ll email you when a moderator decides.</p>`
+      : `<p style="margin:0 0 12px">Thanks for contributing. Your trust score was high enough that this ownership edit was applied to the graph immediately.</p>`;
+    const detailHtml = detail
+      ? `<p style="margin:0 0 12px;padding:12px;background:#1c1c1c;border:1px solid #3a3a3a;border-radius:8px;color:#d4d4d4">${escapeHtml(detail)}</p>`
+      : '';
+
+    await this.send({
+      to,
+      subject: queued
+        ? 'FUPE: we got your suggestion'
+        : 'FUPE: your suggestion was applied',
+      text: [
+        headline + '.',
+        detail || '',
+        '',
+        `Track your edits: ${site}/account/edits`,
+        `Support: support@fupe.app`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      html: renderBrandedEmail(
+        {
+          preheader: headline,
+          headline,
+          bodyHtml: body + detailHtml,
+          cta: { label: 'View my edits', url: `${site}/account/edits` },
+        },
+        { siteUrl: site },
+      ),
+    });
+  }
+
   async sendEditReviewEmail(
     to: string,
     params: {
@@ -114,7 +157,7 @@ export class MailService {
         headline + '.',
         note ? `Note: ${note}` : '',
         '',
-        `View your contributions: ${site}/contribute`,
+        `View your edits: ${site}/account/edits`,
         `Support: support@fupe.app`,
       ]
         .filter(Boolean)
@@ -124,7 +167,7 @@ export class MailService {
           preheader: headline,
           headline,
           bodyHtml: body,
-          cta: { label: 'View contributions', url: `${site}/contribute` },
+          cta: { label: 'View my edits', url: `${site}/account/edits` },
         },
         { siteUrl: site },
       ),

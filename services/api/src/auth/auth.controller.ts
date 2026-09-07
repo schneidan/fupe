@@ -3,11 +3,19 @@ import {
   Controller,
   Delete,
   Get,
+  Patch,
   Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { AuthService, AuthUser } from './auth.service';
 import { AuthIpThrottleGuard } from './auth-ip-throttle.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -20,6 +28,10 @@ class RegisterDto {
   @IsString()
   @MinLength(8)
   password!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  email_updates_opt_in?: boolean;
 }
 
 class LoginDto {
@@ -49,6 +61,17 @@ class ResetPasswordDto {
   password!: string;
 }
 
+class UpdateMeDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  display_name?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  email_updates_opt_in?: boolean;
+}
+
 @Controller('auth')
 @SkipApiKey()
 @UseGuards(AuthIpThrottleGuard)
@@ -56,8 +79,12 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  register(@Body() { email, password }: RegisterDto) {
-    return this.authService.register(email, password);
+  register(
+    @Body() { email, password, email_updates_opt_in }: RegisterDto,
+  ) {
+    return this.authService.register(email, password, {
+      emailUpdatesOptIn: email_updates_opt_in,
+    });
   }
 
   @Post('login')
@@ -78,7 +105,13 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   me(@Req() req: { user: AuthUser }) {
-    return req.user;
+    return this.authService.getMe(req.user.id);
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  updateMe(@Req() req: { user: AuthUser }, @Body() body: UpdateMeDto) {
+    return this.authService.updateMe(req.user.id, body);
   }
 
   @Post('verify-email')
