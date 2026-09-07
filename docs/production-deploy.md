@@ -292,7 +292,7 @@ openssl rand -hex 32   # → paste as JWT_SECRET
 ```bash
 cd /home/YOUR_USER/fupe
 cp services/api/.env.example services/api/.env
-nano services/api/.env
+vi services/api/.env
 ```
 
 Replace the whole file with this template (fill every `CHANGE_ME` / paste your secrets):
@@ -358,7 +358,7 @@ Checklist for this file:
 Next bakes `NEXT_PUBLIC_*` and `API_URL` (rewrites) in at **build** time. Create this **before** `pnpm --filter @fupe/web build`.
 
 ```bash
-nano apps/web/.env.production
+vi apps/web/.env.production
 ```
 
 ```bash
@@ -385,7 +385,7 @@ Checklist:
 ### 8c. Optional root `.env` (migrations / ingest on the VPS)
 
 ```bash
-nano /home/YOUR_USER/fupe/.env
+vi /home/YOUR_USER/fupe/.env
 ```
 
 ```bash
@@ -455,7 +455,7 @@ Stop those manual processes before enabling systemd (`Ctrl+C`).
 ### API unit
 
 ```bash
-sudo nano /etc/systemd/system/fupe-api.service
+sudo vi /etc/systemd/system/fupe-api.service
 ```
 
 ```ini
@@ -480,7 +480,7 @@ WantedBy=multi-user.target
 ### Web unit
 
 ```bash
-sudo nano /etc/systemd/system/fupe-web.service
+sudo vi /etc/systemd/system/fupe-web.service
 ```
 
 ```ini
@@ -542,8 +542,8 @@ sudo mkdir -p /etc/ssl/cloudflare
 4. Copy the **PEM certificate** and **Private key** onto the VPS:
 
 ```bash
-sudo nano /etc/ssl/cloudflare/fupe.pem    # paste certificate
-sudo nano /etc/ssl/cloudflare/fupe.key    # paste private key
+sudo vi /etc/ssl/cloudflare/fupe.pem    # paste certificate
+sudo vi /etc/ssl/cloudflare/fupe.key    # paste private key
 sudo chmod 640 /etc/ssl/cloudflare/fupe.key
 sudo chown root:www-data /etc/ssl/cloudflare/fupe.key
 ```
@@ -553,7 +553,7 @@ Then set Cloudflare **SSL/TLS → Overview** to **Full (strict)**.
 ### 11b. Site config
 
 ```bash
-sudo nano /etc/nginx/sites-available/fupe
+sudo vi /etc/nginx/sites-available/fupe
 ```
 
 ```nginx
@@ -685,7 +685,7 @@ HTTP-01 Certbot often fails or is awkward behind the orange cloud. Prefer either
 ```bash
 sudo apt install -y certbot python3-certbot-dns-cloudflare
 # Create a Cloudflare API token with Zone.DNS Edit for fupe.app
-sudo nano /root/.secrets/cloudflare.ini
+sudo vi /root/.secrets/cloudflare.ini
 # dns_cloudflare_api_token = YOUR_TOKEN
 sudo chmod 600 /root/.secrets/cloudflare.ini
 
@@ -795,7 +795,7 @@ If you change `NEXT_PUBLIC_*` or `API_URL`, you **must** rebuild the web app (in
 
 ```bash
 mkdir -p /home/YOUR_USER/backups
-nano /home/YOUR_USER/bin/fupe-backup.sh
+vi /home/YOUR_USER/bin/fupe-backup.sh
 ```
 
 ```bash

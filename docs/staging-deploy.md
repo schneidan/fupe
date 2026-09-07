@@ -124,7 +124,7 @@ git worktree add STAGING_ROOT main
 ```bash
 cd STAGING_ROOT
 cp services/api/.env.example services/api/.env
-nano services/api/.env
+vi services/api/.env
 ```
 
 Minimum:
@@ -163,7 +163,7 @@ Checklist:
 ### 4b. Web — `STAGING_ROOT/apps/web/.env.production`
 
 ```bash
-nano apps/web/.env.production
+vi apps/web/.env.production
 ```
 
 ```bash
@@ -439,9 +439,9 @@ curl -sf http://127.0.0.1:3000/health && echo   # optional: confirm prod untouch
 
 If units are **not** installed yet, do §6 first, then run `./rebuild-staging.sh`. (A bare `pnpm db:migrate` alone is only useful when you need schema catch-up without a rebuild.)
 
-- [ ] Staging migrate used **5434** (script refused a non-5434 URL)
-- [ ] Staging health OK; a TEXT lookup returns real entities
-- [ ] Prod health still OK
+- [x] Staging migrate used **5434** (script refused a non-5434 URL)
+- [x] Staging health OK; a TEXT lookup returns real entities
+- [x] Prod health still OK
 
 ### G. Remove the unscoped dump
 
@@ -449,7 +449,7 @@ If units are **not** installed yet, do §6 first, then run `./rebuild-staging.sh
 shred -u "$DUMP" 2>/dev/null || rm -f "$DUMP"
 ```
 
-- [ ] Local copy of the unscoped prod dump is gone (or only kept in your normal private backup store)
+- [x] Local copy of the unscoped prod dump is gone (or only kept in your normal private backup store)
 
 **Refreshing later:** repeat A→G when you want a newer graph. Always scrub.
 
@@ -460,7 +460,7 @@ shred -u "$DUMP" 2>/dev/null || rm -f "$DUMP"
 ### 6a. API staging
 
 ```bash
-sudo nano /etc/systemd/system/fupe-api-staging.service
+sudo vi /etc/systemd/system/fupe-api-staging.service
 ```
 
 ```ini
@@ -489,7 +489,7 @@ Adjust `User=` / paths if your deploy user isn’t `root`.
 ### 6b. Web staging
 
 ```bash
-sudo nano /etc/systemd/system/fupe-web-staging.service
+sudo vi /etc/systemd/system/fupe-web-staging.service
 ```
 
 ```ini
@@ -522,9 +522,9 @@ curl -sf http://127.0.0.1:3002/health && echo
 curl -sf -o /dev/null -w "web %{http_code}\n" http://127.0.0.1:3003/
 ```
 
-- [ ] Both units active
-- [ ] Local health curls OK
-- [ ] Prod units still fine: `systemctl status fupe-api fupe-web`
+- [x] Both units active
+- [x] Local health curls OK
+- [x] Prod units still fine: `systemctl status fupe-api fupe-web`
 
 ---
 
@@ -532,19 +532,22 @@ curl -sf -o /dev/null -w "web %{http_code}\n" http://127.0.0.1:3003/
 
 ### 7a. Origin certificate
 
-Cloudflare → SSL/TLS → **Origin Server** → Create certificate (or recreate) including:
+If your Cloudflare Origin CA already includes `**fupe.app**` and `***.fupe.app**`, that covers `staging.fupe.app` and `api-staging.fupe.app` (one label under the apex). **Reuse the same PEM/key as prod** in the staging nginx server blocks — no new cert required.
 
-- [ ] `staging.fupe.app`
-- [ ] `api-staging.fupe.app`  
-  (plus existing `fupe.app`, `www`, `api` if regenerating one cert)
+Only create/recreate an Origin cert if the current one lists specific hostnames and does **not** include those names or a matching wildcard.
 
-Install cert/key on the VPS (same pattern as prod Origin CA).
-
+- [ ] Staging nginx points at the same Origin cert/key files as prod
 - [ ] SSL/TLS mode still **Full (strict)**
 
 ### 7b. Server blocks
 
-Add (or extend) nginx config — mirror prod, change names/ports:
+Prod lives at `/etc/nginx/sites-available/fupe` (enabled via `/etc/nginx/sites-enabled/fupe`). Put staging in a **separate** file so you don’t risk the prod blocks:
+
+```bash
+sudo vi /etc/nginx/sites-available/fupe-staging
+```
+
+Paste (reuse the same Origin cert paths as in `/etc/nginx/sites-available/fupe`):
 
 ```nginx
 # HTTP → HTTPS
@@ -560,7 +563,7 @@ server {
     listen [::]:443 ssl http2;
     server_name staging.fupe.app;
 
-    ssl_certificate     /etc/ssl/cloudflare/fupe.pem;      # your paths
+    ssl_certificate     /etc/ssl/cloudflare/fupe.pem;      # match prod paths
     ssl_certificate_key /etc/ssl/cloudflare/fupe.key;
 
     location / {
@@ -569,7 +572,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
     }
 }
 
@@ -589,15 +592,18 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
     }
 }
 ```
 
 ```bash
+sudo ln -sf /etc/nginx/sites-available/fupe-staging /etc/nginx/sites-enabled/fupe-staging
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
+- [x] File at `/etc/nginx/sites-available/fupe-staging` (+ enabled symlink)
+- [x] `ssl_certificate*` paths match prod
 - [ ] `nginx -t` OK
 - [ ] `https://staging.fupe.app` loads
 - [ ] `https://api-staging.fupe.app/health` OK
@@ -671,19 +677,19 @@ git pull
 ## Troubleshooting
 
 
-| Symptom                            | Check                                                                               |
-| ---------------------------------- | ----------------------------------------------------------------------------------- |
-| Staging web calls prod API         | Rebuild web after setting `API_URL=http://127.0.0.1:3002`                           |
-| Migrate hit prod                   | `echo $DATABASE_URL` — must be `:5434`                                              |
-| 502 on staging hosts               | `systemctl status fupe-*-staging`; nginx `proxy_pass` ports                         |
+| Symptom                            | Check                                                                                                              |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Staging web calls prod API         | Rebuild web after setting `API_URL=http://127.0.0.1:3002`                                                          |
+| Migrate hit prod                   | `echo $DATABASE_URL` — must be `:5434`                                                                             |
+| 502 on staging hosts               | `systemctl status fupe-*-staging`; nginx `proxy_pass` ports                                                        |
 | Web staging crash-loop             | `journalctl -u fupe-web-staging -n 50`; **EADDRINUSE :3001** → set `PORT=3003` (start script uses `${PORT:-3001}`) |
-| 526 SSL                            | Origin cert missing staging hostnames; Full (strict)                                |
-| IMAGE 401 on staging               | `FIRST_PARTY_LOOKUP_SECRET` mismatch web ↔ API                                      |
-| OOM / slow VPS                     | Stop staging units; avoid full prod restore on staging while building               |
-| Cypher OID error after restore     | Re-run §5b E (AGE OID repair) on **staging**                                        |
-| `already exists` during restore    | Staging wasn’t empty — §5b C: `DROP DATABASE fupe` / recreate, then restore again   |
-| `Conflict … fupe-postgres-staging` | Container already exists — `docker start fupe-postgres-staging`; do **not** `rm` it |
-| Real emails on staging             | Re-run §5b D scrub; confirm container is staging                                    |
+| 526 SSL                            | Origin cert missing staging hostnames; Full (strict)                                                               |
+| IMAGE 401 on staging               | `FIRST_PARTY_LOOKUP_SECRET` mismatch web ↔ API                                                                     |
+| OOM / slow VPS                     | Stop staging units; avoid full prod restore on staging while building                                              |
+| Cypher OID error after restore     | Re-run §5b E (AGE OID repair) on **staging**                                                                       |
+| `already exists` during restore    | Staging wasn’t empty — §5b C: `DROP DATABASE fupe` / recreate, then restore again                                  |
+| `Conflict … fupe-postgres-staging` | Container already exists — `docker start fupe-postgres-staging`; do **not** `rm` it                                |
+| Real emails on staging             | Re-run §5b D scrub; confirm container is staging                                                                   |
 
 
 ---
