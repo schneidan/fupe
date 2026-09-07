@@ -34,7 +34,7 @@ Replace placeholders:
 - [x] Prod is healthy (`https://fupe.app`, `https://api.fupe.app/health`)
 - [x] You can SSH to the VPS as the deploy user (often `root`)
 - [x] Droplet has enough RAM for a second AGE + two Node processes (`free -h` — aim for ≥1 GiB free; stop staging when idle if tight)
-- [x] Stripe **Test** mode still available (staging uses test keys + a separate webhook)
+- [x] Stripe **Test** mode still available (staging uses test keys + a separate event destination)
 
 ---
 
@@ -145,10 +145,10 @@ RESEND_API_KEY=re_...          # can reuse prod Resend key
 EMAIL_FROM=FUPE Staging <noreply@fupe.app>
 AUTO_VERIFY_EMAIL=false
 
-# Stripe TEST mode (separate webhook secret — §8)
+# Stripe TEST mode (separate event-destination secret — §8)
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_PRICE_DEVELOPER=price_...
-# STRIPE_WEBHOOK_SECRET=whsec_...   # fill after §8
+# STRIPE_WEBHOOK_SECRET=whsec_...   # fill after §8b
 ```
 
 Checklist:
@@ -604,23 +604,48 @@ sudo nginx -t && sudo systemctl reload nginx
 
 - [x] File at `/etc/nginx/sites-available/fupe-staging` (+ enabled symlink)
 - [x] `ssl_certificate*` paths match prod
-- [ ] `nginx -t` OK
-- [ ] `https://staging.fupe.app` loads
-- [ ] `https://api-staging.fupe.app/health` OK
-- [ ] Prod URLs unchanged
+- [x] `nginx -t` OK
+- [x] `https://staging.fupe.app` loads
+- [x] `https://api-staging.fupe.app/health` OK
+- [x] Prod URLs unchanged
 
 ---
 
-## 8. Stripe test webhook (staging)
+## 8. Stripe (Test mode on staging)
 
-Stripe Dashboard → **Test mode** → Developers → Webhooks → Add endpoint:
+Staging uses the **same Stripe Test mode account** as prod for keys/prices, but a **separate event destination** (and `whsec_`) so deliveries hit `api-staging`, not prod.
 
-- [ ] URL: `https://api-staging.fupe.app/api/v1/billing/webhook`
-- [ ] Events: at least `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
-- [ ] Copy signing secret → `STRIPE_WEBHOOK_SECRET=whsec_...` in staging API `.env`
+Toggle **Test mode** on in the Dashboard before every step below.
+
+### 8a. Keys & prices (reuse Test catalog)
+
+No new products required if prod Test mode already has a Developer price:
+
+- [x] `STRIPE_SECRET_KEY=sk_test_...` in staging API `.env` (same test secret as prod is OK)
+- [x] `STRIPE_PRICE_DEVELOPER=price_...` (same Test price id is OK)
+- [x] Footer link optional: `NEXT_PUBLIC_SUPPORT_URL=https://buy.stripe.com/test_...` in staging web `.env.production` (can reuse the Test Payment Link)
+
+To create/find a price: Dashboard → **Product catalog** → product → copy `price_…`.  
+Payment Links (footer donations): **Payment links** → **+ New** → pick product or “Customers choose what to pay” → set after-payment URL if offered → copy `https://buy.stripe.com/test_…`.
+
+### 8b. Event destination (Workbench → Webhooks)
+
+Stripe’s old “Add endpoint” flow is now **event destinations**. Prod’s destination (name e.g. `FUPE prod API (test)`, URL `https://api.fupe.app/api/v1/billing/webhook`) stays as-is — you should end with **two** Test-mode destinations.
+
+- [ ] Open **[Workbench → Webhooks](https://dashboard.stripe.com/test/workbench/webhooks)** (or Dashboard → **Developers** → **Webhooks**); confirm **Test mode**
+- [ ] **Add destination** / **Create destination**
+- [ ] **Events from:** **Your account** (not Connected accounts)
+- [ ] **API version:** leave the account default unless you know you need otherwise
+- [ ] **Payload / format:** **Snapshot events** (full classic `Event` with `data.object`) — do **not** choose **Thin events** (Nest uses `constructEvent` + types like `checkout.session.completed`)
+- [ ] Select events, then **Continue**: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
+- [ ] **Destination type:** **Webhook** / **Webhook endpoint** (HTTPS) — skip EventBridge, Azure, CLI, other clouds
+- [ ] **Name:** `FUPE staging API (test)`
+- [ ] **Description:** `Nest billing on api-staging.fupe.app — Developers Checkout + subscription lifecycle. Separate destination/secret from prod.`
+- [ ] **Endpoint URL:** `https://api-staging.fupe.app/api/v1/billing/webhook`
+- [ ] **Create destination** → open it → **Reveal** / copy **Signing secret** (`whsec_…`)
+- [ ] Set staging `services/api/.env` → `STRIPE_WEBHOOK_SECRET=whsec_...` (must **not** be prod’s `whsec_`)
 - [ ] `sudo systemctl restart fupe-api-staging`
-
-Keep the **prod** webhook on `https://api.fupe.app/...` (can also be test mode until live Stripe).
+- [ ] After a test Checkout, Workbench shows successful deliveries to the staging destination
 
 ---
 
@@ -631,7 +656,7 @@ Keep the **prod** webhook on `https://api.fupe.app/...` (can also be test mode u
 - [ ] Register / login / verify email (Resend)
 - [ ] Forgot / reset password
 - [ ] `/developers` — create API key
-- [ ] Checkout (test card `4242…`) → success UX; webhook updates tier
+- [ ] Checkout (test card `4242…`) → success UX; event destination updates tier
 - [ ] IMAGE lookup via site (first-party secret)
 - [ ] Admin login still works if you bootstrap a staging admin
 - [ ] Confirm you did **not** break `https://fupe.app`
@@ -677,19 +702,20 @@ git pull
 ## Troubleshooting
 
 
-| Symptom                            | Check                                                                                                              |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Staging web calls prod API         | Rebuild web after setting `API_URL=http://127.0.0.1:3002`                                                          |
-| Migrate hit prod                   | `echo $DATABASE_URL` — must be `:5434`                                                                             |
-| 502 on staging hosts               | `systemctl status fupe-*-staging`; nginx `proxy_pass` ports                                                        |
-| Web staging crash-loop             | `journalctl -u fupe-web-staging -n 50`; **EADDRINUSE :3001** → set `PORT=3003` (start script uses `${PORT:-3001}`) |
-| 526 SSL                            | Origin cert missing staging hostnames; Full (strict)                                                               |
-| IMAGE 401 on staging               | `FIRST_PARTY_LOOKUP_SECRET` mismatch web ↔ API                                                                     |
-| OOM / slow VPS                     | Stop staging units; avoid full prod restore on staging while building                                              |
-| Cypher OID error after restore     | Re-run §5b E (AGE OID repair) on **staging**                                                                       |
-| `already exists` during restore    | Staging wasn’t empty — §5b C: `DROP DATABASE fupe` / recreate, then restore again                                  |
-| `Conflict … fupe-postgres-staging` | Container already exists — `docker start fupe-postgres-staging`; do **not** `rm` it                                |
-| Real emails on staging             | Re-run §5b D scrub; confirm container is staging                                                                   |
+| Symptom                             | Check                                                                                                                    |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Staging web calls prod API          | Rebuild web after setting `API_URL=http://127.0.0.1:3002`                                                                |
+| Migrate hit prod                    | `echo $DATABASE_URL` — must be `:5434`                                                                                   |
+| 502 on staging hosts                | `systemctl status fupe-*-staging`; nginx `proxy_pass` ports                                                              |
+| Web staging crash-loop              | `journalctl -u fupe-web-staging -n 50`; **EADDRINUSE :3001** → set `PORT=3003` (start script uses `${PORT:-3001}`)       |
+| 526 SSL                             | Origin cert missing staging hostnames; Full (strict)                                                                     |
+| IMAGE 401 on staging                | `FIRST_PARTY_LOOKUP_SECRET` mismatch web ↔ API                                                                           |
+| OOM / slow VPS                      | Stop staging units; avoid full prod restore on staging while building                                                    |
+| Cypher OID error after restore      | Re-run §5b E (AGE OID repair) on **staging**                                                                             |
+| `already exists` during restore     | Staging wasn’t empty — §5b C: `DROP DATABASE fupe` / recreate, then restore again                                        |
+| `Conflict … fupe-postgres-staging`  | Container already exists — `docker start fupe-postgres-staging`; do **not** `rm` it                                      |
+| Real emails on staging              | Re-run §5b D scrub; confirm container is staging                                                                         |
+| Stripe 400 / no tier after Checkout | Workbench → Webhooks → staging destination deliveries; `STRIPE_WEBHOOK_SECRET` must match **staging** `whsec_`, not prod |
 
 
 ---
@@ -697,5 +723,5 @@ git pull
 ## Done when
 
 - [ ] Staging and prod both reachable on their hostnames
-- [ ] Separate DB, secrets, systemd units, Stripe webhook
+- [ ] Separate DB, secrets, systemd units, Stripe event destination
 - [ ] You can `./rebuild-staging.sh` without touching prod

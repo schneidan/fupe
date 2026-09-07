@@ -21,7 +21,7 @@ Assumes you already:
 | Next.js web | Node on port **3001** | `https://fupe.app` (+ `www`) |
 | nginx | ports 80/443 on the VPS | origin behind Cloudflare |
 
-Browser calls stay same-origin (`/api/...` via Next rewrites). Mobile and Stripe webhooks should hit **`api.fupe.app`** directly so request bodies are not altered by Next.
+Browser calls stay same-origin (`/api/...` via Next rewrites). Mobile and Stripe event destinations should hit **`api.fupe.app`** directly so request bodies are not altered by Next.
 
 Traffic path: **visitor → Cloudflare → VPS nginx → Node**.
 
@@ -310,7 +310,7 @@ NEXT_PUBLIC_SITE_URL=https://fupe.app
 STRIPE_SECRET_KEY=sk_test_CHANGE_ME
 STRIPE_PRICE_DEVELOPER=price_CHANGE_ME
 # STRIPE_PRICE_BUSINESS=price_CHANGE_ME
-# Add after §12 webhook is created:
+# Add after §12c event destination is created:
 # STRIPE_WEBHOOK_SECRET=whsec_CHANGE_ME
 
 REQUIRE_API_KEY=false
@@ -629,7 +629,7 @@ server {
     }
 }
 
-# API (mobile + Stripe webhooks)
+# API (mobile + Stripe event destinations)
 server {
     listen 80;
     listen [::]:80;
@@ -709,28 +709,70 @@ Point nginx `ssl_certificate` / `ssl_certificate_key` at `/etc/letsencrypt/live/
 
 ## 12. Stripe (Test mode on the live domain)
 
-You can process **test** payments on the real hostname while Stripe account activation is pending. Cloudflare in front is fine for Checkout and webhooks.
+You can process **test** payments on the real hostname while Stripe account activation is pending. Cloudflare in front is fine for Checkout and event destinations.
 
-1. In Stripe Dashboard → **Test mode** → **Payment Links**  
-   - After donation success URL: `https://fupe.app/thanks` (optional `?next=/browse` etc.)  
-   - Cancel URL: `https://fupe.app`  
-   - Developer Checkout success/cancel can stay `/developers?checkout=success` / `cancel`
-2. Set `NEXT_PUBLIC_SUPPORT_URL` to the test Payment Link (rebuild web if you change it — see §14).
-3. **Developers subscriptions:**  
-   - `STRIPE_SECRET_KEY=sk_test_...`  
-   - `STRIPE_PRICE_DEVELOPER=price_...`
-4. **Webhook (Test mode):**  
-   - Endpoint URL: `https://api.fupe.app/api/v1/billing/webhook`  
-   - Events: at least  
-     `checkout.session.completed`,  
-     `customer.subscription.updated`,  
-     `customer.subscription.deleted`,  
-     `invoice.paid`,  
-     `invoice.payment_failed`  
-   - Copy signing secret → `STRIPE_WEBHOOK_SECRET=whsec_...` in `services/api/.env`  
-   - `sudo systemctl restart fupe-api`
+Keep the Dashboard toggle on **Test mode** for every step until you go live.
 
-If webhook delivery fails with timeouts, check Cloudflare **Security** isn’t challenging Stripe (usually fine). Keep cache bypassed on `api.fupe.app`.
+### 12a. Product catalog (Developers subscription price)
+
+`/developers` Checkout uses a **Price** id, not a Payment Link.
+
+1. Dashboard → **Product catalog** → **+ Add product** (or open an existing “FUPE Developer” product).
+2. Name e.g. `FUPE Developer`; recurring monthly price as you prefer.
+3. Copy the **Price** id (`price_…`) → `STRIPE_PRICE_DEVELOPER` in `services/api/.env`.
+4. Developers → **API keys** → Secret key (`sk_test_…`) → `STRIPE_SECRET_KEY`.
+
+### 12b. Payment Link (footer “keep the lights on”)
+
+1. Dashboard → **Payment links** → **+ New** (or **+** → **Payment link**).
+2. Either pick a fixed-price product or **Customers choose what to pay**.
+3. After-payment / success URL if offered: `https://fupe.app/thanks` (optional `?next=/browse`); cancel/back: `https://fupe.app`.
+4. **Create link** → copy `https://buy.stripe.com/test_…` → `NEXT_PUBLIC_SUPPORT_URL` in `apps/web/.env.production`.
+5. Rebuild web after changing that env (§14).
+
+Developer Checkout success/cancel URLs are set in app code (`/developers?checkout=success` / `cancel`) — no Payment Link needed for that flow.
+
+### 12c. Event destination (billing webhooks)
+
+Stripe no longer uses a bare “Add endpoint” label everywhere — create an **event destination** in Workbench.
+
+1. Open **[Workbench → Webhooks](https://dashboard.stripe.com/test/workbench/webhooks)** (or **Developers** → **Webhooks**). Confirm **Test mode**.
+2. **Add destination** / **Create destination**.
+3. **Events from:** **Your account** (not Connected accounts).
+4. **API version:** account default is fine.
+5. **Payload / format:** **Snapshot events** — not **Thin** (Nest uses `constructEvent` + `data.object`).
+6. Select events, then **Continue**:
+   - `checkout.session.completed`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `invoice.payment_failed`  
+   (`invoice.paid` is unused by the API today.)
+7. **Destination type:** **Webhook** / **Webhook endpoint** (HTTPS).  
+   Skip EventBridge, Azure Event Grid, and other cloud destinations.
+8. **Name:** `FUPE prod API (test)`
+9. **Description:** `Nest billing on api.fupe.app — Developers Checkout + subscription lifecycle (snapshot events).`
+10. **Endpoint URL:** `https://api.fupe.app/api/v1/billing/webhook`  
+    (API host, **not** `fupe.app` — Next must not rewrite the raw body.)
+11. **Create destination** → open it → reveal **Signing secret** (`whsec_…`) → `STRIPE_WEBHOOK_SECRET` in `services/api/.env`.
+12. `sudo systemctl restart fupe-api`
+
+If deliveries fail with timeouts, check Cloudflare **Security** isn’t challenging Stripe. Keep cache bypassed on `api.fupe.app`.
+
+Workbench → Webhooks → destination → **Event deliveries** is the place to inspect/resend failed posts.
+
+### 12d. Going live later
+
+When Stripe unlocks **Live mode**:
+
+1. Create **Live** Product/Price + Payment Link (same steps with Test mode off).
+2. Create a **new** Live event destination:
+   - **Name:** `FUPE prod API (live)`
+   - **Description:** `Nest billing on api.fupe.app (live).`
+   - Same Webhook + Snapshot + events + URL as Test.
+3. Swap env: `sk_live_…`, live `price_…`, live `whsec_…`, live `buy.stripe.com/…` (not `test_`).
+4. Rebuild web, restart `fupe-api` / `fupe-web`.
+
+Do **not** reuse the Test destination’s signing secret in Live (or vice versa).
 
 ### Lookup rate limits (API + Cloudflare)
 
@@ -740,8 +782,6 @@ Optional Cloudflare hardening (dashboard → Security → WAF / Rate limiting):
 
 - Rate limit rule on `api.fupe.app/api/v1/lookup*` (e.g. 60–120 / min per IP)
 - Keep `api.fupe.app` **cache bypass** (API responses must not be cached)
-
-When Stripe unlocks live mode later: create **live** Payment Link + prices + webhook, swap `sk_test_` → `sk_live_`, update `NEXT_PUBLIC_SUPPORT_URL`, rebuild web, restart services.
 
 ---
 
@@ -852,7 +892,7 @@ Copy dumps off-box occasionally (`scp` or object storage). Provider disk snapsho
 | `password authentication failed` | `DATABASE_URL` password ≠ compose `POSTGRES_PASSWORD` |
 | Web loads but lookups fail | `fupe-api` down; or `API_URL` wrong at **build** time — rebuild web |
 | CORS errors from browser to `api.` | Add site origins to `CORS_ORIGIN` |
-| Stripe webhook 400 | Wrong `STRIPE_WEBHOOK_SECRET`; or webhook pointed at web host instead of `api.fupe.app` |
+| Stripe webhook 400 | Wrong `STRIPE_WEBHOOK_SECRET` for that destination; or URL pointed at web host instead of `api.fupe.app` / `api-staging` |
 | `env: node: No such file` in cron | Cron PATH missing Node — use full paths or `PATH=/usr/bin:...` |
 | Out of memory on build | Use a 4+ GB RAM VPS, or add swap temporarily |
 
