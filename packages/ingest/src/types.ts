@@ -80,6 +80,8 @@ export interface LoadStats {
   citationsUpserted: number;
   entitiesMatched: number;
   entitiesQueued: number;
+  /** Skipped because they match entity_blocklist. */
+  entitiesBlocked: number;
 }
 
 export interface IngestCursorMeta {

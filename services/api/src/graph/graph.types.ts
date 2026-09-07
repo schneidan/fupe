@@ -14,6 +14,7 @@ export interface EntityProperties {
   country_codes?: string[];
   sector?: string;
   aliases?: string[];
+  external_ids?: Record<string, string>;
   source?: string;
   updated_at?: string;
 }

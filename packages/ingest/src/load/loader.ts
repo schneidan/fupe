@@ -7,6 +7,7 @@ import type {
   NormalizedProduct,
   SourceBatch,
 } from '../types';
+import { isEntityBlocked } from './blocklist';
 import { runCypherWrite } from './client';
 
 export interface LoadOptions {
@@ -27,12 +28,21 @@ export async function loadBatch(
     citationsUpserted: 0,
     entitiesMatched: 0,
     entitiesQueued: 0,
+    entitiesBlocked: 0,
   };
 
   /** Remap incoming entity ids → canonical graph ids after dedupe. */
   const idMap = new Map<string, string>();
+  /** Ids skipped due to blocklist — drop edges/products that only reference them. */
+  const blockedIds = new Set<string>();
 
   for (const entity of batch.entities) {
+    if (await isEntityBlocked(client, entity)) {
+      blockedIds.add(entity.id);
+      stats.entitiesBlocked++;
+      continue;
+    }
+
     let target = entity;
 
     if (!options.skipDedupe) {
@@ -70,6 +80,9 @@ export async function loadBatch(
   }
 
   for (const edge of batch.edges) {
+    if (blockedIds.has(edge.fromId) || blockedIds.has(edge.toId)) {
+      continue;
+    }
     const remapped: NormalizedEdge = {
       ...edge,
       fromId: idMap.get(edge.fromId) ?? edge.fromId,
@@ -84,6 +97,19 @@ export async function loadBatch(
   }
 
   for (const product of batch.products) {
+    if (
+      product.manufacturerEntityId &&
+      blockedIds.has(product.manufacturerEntityId)
+    ) {
+      // Still upsert the product, but drop the blocked manufacturer link.
+      const remapped: NormalizedProduct = {
+        ...product,
+        manufacturerEntityId: undefined,
+      };
+      await upsertProduct(client, remapped);
+      stats.productsUpserted++;
+      continue;
+    }
     const remapped: NormalizedProduct = {
       ...product,
       manufacturerEntityId: product.manufacturerEntityId

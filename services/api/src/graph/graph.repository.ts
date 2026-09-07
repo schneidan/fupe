@@ -345,7 +345,9 @@ export class GraphRepository {
   }
 
   async getEntityDetail(slug: string): Promise<EntityDetail | null> {
-    const entity = await this.findEntityBySlug(slug);
+    const entity =
+      (await this.findEntityBySlug(slug)) ??
+      (await this.findEntityById(slug));
     if (!entity) return null;
 
     const chain = await this.buildOwnershipChain(entity.id);
@@ -483,7 +485,30 @@ export class GraphRepository {
       updated_at: raw.updated_at ? String(raw.updated_at) : undefined,
       country_codes: this.parseJsonArray(raw.country_codes),
       aliases: this.parseJsonArray(raw.aliases),
+      external_ids: this.parseJsonObject(raw.external_ids),
     };
+  }
+
+  private parseJsonObject(
+    value: unknown,
+  ): Record<string, string> | undefined {
+    if (!value) return undefined;
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+        if (v != null) out[k] = String(v);
+      }
+      return Object.keys(out).length ? out : undefined;
+    }
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        return this.parseJsonObject(parsed);
+      } catch {
+        return undefined;
+      }
+    }
+    return undefined;
   }
 
   private parseJsonArray(value: unknown): string[] | undefined {
@@ -502,21 +527,52 @@ export class GraphRepository {
 
   async applyEntityUpdate(
     entityId: string,
-    data: Partial<EntityProperties>,
+    data: Partial<EntityProperties> & {
+      clear_sector?: boolean;
+      clear_aliases?: boolean;
+      clear_country_codes?: boolean;
+    },
   ): Promise<EntityProperties | null> {
     const sets: string[] = [];
     const params: Record<string, unknown> = { entityId };
 
-    if (data.name) {
+    if (data.name != null && data.name.trim()) {
       sets.push('e.name = $name');
-      params.name = data.name;
+      params.name = data.name.trim();
     }
     if (data.type) {
       sets.push('e.type = $type');
       params.type = data.type;
     }
+    if (data.slug != null && data.slug.trim()) {
+      sets.push('e.slug = $slug');
+      params.slug = data.slug.trim();
+    }
+    if (data.sector != null) {
+      sets.push('e.sector = $sector');
+      params.sector = data.sector;
+    } else if (data.clear_sector) {
+      sets.push('e.sector = null');
+    }
+    if (data.country_codes) {
+      sets.push('e.country_codes = $country_codes');
+      params.country_codes = data.country_codes;
+    } else if (data.clear_country_codes) {
+      sets.push('e.country_codes = null');
+    }
+    if (data.aliases) {
+      sets.push('e.aliases = $aliases');
+      params.aliases = data.aliases;
+    } else if (data.clear_aliases) {
+      sets.push('e.aliases = null');
+    }
 
-    if (!sets.length) return this.findEntityById(entityId);
+    sets.push('e.updated_at = $updated_at');
+    params.updated_at = new Date().toISOString().slice(0, 10);
+
+    if (sets.length <= 1 && !data.name && !data.type && data.slug == null) {
+      // only updated_at — still fine to stamp
+    }
 
     const rows = await this.graph.runCypher<{
       entity: { properties: EntityProperties };
@@ -526,7 +582,93 @@ export class GraphRepository {
       ['entity'],
     );
 
-    return rows[0]?.entity.properties ?? null;
+    return rows[0]?.entity.properties
+      ? this.parseEntityProperties(
+          rows[0].entity.properties as unknown as Record<string, unknown>,
+        )
+      : this.findEntityById(entityId);
+  }
+
+  /** Remove entity and all incident edges (ownership, citations, product links). */
+  async deleteEntity(entityId: string): Promise<boolean> {
+    const existing = await this.findEntityById(entityId);
+    if (!existing) return false;
+    await this.graph.runCypherWrite(
+      `MATCH (e:Entity) WHERE e.id = $entityId DETACH DELETE e`,
+      { entityId },
+    );
+    return true;
+  }
+
+  /**
+   * Graph neighbors that would be orphaned / unlinked if this entity is deleted.
+   * Children keep existing but lose their OWNED_BY edge to this node.
+   */
+  async getEntityDependencies(entityId: string): Promise<{
+    children: Array<{ id: string; name: string; slug: string; type: string }>;
+    parents: Array<{ id: string; name: string; slug: string; type: string }>;
+    products: Array<{ gtin: string; name: string }>;
+  }> {
+    const [childRows, parentRows, productRows] = await Promise.all([
+      this.graph.runCypher<{
+        id: string;
+        name: string;
+        slug: string | null;
+        type: string;
+      }>(
+        `
+          MATCH (child:Entity)-[:OWNED_BY]->(e:Entity)
+          WHERE e.id = $entityId
+          RETURN child.id AS id, child.name AS name, child.slug AS slug, child.type AS type
+        `,
+        { entityId },
+        ['id', 'name', 'slug', 'type'],
+      ),
+      this.graph.runCypher<{
+        id: string;
+        name: string;
+        slug: string | null;
+        type: string;
+      }>(
+        `
+          MATCH (e:Entity)-[:OWNED_BY]->(parent:Entity)
+          WHERE e.id = $entityId
+          RETURN parent.id AS id, parent.name AS name, parent.slug AS slug, parent.type AS type
+        `,
+        { entityId },
+        ['id', 'name', 'slug', 'type'],
+      ),
+      this.graph.runCypher<{ gtin: string; name: string }>(
+        `
+          MATCH (p:Product)-[:MANUFACTURED_BY]->(e:Entity)
+          WHERE e.id = $entityId
+          RETURN p.gtin AS gtin, p.name AS name
+        `,
+        { entityId },
+        ['gtin', 'name'],
+      ),
+    ]);
+
+    const mapEnt = (r: {
+      id: string;
+      name: string;
+      slug: string | null;
+      type: string;
+    }) => ({
+      id: String(r.id),
+      name: String(r.name),
+      slug: String(r.slug ?? r.id),
+      type: String(r.type),
+    });
+
+    return {
+      children: childRows.map(mapEnt),
+      parents: parentRows.map(mapEnt),
+      products: productRows.map((r) => ({
+        gtin: String(r.gtin),
+        name: String(r.name),
+      })),
+    };
   }
 
   async createEntity(entity: EntityProperties): Promise<EntityProperties> {

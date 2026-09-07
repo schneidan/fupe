@@ -54,6 +54,22 @@ export interface EntityDetail extends EntitySummary {
   updated_at?: string;
 }
 
+export interface EntityDependencyRef {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+}
+
+export interface EntityDependencies {
+  entity_id: string;
+  name: string;
+  children: EntityDependencyRef[];
+  parents: EntityDependencyRef[];
+  products: Array<{ gtin: string; name: string }>;
+  has_dependents: boolean;
+}
+
 export interface EntityListResponse {
   items: EntitySummary[];
   total: number;
@@ -133,6 +149,44 @@ export async function getEntity(slug: string): Promise<EntityDetail> {
   const res = await fetch(`/api/v1/entities/${encodeURIComponent(slug)}`);
   if (!res.ok) throw new Error('Entity not found');
   return res.json();
+}
+
+export async function getEntityDependencies(
+  token: string,
+  idOrSlug: string,
+): Promise<EntityDependencies> {
+  return authJson(
+    `/api/v1/entities/${encodeURIComponent(idOrSlug)}/dependencies`,
+    { method: 'GET', token },
+  );
+}
+
+export async function updateEntity(
+  token: string,
+  idOrSlug: string,
+  patch: {
+    name?: string;
+    type?: string;
+    sector?: string;
+    country_codes?: string[];
+    aliases?: string[];
+  },
+): Promise<EntityDetail> {
+  return authJson(`/api/v1/entities/${encodeURIComponent(idOrSlug)}`, {
+    method: 'PATCH',
+    token,
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function deleteEntity(
+  token: string,
+  idOrSlug: string,
+): Promise<{ deleted: boolean; id: string; name: string }> {
+  return authJson(`/api/v1/entities/${encodeURIComponent(idOrSlug)}`, {
+    method: 'DELETE',
+    token,
+  });
 }
 
 export async function getRelatedEntities(

@@ -9,7 +9,13 @@ import { OwnershipChain } from '@/components/OwnershipChain';
 import { CitationsList } from '@/components/CitationsList';
 import { DidYouKnow } from '@/components/DidYouKnow';
 import { SuggestEditLink } from '@/components/SuggestEditLink';
+import { EntityModeratorPanel } from '@/components/EntityModeratorPanel';
 import { lookup, type LookupResult } from '@/lib/api';
+import {
+  getStoredUser,
+  isModerator,
+  type AuthUser,
+} from '@/lib/auth';
 import { entityPath, slugToQuery, toSlug } from '@/lib/slug';
 
 interface EntityViewProps {
@@ -27,6 +33,17 @@ export function EntityView({ slug }: EntityViewProps) {
   const [result, setResult] = useState<LookupResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [modPanelOpen, setModPanelOpen] = useState(false);
+
+  useEffect(() => {
+    function syncUser() {
+      setUser(getStoredUser());
+    }
+    syncUser();
+    window.addEventListener('fupe-auth', syncUser);
+    return () => window.removeEventListener('fupe-auth', syncUser);
+  }, []);
 
   useEffect(() => {
     if (!query) {
@@ -106,6 +123,8 @@ export function EntityView({ slug }: EntityViewProps) {
     );
   }
 
+  const showModEdit = isModerator(user) && Boolean(result.entity_id);
+
   return (
     <div className="space-y-8">
       <VerdictHero result={result} />
@@ -115,6 +134,20 @@ export function EntityView({ slug }: EntityViewProps) {
         entityId={result.entity_id}
         name={result.matched_item}
       />
+      {showModEdit && result.entity_id && (
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => setModPanelOpen(true)}
+            className="inline-block rounded-full border border-fupe-border px-5 py-2 text-sm text-fupe-muted transition hover:border-fupe-muted hover:text-fupe-text"
+          >
+            Edit entity
+          </button>
+          <p className="mt-2 text-xs text-fupe-accentDim">
+            Moderator: change details or delete
+          </p>
+        </div>
+      )}
       <DidYouKnow result={result} />
       <div className="border-t border-fupe-border pt-8">
         <p className="mb-4 text-center text-sm text-fupe-muted">
@@ -122,6 +155,14 @@ export function EntityView({ slug }: EntityViewProps) {
         </p>
         <PeSearchForm size="compact" />
       </div>
+
+      {result.entity_id && (
+        <EntityModeratorPanel
+          entityId={result.entity_id}
+          open={modPanelOpen}
+          onClose={() => setModPanelOpen(false)}
+        />
+      )}
     </div>
   );
 }

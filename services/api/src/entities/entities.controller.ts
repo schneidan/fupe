@@ -1,12 +1,26 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
 import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
   ApiHeader,
   ApiOkResponse,
   ApiOperation,
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import { ListEntitiesDto } from './entities.dto';
+import { SkipApiKey } from '../api-keys/api-key.decorators';
+import { AuthUser } from '../auth/auth.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ListEntitiesDto, UpdateEntityDto } from './entities.dto';
 import { EntitiesService } from './entities.service';
 
 @ApiTags('Entities')
@@ -32,10 +46,59 @@ export class EntitiesController {
     return this.entitiesService.getRelated(slug);
   }
 
+  @Get(':idOrSlug/dependencies')
+  @SkipApiKey()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Entity graph dependencies (moderator/admin)',
+    description:
+      'Children, parents, and products that would be unlinked if this entity is deleted.',
+  })
+  dependencies(
+    @Req() req: { user: AuthUser },
+    @Param('idOrSlug') idOrSlug: string,
+  ) {
+    return this.entitiesService.getDependenciesAsModerator(req.user, idOrSlug);
+  }
+
   @Get(':slug')
   @ApiOperation({ summary: 'Entity detail by slug' })
   @ApiOkResponse({ description: 'Entity with ownership chain and citations' })
   detail(@Param('slug') slug: string) {
     return this.entitiesService.getBySlug(slug);
+  }
+
+  @Patch(':idOrSlug')
+  @SkipApiKey()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Update entity (moderator/admin)',
+    description:
+      'Direct name/type/sector/countries/aliases edit. Renaming updates the slug.',
+  })
+  update(
+    @Req() req: { user: AuthUser },
+    @Param('idOrSlug') idOrSlug: string,
+    @Body() body: UpdateEntityDto,
+  ) {
+    return this.entitiesService.updateAsModerator(req.user, idOrSlug, body);
+  }
+
+  @Delete(':idOrSlug')
+  @SkipApiKey()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Delete entity (moderator/admin)',
+    description:
+      'DETACH DELETE, add to entity_blocklist (blocks re-ingest), reject pending edits targeting it.',
+  })
+  remove(
+    @Req() req: { user: AuthUser },
+    @Param('idOrSlug') idOrSlug: string,
+  ) {
+    return this.entitiesService.deleteAsModerator(req.user, idOrSlug);
   }
 }

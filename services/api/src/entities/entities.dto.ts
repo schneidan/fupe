@@ -1,4 +1,14 @@
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { EntityType } from '../graph/graph.types';
@@ -39,4 +49,41 @@ export class ListEntitiesDto {
   @Min(1)
   @Max(100)
   limit?: number = 20;
+}
+
+export class UpdateEntityDto {
+  @ApiPropertyOptional({ example: 'Panera Bread' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  name?: string;
+
+  @ApiPropertyOptional({ enum: EntityType })
+  @IsOptional()
+  @IsEnum(EntityType)
+  type?: EntityType;
+
+  @ApiPropertyOptional({ example: 'Restaurants' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  sector?: string;
+
+  @ApiPropertyOptional({
+    example: ['US', 'CA'],
+    description: 'ISO country codes. Pass [] to clear.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  country_codes?: string[];
+
+  @ApiPropertyOptional({
+    example: ['Panera'],
+    description: 'Alternate names. Pass [] to clear.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  aliases?: string[];
 }

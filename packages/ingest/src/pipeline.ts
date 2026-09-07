@@ -17,6 +17,7 @@ const emptyStats = (): LoadStats => ({
   citationsUpserted: 0,
   entitiesMatched: 0,
   entitiesQueued: 0,
+  entitiesBlocked: 0,
 });
 
 export async function runIngest(options: IngestOptions): Promise<IngestResult> {
@@ -61,6 +62,7 @@ export async function runIngest(options: IngestOptions): Promise<IngestResult> {
         citationsUpserted: batch.entities.filter((e) => e.citation).length,
         entitiesMatched: 0,
         entitiesQueued: 0,
+        entitiesBlocked: 0,
       },
       cursor: cursorFromBatch(),
       message: source.implemented
