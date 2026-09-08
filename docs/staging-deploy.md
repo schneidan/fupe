@@ -69,11 +69,12 @@ cd PROD_ROOT
 
 Expected file: `[docker-compose.staging.yml](../docker-compose.staging.yml)` — maps `127.0.0.1:5434:5432`, volume `fupe_pgdata_staging`, DB/user `fupe`.
 
-- [x] Set `POSTGRES_PASSWORD` in that file (or an override) to `STAGING_DB_PASSWORD` — **not** the prod password
+- [x] Set `STAGING_POSTGRES_PASSWORD` in a **gitignored** `.env` next to the compose file (Compose substitutes it — do not put the real password in `docker-compose.staging.yml`). Use a staging-only value — **not** the prod password / `POSTGRES_PASSWORD`
 - [x] Start it:
 
 ```bash
 cd PROD_ROOT
+# .env should contain: STAGING_POSTGRES_PASSWORD=STAGING_DB_PASSWORD
 # Always use -p fupe-staging so PROD_ROOT vs STAGING_ROOT don't fight over the name
 docker compose -p fupe-staging -f docker-compose.staging.yml up -d
 docker compose -p fupe-staging -f docker-compose.staging.yml exec -T postgres-staging \

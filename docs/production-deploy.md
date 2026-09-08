@@ -143,41 +143,25 @@ pnpm -v
 
 **Important:** set a strong password *before* the first `docker compose up`. Changing it later on an existing volume is painful.
 
-Edit `docker-compose.yml` on the VPS:
+Do **not** put the real password in `docker-compose.yml` (tracked in git). Put it in a **gitignored** `.env` next to compose — Compose substitutes `${POSTGRES_PASSWORD}` automatically:
 
-1. Change `POSTGRES_PASSWORD` from `fupe_dev` to `STRONG_DB_PASSWORD`.
-2. Bind the port to localhost only (so AGE is not reachable from the internet):
-
-```yaml
-ports:
-  - "127.0.0.1:5433:5432"
+```bash
+cd /root/fupe   # PROD_ROOT
+grep -q '^POSTGRES_PASSWORD=' .env 2>/dev/null || echo 'POSTGRES_PASSWORD=STRONG_DB_PASSWORD' >> .env
+# Keep DATABASE_URL in services/api/.env in sync with the same password.
 ```
 
-Full service block should look like:
+Bind the port to localhost only (so AGE is not reachable from the internet). Prefer a **local** `docker-compose.override.yml` (gitignored) rather than editing the tracked compose file:
 
 ```yaml
+# docker-compose.override.yml  (do not commit)
 services:
   postgres:
-    image: apache/age:latest
-    container_name: fupe-postgres
-    restart: unless-stopped
     ports:
       - "127.0.0.1:5433:5432"
-    environment:
-      POSTGRES_USER: fupe
-      POSTGRES_PASSWORD: STRONG_DB_PASSWORD
-      POSTGRES_DB: fupe
-    volumes:
-      - fupe_pgdata:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fupe -d fupe"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-volumes:
-  fupe_pgdata:
 ```
+
+Tracked `docker-compose.yml` uses `POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fupe_dev}` (local default only). On an **already initialized** volume, keep env/`DATABASE_URL` matching the password Postgres was first created with — changing the env var alone does not rotate the DB login.
 
 Start DB:
 
@@ -284,7 +268,8 @@ Generate secrets once:
 
 ```bash
 openssl rand -hex 32   # → paste as JWT_SECRET
-# DB password: same value you put in docker-compose.yml POSTGRES_PASSWORD
+# DB password: same value as POSTGRES_PASSWORD in the gitignored root .env
+# (must match what Postgres was initialized with)
 ```
 
 ### 8a. API — `services/api/.env`
@@ -350,7 +335,7 @@ STT_MODEL=openai/whisper-large-v3-turbo
 
 Checklist for this file:
 
-- [ ] `DATABASE_URL` password matches `docker-compose.yml` `POSTGRES_PASSWORD`
+- [ ] `DATABASE_URL` password matches root `.env` `POSTGRES_PASSWORD` (the value Postgres was initialized with)
 - [ ] Host is `127.0.0.1:5433` (not a public hostname)
 - [ ] `NODE_ENV=production` (not `development`)
 - [ ] `JWT_SECRET` is a long random string (not `change-me-in-production`)
@@ -900,7 +885,7 @@ Copy dumps off-box occasionally (`scp` or object storage). Provider disk snapsho
 | Certbot HTTP-01 fails while proxied | Use Origin CA (§11a) or DNS-01 / temporary grey-cloud (§11c) |
 | Stale HTML/favicon after deploy | Cloudflare → Caching → Purge; also hard-refresh browser |
 | API responses look cached/wrong | Add Cache Rule: bypass `api.fupe.app` and `/api/*` |
-| `password authentication failed` | `DATABASE_URL` password ≠ compose `POSTGRES_PASSWORD` |
+| `password authentication failed` | `DATABASE_URL` password ≠ Postgres init password / `.env` `POSTGRES_PASSWORD` |
 | Web loads but lookups fail | `fupe-api` down; or `API_URL` wrong at **build** time — rebuild web |
 | CORS errors from browser to `api.` | Add site origins to `CORS_ORIGIN` |
 | Stripe webhook 400 | Wrong `STRIPE_WEBHOOK_SECRET` for that destination; or URL pointed at web host instead of `api.fupe.app` / `api-staging` |

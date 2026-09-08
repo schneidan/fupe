@@ -15,6 +15,9 @@ out/
 !.env.example
 restart.sh
 
+# Local Docker Compose overrides (ports, etc.) — passwords belong in .env
+docker-compose.override.yml
+
 # IDE
 .idea/
 .vscode/

@@ -5,6 +5,11 @@
 #
 # Host port 5434 → container 5432. Do not conflict with prod on 5433.
 # Never use --remove-orphans on this file (prod compose may share the host).
+#
+# Set STAGING_POSTGRES_PASSWORD in a gitignored .env (distinct from prod
+# POSTGRES_PASSWORD so one VPS .env can hold both). Changing the password after
+# the volume already exists does not re-init Postgres — keep it stable and match
+# the staging DATABASE_URL.
 
 services:
   postgres-staging:
@@ -14,10 +19,10 @@ services:
     ports:
       - "127.0.0.1:5434:5432"
     environment:
-      POSTGRES_USER: fupe
-      # Change before first start — then keep stable (volume remembers init password)
-      POSTGRES_PASSWORD: CHANGE_ME_STAGING_DB_PASSWORD
-      POSTGRES_DB: fupe
+      POSTGRES_USER: ${POSTGRES_USER:-fupe}
+      # Prefer STAGING_POSTGRES_PASSWORD in a gitignored .env (distinct from prod POSTGRES_PASSWORD).
+      POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:?Set STAGING_POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-fupe}
     volumes:
       - fupe_pgdata_staging:/var/lib/postgresql
     healthcheck:
