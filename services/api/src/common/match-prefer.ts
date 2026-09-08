@@ -1,33 +1,17 @@
-import { entityPath } from '@/lib/slug';
+import { normalizeNameKey } from './slug';
 
-export interface SearchHit {
-  kind: 'entity' | 'product';
-  id: string;
-  name: string;
-  type?: string;
-  gtin?: string;
-  slug?: string;
-  score: number;
-}
-
-const AUTO_MATCH_SCORE = 0.42;
-const AUTO_MATCH_GAP = 0.1;
-
+/** Legal / corporate tails that don't change the brand core. */
 const CORPORATE_TOKEN =
   /^(inc|incorporated|llc|ltd|limited|corp|corporation|co|company|plc|gmbh|ag|sa|nv|bv|pty)$/i;
 
-function normalizeNameKey(name: string): string {
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/['']/g, '')
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+export interface RankableHit {
+  id: string;
+  name: string;
+  score: number;
 }
 
-function stripCorporateKey(key: string): string {
+/** Strip trailing corporate tokens from a normalized name key. */
+export function stripCorporateKey(key: string): string {
   const tokens = key.split(/\s+/).filter(Boolean);
   while (tokens.length > 1 && CORPORATE_TOKEN.test(tokens[tokens.length - 1]!)) {
     tokens.pop();
@@ -39,7 +23,8 @@ function tokenCount(key: string): number {
   return key.split(/\s+/).filter(Boolean).length;
 }
 
-function isNameExtension(base: string, other: string): boolean {
+/** True when `other` is the same brand core or a longer extension of `base`. */
+export function isNameExtension(base: string, other: string): boolean {
   const b = normalizeNameKey(base);
   const o = normalizeNameKey(other);
   if (!b || !o) return false;
@@ -54,6 +39,7 @@ function isNameExtension(base: string, other: string): boolean {
 function simplicityRank(name: string): [number, number, string] {
   const key = normalizeNameKey(name);
   const core = stripCorporateKey(key);
+  // Prefer bare core ("Panera") over "Panera Inc" / "Panera Foods"
   return [tokenCount(core), core.length, key];
 }
 
@@ -74,8 +60,14 @@ function inQueryFamily(query: string, name: string): boolean {
   return qStem.length >= 4 && qStem === nStem;
 }
 
-/** Prefer "Panera" over "Panera Inc" / "Panera Foods" among close family hits. */
-export function preferSimplestFamilyHit(query: string, hits: SearchHit[]): SearchHit[] {
+/**
+ * Among close-scoring hits that share a brand family with the query, put the
+ * simplest label first ("Panera" over "Panera Inc" / "Panera Foods").
+ */
+export function preferSimplestFamilyHit<T extends RankableHit>(
+  query: string,
+  hits: T[],
+): T[] {
   if (hits.length < 2) return hits;
 
   const family = hits.filter((h) => inQueryFamily(query, h.name));
@@ -110,7 +102,14 @@ export function preferSimplestFamilyHit(query: string, hits: SearchHit[]): Searc
   return [winner, ...hits.filter((h) => h.id !== winner.id)];
 }
 
-function isSimplestFamilyConfident(query: string, hits: SearchHit[]): boolean {
+/**
+ * Near-tie siblings that are all extensions of the simplest top hit should not
+ * block auto-navigate (Panera vs Panera Inc vs Panera Foods).
+ */
+export function isSimplestFamilyConfident(
+  query: string,
+  hits: RankableHit[],
+): boolean {
   const top = hits[0];
   if (!top) return false;
   if (!inQueryFamily(query, top.name)) return false;
@@ -140,6 +139,7 @@ function isSimplestFamilyConfident(query: string, hits: SearchHit[]): boolean {
   const topKey = normalizeNameKey(top.name);
   const topCore = stripCorporateKey(topKey);
 
+  // Query is the brand (or a longer form of it) and top is the simplest label.
   return (
     topCore === qCore ||
     topKey === qKey ||
@@ -147,67 +147,4 @@ function isSimplestFamilyConfident(query: string, hits: SearchHit[]): boolean {
     qKey.startsWith(`${topKey} `) ||
     topKey.startsWith(`${qCore} `)
   );
-}
-
-/** Mirror API confidence so the form doesn't bounce through a wrong /entity URL. */
-export function isConfidentSearchMatch(
-  query: string,
-  hits: SearchHit[],
-): boolean {
-  const top = hits[0];
-  if (!top) return false;
-
-  const q = query.trim();
-  const qLower = q.toLowerCase();
-  const topLower = top.name.trim().toLowerCase();
-  const qKey = normalizeNameKey(query);
-  const topKey = normalizeNameKey(top.name);
-
-  if (qKey && topKey && qKey === topKey) return true;
-  if (qLower === topLower) return true;
-
-  const topWords = topLower.split(/[^a-z0-9]+/).filter(Boolean);
-  const queryIsWholeWord = topWords.includes(qLower);
-  const startsWithQuery =
-    topLower.startsWith(qLower) ||
-    topWords.some((w) => w.startsWith(qLower) && qLower.length >= 3);
-
-  if (q.length <= 4) {
-    return queryIsWholeWord || (startsWithQuery && top.score >= 0.85);
-  }
-
-  if (top.score < AUTO_MATCH_SCORE) return false;
-
-  const onlyLooseContains =
-    !startsWithQuery &&
-    !queryIsWholeWord &&
-    topLower.includes(qLower) &&
-    top.score < 0.85;
-  if (onlyLooseContains) return false;
-
-  if (isSimplestFamilyConfident(q, hits)) return true;
-
-  const second = hits[1];
-  if (!second) return top.score >= 0.55 || startsWithQuery;
-  if (top.score - second.score >= AUTO_MATCH_GAP) return true;
-  return top.score >= 0.72 && top.score - second.score >= 0.05;
-}
-
-/** Reorder family hits, then return the auto-nav target when confident. */
-export function selectAutoMatchHit(
-  query: string,
-  hits: SearchHit[],
-): SearchHit | null {
-  const ranked = preferSimplestFamilyHit(query, hits);
-  if (!ranked.length || !isConfidentSearchMatch(query, ranked)) return null;
-  return ranked[0] ?? null;
-}
-
-export function pathForSearchHit(hit: SearchHit): string {
-  if (hit.kind === 'product' && hit.gtin) {
-    // Products resolve via barcode on the entity page path using name lookup;
-    // prefer manufacturer entity when we only have a product name hit.
-    return entityPath(hit.name);
-  }
-  return entityPath(hit.slug || hit.name);
 }

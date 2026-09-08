@@ -6,6 +6,10 @@ import {
 import { GraphRepository } from '../graph/graph.repository';
 import { FuzzySearchHit, LookupResult } from '../graph/graph.types';
 import { normalizeNameKey, toSlug } from '../common/slug';
+import {
+  isSimplestFamilyConfident,
+  preferSimplestFamilyHit,
+} from '../common/match-prefer';
 import { OpenFoodFactsService } from './open-food-facts.service';
 import { OcrService } from './ocr.service';
 import { WhisperService } from './whisper.service';
@@ -88,7 +92,10 @@ export class LookupService {
       throw new BadRequestException('query is required for TEXT lookup');
     }
 
-    const hits = await this.graphRepo.fuzzySearch(query.trim(), 8);
+    const hits = preferSimplestFamilyHit(
+      query.trim(),
+      await this.graphRepo.fuzzySearch(query.trim(), 8),
+    );
     if (!hits.length) {
       throw new NotFoundException(`No matches for "${query}"`);
     }
@@ -116,6 +123,8 @@ export class LookupService {
    * Exact / near-exact names always win. Typos need a strong trgm score and a
    * clear gap over the runner-up so "starbucks" never resolves to "Arby's".
    * Short queries must not auto-match mid-string (e.g. "utz" → "Schutzstaffel").
+   * Brand families ("Panera" / "Panera Inc" / "Panera Foods") prefer the
+   * simplest label and may auto-resolve without a score gap.
    */
   private isConfidentMatch(query: string, hits: FuzzySearchHit[]): boolean {
     const top = hits[0];
@@ -154,6 +163,8 @@ export class LookupService {
       topLower.includes(qLower) &&
       top.score < 0.85;
     if (onlyLooseContains) return false;
+
+    if (isSimplestFamilyConfident(q, hits)) return true;
 
     const second = hits[1];
     if (!second) {
@@ -263,6 +274,7 @@ export class LookupService {
   }
 
   async fuzzySearchHits(query: string, limit = 20) {
-    return this.graphRepo.fuzzySearch(query, limit);
+    const hits = await this.graphRepo.fuzzySearch(query, limit);
+    return preferSimplestFamilyHit(query.trim(), hits);
   }
 }

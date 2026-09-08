@@ -119,7 +119,7 @@ export class GraphRepository {
           FROM fupe_graph."Product"
         ) hits
         WHERE score >= $3
-        ORDER BY score DESC, name ASC
+        ORDER BY score DESC, char_length(name) ASC, name ASC
         LIMIT $2
       `,
       [q, limit, 0.25],

@@ -18,7 +18,7 @@ import {
 import { resizeImageForLookup } from '@/lib/image';
 import { entityPath } from '@/lib/slug';
 import {
-  isConfidentSearchMatch,
+  selectAutoMatchHit,
   pathForSearchHit,
 } from '@/lib/search';
 import { ImageLookupResults } from '@/components/ImageLookupResults';
@@ -351,8 +351,9 @@ export function SearchByModes() {
           setStatus('Looking that up…');
           try {
             const hits = await searchHits(q);
-            if (hits.length && isConfidentSearchMatch(q, hits)) {
-              router.push(pathForSearchHit(hits[0]));
+            const auto = selectAutoMatchHit(q, hits);
+            if (auto) {
+              router.push(pathForSearchHit(auto));
               return;
             }
             setError(

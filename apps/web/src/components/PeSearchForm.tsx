@@ -5,7 +5,8 @@ import { FormEvent, useEffect, useId, useRef, useState, type KeyboardEvent } fro
 import { useRouter } from 'next/navigation';
 import { searchHits } from '@/lib/api';
 import {
-  isConfidentSearchMatch,
+  preferSimplestFamilyHit,
+  selectAutoMatchHit,
   pathForSearchHit,
   type SearchHit,
 } from '@/lib/search';
@@ -46,7 +47,7 @@ export function PeSearchForm({
     const handle = setTimeout(() => {
       void searchHits(trimmed).then((hits) => {
         if (seq !== reqSeq.current) return;
-        setSuggestions(hits.slice(0, 8));
+        setSuggestions(preferSimplestFamilyHit(trimmed, hits).slice(0, 8));
         setActiveIndex(-1);
       });
     }, 200);
@@ -62,12 +63,13 @@ export function PeSearchForm({
     setDidYouMean(null);
     try {
       const hits = await searchHits(trimmed);
-      if (hits.length && isConfidentSearchMatch(trimmed, hits)) {
+      const auto = selectAutoMatchHit(trimmed, hits);
+      if (auto) {
         setShowSuggestions(false);
-        router.push(pathForSearchHit(hits[0]));
+        router.push(pathForSearchHit(auto));
         return;
       }
-      setDidYouMean(hits.slice(0, 8));
+      setDidYouMean(preferSimplestFamilyHit(trimmed, hits).slice(0, 8));
       setShowSuggestions(false);
     } finally {
       setSearching(false);
