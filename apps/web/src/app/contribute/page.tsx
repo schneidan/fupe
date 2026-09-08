@@ -13,9 +13,10 @@ export default function ContributePage() {
       </div>
       <h1 className="text-2xl font-bold text-fupe-text">Contribute</h1>
       <p className="mt-3 text-fupe-muted">
-        Help fill gaps the ingest pipeline misses. Suggest ownership parents
-        with a public citation. New accounts start in the review queue; as your
-        trust score rises, ownership edits can auto-commit.
+        Help fill gaps the ingest pipeline misses. Suggest ownership edits with
+        a citation, tip a missing brand name for enrichment, or add a full
+        entity when you know the details. High trust can auto-commit ownership
+        and full adds; name-only suggestions always go to review.
       </p>
       <ContributeHub />
     </main>

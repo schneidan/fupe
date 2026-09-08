@@ -67,7 +67,7 @@ class ListQueueQuery {
   status?: EditStatus | 'ALL';
 
   @IsOptional()
-  @IsEnum(['ownership', 'create_entity', 'other'])
+  @IsEnum(['ownership', 'create_entity', 'suggest_entity', 'other'])
   kind?: EditKind;
 
   @IsOptional()

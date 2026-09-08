@@ -66,12 +66,22 @@ export function ContributeHub() {
           </p>
         </Link>
         <Link
-          href="/contribute/new-entity"
+          href="/contribute/suggest-entity"
           className="rounded-xl border border-fupe-border bg-fupe-surface p-5 transition hover:border-fupe-muted"
         >
-          <h2 className="font-semibold text-fupe-text">Propose new entity</h2>
+          <h2 className="font-semibold text-fupe-text">Suggest an entity</h2>
           <p className="mt-2 text-sm text-fupe-muted">
-            Add a missing brand or company — always reviewed by a moderator.
+            Name-only tip for something missing — we&apos;ll enrich it in review.
+          </p>
+        </Link>
+        <Link
+          href="/contribute/new-entity"
+          className="rounded-xl border border-fupe-border bg-fupe-surface p-5 transition hover:border-fupe-muted sm:col-span-2"
+        >
+          <h2 className="font-semibold text-fupe-text">Add entity</h2>
+          <p className="mt-2 text-sm text-fupe-muted">
+            Full details (type, citation, optional parent). High trust can
+            auto-commit.
           </p>
         </Link>
         {isModerator(user) ? (

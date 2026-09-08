@@ -180,6 +180,7 @@ vi apps/web/.env.production
 API_URL=http://127.0.0.1:3002
 PORT=3003
 NEXT_PUBLIC_SITE_URL=https://staging.fupe.app
+NEXT_PUBLIC_FUPE_ENV=staging
 FIRST_PARTY_LOOKUP_SECRET=STAGING_FIRST_PARTY
 NEXT_PUBLIC_SUPPORT_URL=https://buy.stripe.com/test_...
 ```
@@ -187,6 +188,7 @@ NEXT_PUBLIC_SUPPORT_URL=https://buy.stripe.com/test_...
 - [x] `API_URL` points at **3002** (loopback)
 - [x] `FIRST_PARTY_LOOKUP_SECRET` matches staging API
 - [x] `PORT=3003`
+- [x] `NEXT_PUBLIC_FUPE_ENV=staging` (yellow slash on favicon; rebuild web after changing)
 
 ---
 

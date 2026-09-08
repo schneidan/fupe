@@ -38,10 +38,7 @@ export function SiteFooter() {
         <Link href="/legal/terms" className="text-fupe-text transition hover:text-fupe-muted">
           Terms
         </Link>
-        <Link
-          href="/legal/contact"
-          className="text-fupe-muted transition hover:text-fupe-text"
-        >
+        <Link href="/legal/contact" className="text-fupe-text transition hover:text-fupe-muted">
           Contact
         </Link>
       </nav>

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ProposeEntityForm } from '@/components/ProposeEntityForm';
 
 export const metadata = {
-  title: 'Propose new entity',
+  title: 'Add entity',
 };
 
 export default function ProposeEntityPage() {
@@ -15,10 +15,18 @@ export default function ProposeEntityPage() {
       >
         ← Contribute
       </Link>
-      <h1 className="text-2xl font-bold text-fupe-text">Propose new entity</h1>
+      <h1 className="text-2xl font-bold text-fupe-text">Add entity</h1>
       <p className="mt-3 mb-8 text-sm text-fupe-muted">
-        Add a brand or company missing from the directory. A moderator must
-        approve before it appears in browse and lookup.
+        Full details when you know them: type, optional parent/sector, and a
+        citation. High trust scores can auto-commit; otherwise a moderator
+        reviews. Just have a name?{' '}
+        <Link
+          href="/contribute/suggest-entity"
+          className="text-fupe-text hover:underline"
+        >
+          Suggest an entity
+        </Link>{' '}
+        instead.
       </p>
       <Suspense fallback={<p className="text-fupe-muted">Loading form…</p>}>
         <ProposeEntityForm />

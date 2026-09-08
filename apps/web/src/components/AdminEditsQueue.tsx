@@ -152,7 +152,8 @@ export function AdminEditsQueue() {
         >
           <option value="">All types</option>
           <option value="ownership">Ownership</option>
-          <option value="create_entity">New entity</option>
+          <option value="create_entity">Add entity</option>
+          <option value="suggest_entity">Suggest entity</option>
           <option value="other">Other</option>
         </select>
         <input

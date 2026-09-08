@@ -151,11 +151,11 @@ export function AccountHub() {
             : ' · ownership edits need review'}
           {isModerator(user) ? ` · ${user.role}` : ''}
         </p>
-        <details className="rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-base text-fupe-muted">
+        <details className="rounded-lg border border-fupe-border bg-fupe-bg px-4 py-3 text-sm text-fupe-muted">
           <summary className="cursor-pointer text-fupe-text">
             How trust works
           </summary>
-          <ul className="mt-2 list-disc space-y-1.5 pl-5 text-lg leading-relaxed">
+          <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed">
             <li>New accounts start at 0 — edits go to the moderator queue.</li>
             <li>
               Approved ownership edits: <span className="text-fupe-text">+5</span>.
@@ -166,14 +166,16 @@ export function AccountHub() {
               parent edits auto-commit (still need a citation).
             </li>
             <li>
-              Proposing a <span className="text-fupe-text">new entity</span> is
-              always reviewed, regardless of trust.
+              Proposing a full <span className="text-fupe-text">Add entity</span>{' '}
+              can auto-commit above 50 (with citation). Lightweight{' '}
+              <span className="text-fupe-text">Suggest an entity</span> tips
+              always go to review.
             </li>
             <li>Max 5 pending edits per account at a time.</li>
           </ul>
         </details>
         {!user.email_verified ? (
-          <div className="rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-sm">
+          <div className="rounded-lg border border-fupe-border bg-fupe-bg px-4 py-3 text-sm">
             <p className="text-fupe-muted">
               Verify your email before submitting edits. Check your inbox (and
               spam) for the link from FUPE.
@@ -289,7 +291,7 @@ export function AccountHub() {
           Current: <span className="text-fupe-text">{user.email}</span>
         </p>
         {user.pending_email ? (
-          <div className="rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-sm">
+          <div className="rounded-lg border border-fupe-border bg-fupe-bg px-4 py-3 text-sm">
             <p className="text-fupe-muted">
               Pending change to{' '}
               <span className="text-fupe-text">{user.pending_email}</span>. Check

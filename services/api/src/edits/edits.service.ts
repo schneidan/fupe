@@ -29,11 +29,20 @@ export interface CreateEntityProposal {
   country_codes?: string[];
 }
 
+/** Lightweight name tip — enriched later (AI / moderator); always queued. */
+export interface SuggestEntityProposal {
+  name: string;
+  notes?: string;
+  /** Optional guess; defaults to BRAND on commit if omitted. */
+  type_hint?: EntityType;
+}
+
 export interface ProposedEditData {
   entity?: { name?: string; type?: EntityType };
   ownership?: { parent_id?: string; percentage?: number };
   new_parent?: { name: string; type: EntityType };
   create_entity?: CreateEntityProposal;
+  suggest_entity?: SuggestEntityProposal;
 }
 
 export interface SubmitEditDto {
@@ -49,7 +58,7 @@ const TRUST_ON_REJECT = -10;
 /** Rejected edits can be reopened to PENDING within this window. */
 const REOPEN_WINDOW_MS = 1000 * 60 * 60 * 48;
 
-export type EditKind = 'ownership' | 'create_entity' | 'other';
+export type EditKind = 'ownership' | 'create_entity' | 'suggest_entity' | 'other';
 
 export interface QueueListFilters {
   status?: EditStatus | 'ALL';
@@ -91,13 +100,13 @@ export class EditsService {
     const targetNodeId = this.resolveTargetNodeId(dto);
     const normalized: SubmitEditDto = { ...dto, target_node_id: targetNodeId };
 
-    // New entities always require moderator approval (Phase 5.3).
-    if (!this.isNewEntitySubmission(normalized)) {
-      if (user.trust_score > TRUST_AUTO_COMMIT_THRESHOLD) {
-        const result = await this.commitEdit(user.id, normalized);
-        await this.notifyEditReceived(user, 'committed');
-        return result;
-      }
+    // Lightweight entity tips always need review (AI / mod enrichment later).
+    // Full create_entity + ownership can auto-commit above the trust threshold.
+    const alwaysQueue = this.isSuggestEntitySubmission(normalized);
+    if (!alwaysQueue && user.trust_score > TRUST_AUTO_COMMIT_THRESHOLD) {
+      const result = await this.commitEdit(user.id, normalized);
+      await this.notifyEditReceived(user, 'committed');
+      return result;
     }
 
     const { rows } = await this.pool.query(
@@ -149,13 +158,17 @@ export class EditsService {
 
     if (filters.kind === 'create_entity') {
       conditions.push(`eq.proposed_data ? 'create_entity'`);
+    } else if (filters.kind === 'suggest_entity') {
+      conditions.push(`eq.proposed_data ? 'suggest_entity'`);
     } else if (filters.kind === 'ownership') {
       conditions.push(
         `(eq.proposed_data ? 'ownership' OR eq.proposed_data ? 'new_parent')`,
       );
       conditions.push(`NOT (eq.proposed_data ? 'create_entity')`);
+      conditions.push(`NOT (eq.proposed_data ? 'suggest_entity')`);
     } else if (filters.kind === 'other') {
       conditions.push(`NOT (eq.proposed_data ? 'create_entity')`);
+      conditions.push(`NOT (eq.proposed_data ? 'suggest_entity')`);
       conditions.push(
         `NOT (eq.proposed_data ? 'ownership') AND NOT (eq.proposed_data ? 'new_parent')`,
       );
@@ -191,6 +204,7 @@ export class EditsService {
               u.trust_score AS submitter_trust,
               r.email AS reviewer_email,
               CASE
+                WHEN eq.proposed_data ? 'suggest_entity' THEN 'suggest_entity'
                 WHEN eq.proposed_data ? 'create_entity' THEN 'create_entity'
                 WHEN eq.proposed_data ? 'ownership' OR eq.proposed_data ? 'new_parent' THEN 'ownership'
                 ELSE 'other'
@@ -365,12 +379,19 @@ export class EditsService {
     return updated[0];
   }
 
+  isSuggestEntitySubmission(dto: SubmitEditDto): boolean {
+    return Boolean(dto.proposed_data.suggest_entity);
+  }
+
   isNewEntitySubmission(dto: SubmitEditDto): boolean {
     return Boolean(dto.proposed_data.create_entity);
   }
 
   private resolveTargetNodeId(dto: SubmitEditDto): string {
-    if (this.isNewEntitySubmission(dto)) {
+    if (
+      this.isNewEntitySubmission(dto) ||
+      this.isSuggestEntitySubmission(dto)
+    ) {
       return NEW_ENTITY_TARGET;
     }
     const id = dto.target_node_id?.trim();
@@ -395,7 +416,14 @@ export class EditsService {
     let targetNodeId = dto.target_node_id ?? NEW_ENTITY_TARGET;
     let previousState: Record<string, unknown> | null = null;
 
-    if (proposed.create_entity) {
+    if (proposed.suggest_entity) {
+      const tip = proposed.suggest_entity;
+      targetNodeId = await this.createEntityFromProposal({
+        name: tip.name,
+        type: tip.type_hint ?? EntityType.BRAND,
+      });
+      previousState = null;
+    } else if (proposed.create_entity) {
       targetNodeId = await this.createEntityFromProposal(proposed.create_entity);
       previousState = null;
     } else {
@@ -511,6 +539,30 @@ export class EditsService {
   private validateSubmitDto(dto: SubmitEditDto) {
     const proposed = dto.proposed_data;
 
+    if (proposed.suggest_entity) {
+      const tip = proposed.suggest_entity;
+      if (!tip.name?.trim()) {
+        throw new BadRequestException('suggest_entity.name is required');
+      }
+      if (
+        tip.type_hint &&
+        !Object.values(EntityType).includes(tip.type_hint)
+      ) {
+        throw new BadRequestException('suggest_entity.type_hint is invalid');
+      }
+      if (tip.notes && tip.notes.length > 2000) {
+        throw new BadRequestException('suggest_entity.notes must be ≤ 2000 characters');
+      }
+      if (dto.citation_url) {
+        try {
+          new URL(dto.citation_url);
+        } catch {
+          throw new BadRequestException('citation_url must be a valid URL');
+        }
+      }
+      return;
+    }
+
     if (proposed.create_entity) {
       const ce = proposed.create_entity;
       if (!ce.name?.trim()) {
@@ -521,7 +573,7 @@ export class EditsService {
       }
       if (!dto.citation_url) {
         throw new BadRequestException(
-          'citation_url is required when proposing a new entity',
+          'citation_url is required when adding a new entity',
         );
       }
     } else if (!dto.target_node_id?.trim()) {

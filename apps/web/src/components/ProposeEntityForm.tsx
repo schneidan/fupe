@@ -163,7 +163,7 @@ export function ProposeEntityForm() {
       setSuccess(
         result.status === 'committed'
           ? 'Entity created.'
-          : 'New entity submitted for moderator review.',
+          : 'Entity submitted for review.',
       );
       setTimeout(() => router.push('/account/edits'), 1200);
     } catch (err) {
@@ -391,7 +391,7 @@ export function ProposeEntityForm() {
         disabled={busy}
         className="rounded-full bg-fupe-text px-6 py-2.5 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted disabled:opacity-60"
       >
-        {busy ? 'Submitting…' : 'Propose new entity'}
+        {busy ? 'Submitting…' : 'Add entity'}
       </button>
     </form>
   );

@@ -364,6 +364,9 @@ FIRST_PARTY_LOOKUP_SECRET=CHANGE_ME_SAME_AS_API
 # Public site URL (metadata, absolute links)
 NEXT_PUBLIC_SITE_URL=https://fupe.app
 
+# Favicon cue: production = clean mark (omit or set production)
+NEXT_PUBLIC_FUPE_ENV=production
+
 # Footer "keep the lights on" — Stripe Payment Link (Test mode OK)
 NEXT_PUBLIC_SUPPORT_URL=https://buy.stripe.com/test_CHANGE_ME
 ```
@@ -373,6 +376,7 @@ Checklist:
 - [ ] `API_URL` is `http://127.0.0.1:3000` (loopback; nginx/Cloudflare handle public HTTPS)
 - [ ] `FIRST_PARTY_LOOKUP_SECRET` matches the API env (IMAGE camera lookup)
 - [ ] `NEXT_PUBLIC_SITE_URL` is `https://fupe.app` (not `:3001`)
+- [ ] `NEXT_PUBLIC_FUPE_ENV=production` (or unset — clean favicon)
 - [ ] Payment link set (or omit `NEXT_PUBLIC_SUPPORT_URL` to hide the footer line)
 - [ ] After any change to this file → **rebuild** web (`pnpm --filter @fupe/web build`) then restart `fupe-web`
 

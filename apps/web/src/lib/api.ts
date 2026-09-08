@@ -224,6 +224,11 @@ export interface ProposedEditData {
     sector?: string;
     country_codes?: string[];
   };
+  suggest_entity?: {
+    name: string;
+    notes?: string;
+    type_hint?: string;
+  };
 }
 
 export interface QueueEdit {
@@ -239,11 +244,15 @@ export interface QueueEdit {
   submitter_email?: string;
   submitter_trust?: number;
   reviewer_email?: string | null;
-  edit_kind?: 'ownership' | 'create_entity' | 'other';
+  edit_kind?: 'ownership' | 'create_entity' | 'suggest_entity' | 'other';
   can_reopen?: boolean;
 }
 
-export type EditKindFilter = 'ownership' | 'create_entity' | 'other';
+export type EditKindFilter =
+  | 'ownership'
+  | 'create_entity'
+  | 'suggest_entity'
+  | 'other';
 
 export interface EditQueueFilters {
   status?: EditStatus | 'ALL';
@@ -288,7 +297,7 @@ export async function submitEdit(
   payload: {
     target_node_id?: string;
     proposed_data: ProposedEditData;
-    citation_url: string;
+    citation_url?: string;
   },
 ): Promise<SubmitEditResponse> {
   return authJson('/api/v1/edits', {

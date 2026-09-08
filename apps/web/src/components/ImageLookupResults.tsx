@@ -18,7 +18,7 @@ export function ImageLookupResults({
   onDismiss,
 }: ImageLookupResultsProps) {
   const suggestHref = (name: string) =>
-    `/contribute/new-entity?name=${encodeURIComponent(name)}`;
+    `/contribute/suggest-entity?name=${encodeURIComponent(name)}`;
 
   return (
     <div className="mx-auto mt-8 w-full max-w-xl text-left">

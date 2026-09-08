@@ -2,9 +2,16 @@ import type { ProposedEditData, QueueEdit } from '@/lib/api';
 
 export function summarizeEdit(edit: QueueEdit): string {
   const p = edit.proposed_data;
+  if (p.suggest_entity) {
+    const tip = p.suggest_entity;
+    let s = `Suggest entity “${tip.name}”`;
+    if (tip.type_hint) s += ` (${tip.type_hint.replace(/_/g, ' ')})`;
+    if (tip.notes?.trim()) s += ` — ${tip.notes.trim().slice(0, 80)}`;
+    return s;
+  }
   if (p.create_entity) {
     const ce = p.create_entity;
-    let s = `New entity “${ce.name}” (${ce.type.replace(/_/g, ' ')})`;
+    let s = `Add entity “${ce.name}” (${ce.type.replace(/_/g, ' ')})`;
     if (p.ownership?.parent_id) {
       s += ` → parent ${p.ownership.parent_id}`;
     } else if (p.new_parent) {
@@ -27,5 +34,5 @@ export function summarizeEdit(edit: QueueEdit): string {
 }
 
 export function isNewEntityEdit(proposed: ProposedEditData): boolean {
-  return Boolean(proposed.create_entity);
+  return Boolean(proposed.create_entity || proposed.suggest_entity);
 }

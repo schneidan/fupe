@@ -230,7 +230,7 @@ export function PeSearchForm({
             </Link>{' '}
             our complete database or{' '}
             <Link
-              href="/contribute/new-entity"
+              href="/contribute/suggest-entity"
               className="text-fupe-text underline decoration-fupe-border underline-offset-2 hover:decoration-fupe-muted"
             >
               suggest an addition here
