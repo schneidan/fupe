@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   listEntities,
   submitEdit,
@@ -31,7 +31,8 @@ type ParentMode = 'none' | 'existing' | 'new';
 
 export function ProposeEntityForm() {
   const router = useRouter();
-  const [name, setName] = useState('');
+  const searchParams = useSearchParams();
+  const [name, setName] = useState(() => searchParams.get('name')?.trim() ?? '');
   const [entityType, setEntityType] =
     useState<(typeof ENTITY_TYPES)[number]['value']>('BRAND');
   const [sector, setSector] = useState('');

@@ -44,6 +44,7 @@ export function SearchByModes() {
   const [multi, setMulti] = useState<{
     interpretation: string;
     results: LookupResult[];
+    unmatchedGuesses: string[];
   } | null>(null);
 
   const [gtin, setGtin] = useState('');
@@ -114,20 +115,34 @@ export function SearchByModes() {
     setMode((m) => (m === next ? null : next));
   }
 
-  function handleImageResult(data: LookupResult) {
+  function handleImageResult(
+    data: LookupResult,
+    opts: { preferPicker?: boolean } = {},
+  ) {
     const results =
-      data.results && data.results.length > 0 ? data.results : [data];
+      data.results && data.results.length > 0
+        ? data.results
+        : data.entity_id || data.ownership_chain?.length
+          ? [data]
+          : [];
+    const unmatchedGuesses = data.unmatched_guesses ?? [];
     const interpretation =
       data.interpretation?.trim() ||
-      `“${data.matched_item}”`;
+      (data.matched_item ? `“${data.matched_item}”` : 'your photo');
 
-    if (results.length === 1) {
+    // IMAGE / ambiguous: always let the user confirm. Barcode single-hit can jump.
+    const showPicker =
+      opts.preferPicker ||
+      results.length !== 1 ||
+      unmatchedGuesses.length > 0;
+
+    if (!showPicker && results.length === 1) {
       setMulti(null);
       router.push(entityPath(results[0].matched_item));
       return;
     }
 
-    setMulti({ interpretation, results });
+    setMulti({ interpretation, results, unmatchedGuesses });
   }
 
   async function runLookup(fn: () => Promise<LookupResult>, busyMessage: string) {
@@ -180,7 +195,7 @@ export function SearchByModes() {
           : 'Reading text in your photo…',
       );
       const data = await lookupImage(prepared, { useAi });
-      handleImageResult(data);
+      handleImageResult(data, { preferPicker: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Image lookup failed');
     } finally {
@@ -665,6 +680,7 @@ export function SearchByModes() {
         <ImageLookupResults
           interpretation={multi.interpretation}
           results={multi.results}
+          unmatchedGuesses={multi.unmatchedGuesses}
           onDismiss={() => setMulti(null)}
         />
       )}

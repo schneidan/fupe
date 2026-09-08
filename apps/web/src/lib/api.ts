@@ -32,8 +32,10 @@ export interface LookupResult {
   related?: RelatedEntities;
   /** IMAGE: short description of what the photo appears to show. */
   interpretation?: string;
-  /** IMAGE: all ownership matches (top-level fields mirror the first hit). */
+  /** IMAGE: all ownership matches (top-level fields mirror the first hit when present). */
   results?: LookupResult[];
+  /** IMAGE: vision/OCR guesses that did not resolve in the directory. */
+  unmatched_guesses?: string[];
 }
 
 export interface EntitySummary {

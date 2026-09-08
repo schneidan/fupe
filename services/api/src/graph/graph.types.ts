@@ -85,8 +85,10 @@ export interface LookupResult {
   related?: RelatedEntities;
   /** Present on IMAGE lookups — what the photo appears to show. */
   interpretation?: string;
-  /** Present on IMAGE lookups — all resolved ownership hits (may be 1). */
+  /** Present on IMAGE lookups — all resolved ownership hits (may be empty). */
   results?: LookupResult[];
+  /** IMAGE: brand/name guesses from the photo that did not match the directory. */
+  unmatched_guesses?: string[];
 }
 
 export interface FuzzySearchHit {

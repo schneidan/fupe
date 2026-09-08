@@ -115,26 +115,53 @@ export class LookupService {
   /**
    * Exact / near-exact names always win. Typos need a strong trgm score and a
    * clear gap over the runner-up so "starbucks" never resolves to "Arby's".
+   * Short queries must not auto-match mid-string (e.g. "utz" → "Schutzstaffel").
    */
   private isConfidentMatch(query: string, hits: FuzzySearchHit[]): boolean {
     const top = hits[0];
     if (!top) return false;
 
+    const q = query.trim();
+    const qLower = q.toLowerCase();
+    const topLower = top.name.trim().toLowerCase();
     const qKey = normalizeNameKey(query);
     const topKey = normalizeNameKey(top.name);
+
     if (qKey && topKey && qKey === topKey) return true;
-    if (query.trim().toLowerCase() === top.name.trim().toLowerCase()) return true;
-    if (top.slug && top.slug === toSlug(query)) {
-      return true;
+    if (qLower === topLower) return true;
+    if (top.slug && top.slug === toSlug(query)) return true;
+
+    const topWords = topLower.split(/[^a-z0-9]+/).filter(Boolean);
+    const queryIsWholeWord = topWords.includes(qLower);
+    const startsWithQuery =
+      topLower.startsWith(qLower) ||
+      topWords.some((w) => w.startsWith(qLower) && qLower.length >= 3);
+
+    // Short tokens: only exact/whole-word or strong prefix — never mid-string.
+    if (q.length <= 4) {
+      return (
+        queryIsWholeWord ||
+        (startsWithQuery && top.score >= 0.85)
+      );
     }
 
     if (top.score < AUTO_MATCH_SCORE) return false;
 
+    // Bare "contains" (~0.55 from SQL) is too weak to auto-resolve alone.
+    const onlyLooseContains =
+      !startsWithQuery &&
+      !queryIsWholeWord &&
+      topLower.includes(qLower) &&
+      top.score < 0.85;
+    if (onlyLooseContains) return false;
+
     const second = hits[1];
-    if (!second) return true;
+    if (!second) {
+      // Solo hit still needs a solid score (or a clear prefix).
+      return top.score >= 0.55 || startsWithQuery;
+    }
     if (top.score - second.score >= AUTO_MATCH_GAP) return true;
 
-    // Two near-ties at very high score still ok only if top is clearly the name stem
     return top.score >= 0.72 && top.score - second.score >= 0.05;
   }
 
@@ -157,6 +184,7 @@ export class LookupService {
     }
 
     const results: LookupResult[] = [];
+    const unmatchedGuesses: string[] = [];
     const seenIds = new Set<string>();
 
     for (const candidate of candidates) {
@@ -167,15 +195,24 @@ export class LookupService {
         seenIds.add(key);
         results.push(hit);
       } catch {
-        // Candidate did not match the graph — try next
+        unmatchedGuesses.push(candidate);
       }
       if (results.length >= 5) break;
     }
 
+    // Always return a structured IMAGE payload so the client can show a picker
+    // (including "we saw these names but they're not in FUPE yet").
     if (!results.length) {
-      throw new NotFoundException(
-        `It looks like ${interpretation}, but we couldn't match anything in our directory yet.`,
-      );
+      return {
+        matched_item: unmatchedGuesses[0] ?? interpretation,
+        is_private_equity_owned: false,
+        ultimate_parent: null,
+        ownership_chain: [],
+        citations: [],
+        interpretation,
+        results: [],
+        unmatched_guesses: unmatchedGuesses,
+      };
     }
 
     const primary = results[0];
@@ -183,6 +220,7 @@ export class LookupService {
       ...primary,
       interpretation,
       results,
+      unmatched_guesses: unmatchedGuesses,
     };
   }
 
@@ -194,7 +232,7 @@ export class LookupService {
       if (out.some((x) => x.toLowerCase() === c.toLowerCase())) continue;
       out.push(c);
     }
-    return out.slice(0, 5);
+    return out.slice(0, 8);
   }
 
   private async resolveVoice(

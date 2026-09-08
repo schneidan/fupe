@@ -78,7 +78,9 @@ export class GraphRepository {
                 WHEN lower(properties::jsonb->>'slug') = lower(regexp_replace(lower($1), '[^a-z0-9]+', '-', 'g'))
                   THEN 0.98
                 WHEN lower(properties::jsonb->>'name') LIKE lower($1) || '%' THEN 0.85
-                WHEN lower(properties::jsonb->>'name') LIKE '%' || lower($1) || '%' THEN 0.55
+                -- Mid-string contains: skip for short queries (utz ≠ Schutzstaffel)
+                WHEN char_length(btrim($1)) > 4
+                  AND lower(properties::jsonb->>'name') LIKE '%' || lower($1) || '%' THEN 0.55
                 ELSE 0
               END,
               COALESCE((
@@ -303,10 +305,19 @@ export class GraphRepository {
     let paramIndex = 1;
 
     if (options.q?.trim()) {
-      conditions.push(
-        `(properties::jsonb->>'name' ILIKE $${paramIndex} OR properties::jsonb->>'aliases' ILIKE $${paramIndex})`,
-      );
-      params.push(`%${options.q.trim()}%`);
+      const q = options.q.trim();
+      // Short tokens: prefix / alias prefix only — avoid "utz" → Schutzstaffel
+      if (q.length <= 3) {
+        conditions.push(
+          `(properties::jsonb->>'name' ILIKE $${paramIndex} OR properties::jsonb->>'aliases' ILIKE $${paramIndex})`,
+        );
+        params.push(`${q}%`);
+      } else {
+        conditions.push(
+          `(properties::jsonb->>'name' ILIKE $${paramIndex} OR properties::jsonb->>'aliases' ILIKE $${paramIndex})`,
+        );
+        params.push(`%${q}%`);
+      }
       paramIndex++;
     }
 
