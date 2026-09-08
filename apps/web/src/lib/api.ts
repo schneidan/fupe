@@ -195,11 +195,39 @@ export async function updateEntity(
 export async function deleteEntity(
   token: string,
   idOrSlug: string,
-): Promise<{ deleted: boolean; id: string; name: string }> {
-  return authJson(`/api/v1/entities/${encodeURIComponent(idOrSlug)}`, {
+  options?: { mode?: 'entity' | 'chain'; confirm?: string },
+): Promise<{
+  deleted: boolean;
+  id?: string;
+  name?: string;
+  mode?: string;
+  count?: number;
+  entities?: Array<{ id: string; name: string; slug?: string }>;
+}> {
+  const mode = options?.mode ?? 'entity';
+  const qs = mode !== 'entity' ? `?mode=${encodeURIComponent(mode)}` : '';
+  return authJson(`/api/v1/entities/${encodeURIComponent(idOrSlug)}${qs}`, {
     method: 'DELETE',
     token,
+    body: JSON.stringify(
+      options?.confirm != null ? { confirm: options.confirm } : {},
+    ),
   });
+}
+
+export async function previewOwnershipChain(
+  token: string,
+  idOrSlug: string,
+): Promise<{
+  root_id: string;
+  root_name: string;
+  count: number;
+  entities: Array<{ id: string; name: string; slug: string; type: string }>;
+}> {
+  return authJson(
+    `/api/v1/entities/${encodeURIComponent(idOrSlug)}/ownership-chain`,
+    { method: 'GET', token },
+  );
 }
 
 export async function getRelatedEntities(

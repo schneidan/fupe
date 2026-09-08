@@ -7,6 +7,7 @@ import { FupeLogo } from '@/components/FupeLogo';
 const NAV = [
   { href: '/admin', label: 'Dashboard', exact: true },
   { href: '/admin/users', label: 'Users' },
+  { href: '/admin/entities', label: 'Entities' },
   { href: '/admin/contributions', label: 'Contributions' },
   { href: '/admin/subscriptions', label: 'Subscriptions' },
   { href: '/admin/email-updates', label: 'Email updates' },

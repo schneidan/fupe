@@ -7,11 +7,12 @@ import {
   deleteEntity,
   getEntity,
   getEntityDependencies,
+  previewOwnershipChain,
   updateEntity,
   type EntityDependencies,
   type EntityDetail,
 } from '@/lib/api';
-import { getToken } from '@/lib/auth';
+import { getStoredUser, getToken } from '@/lib/auth';
 import { entityPath } from '@/lib/slug';
 
 const ENTITY_TYPES = [
@@ -43,6 +44,13 @@ export function EntityModeratorPanel({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [chainOpen, setChainOpen] = useState(false);
+  const [chainLoading, setChainLoading] = useState(false);
+  const [chainEntities, setChainEntities] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [chainConfirm, setChainConfirm] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -51,7 +59,11 @@ export function EntityModeratorPanel({
     setError(null);
     setStatus(null);
     setConfirmDelete(false);
+    setChainOpen(false);
+    setChainEntities([]);
+    setChainConfirm('');
     setDeps(null);
+    setIsAdmin(getStoredUser()?.role === 'admin');
     setLoading(true);
     const token = getToken();
     Promise.all([
@@ -78,11 +90,17 @@ export function EntityModeratorPanel({
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (chainOpen) {
+          setChainOpen(false);
+          return;
+        }
+        onClose();
+      }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open, onClose, chainOpen]);
 
   if (!open) return null;
 
@@ -124,7 +142,7 @@ export function EntityModeratorPanel({
     }
   }
 
-  async function onDelete() {
+  async function onDeleteEntity() {
     const token = getToken();
     if (!token) {
       setError('Sign in required.');
@@ -137,7 +155,7 @@ export function EntityModeratorPanel({
     setDeleting(true);
     setError(null);
     try {
-      await deleteEntity(token, entityId);
+      await deleteEntity(token, entityId, { mode: 'entity' });
       onClose();
       router.push('/browse');
       router.refresh();
@@ -147,10 +165,60 @@ export function EntityModeratorPanel({
     }
   }
 
+  async function openChainConfirm() {
+    const token = getToken();
+    if (!token) {
+      setError('Sign in required.');
+      return;
+    }
+    setChainLoading(true);
+    setError(null);
+    setChainConfirm('');
+    try {
+      const preview = await previewOwnershipChain(token, entityId);
+      setChainEntities(
+        preview.entities.map((e) => ({ id: e.id, name: e.name })),
+      );
+      setChainOpen(true);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to load ownership chain',
+      );
+    } finally {
+      setChainLoading(false);
+    }
+  }
+
+  async function onDeleteChain() {
+    const token = getToken();
+    if (!token) {
+      setError('Sign in required.');
+      return;
+    }
+    if (chainConfirm.trim().toLowerCase() !== 'yes') return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteEntity(token, entityId, { mode: 'chain', confirm: 'yes' });
+      setChainOpen(false);
+      onClose();
+      router.push('/browse');
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Chain delete failed');
+      setDeleting(false);
+    }
+  }
+
   const hasChildren = (deps?.children.length ?? 0) > 0;
   const hasParents = (deps?.parents.length ?? 0) > 0;
   const hasProducts = (deps?.products.length ?? 0) > 0;
   const hasDeps = hasChildren || hasParents || hasProducts;
+  const chainNames = chainEntities.map((e) => e.name);
+  const chainLabel =
+    chainNames.length <= 8
+      ? chainNames.join(', ')
+      : `${chainNames.slice(0, 8).join(', ')}, and ${chainNames.length - 8} more`;
 
   return (
     <div
@@ -274,9 +342,10 @@ export function EntityModeratorPanel({
                 Danger zone
               </p>
               <p className="mt-2 text-xs text-fupe-muted">
-                Delete removes the node from the graph and adds it to the
-                blocklist so ingest will not re-create it (matched by id, slug,
-                Wikidata/external id, or name).
+                Deletes remove nodes from the graph and add them to the
+                blocklist so ingest will not re-create them. Linked products are
+                unlinked, not deleted. Orphaned neighbors stay in the directory
+                without the removed ownership edges.
               </p>
 
               {confirmDelete && hasDeps && (
@@ -285,9 +354,8 @@ export function EntityModeratorPanel({
                     Reassign before confirming if you care about these links
                   </p>
                   <p>
-                    Deleting will drop ownership edges. Child brands stay in the
-                    directory but lose this parent; products lose their
-                    manufacturer link. Prefer{' '}
+                    Deleting this entity alone drops ownership edges. Child
+                    brands stay but lose this parent. Prefer{' '}
                     <Link
                       href={`/contribute/suggest?entity_id=${encodeURIComponent(entityId)}&name=${encodeURIComponent(detail?.name ?? name)}`}
                       className="text-fupe-text underline underline-offset-2 hover:text-fupe-muted"
@@ -295,7 +363,7 @@ export function EntityModeratorPanel({
                     >
                       suggesting an ownership edit
                     </Link>{' '}
-                    first, or open each child and point it at a better parent.
+                    first.
                   </p>
                   {hasChildren && (
                     <div>
@@ -343,8 +411,7 @@ export function EntityModeratorPanel({
                   {hasProducts && (
                     <p>
                       {deps!.products.length} product
-                      {deps!.products.length === 1 ? '' : 's'} linked as
-                      manufacturer will be unlinked (products themselves remain).
+                      {deps!.products.length === 1 ? '' : 's'} will be unlinked.
                     </p>
                   )}
                 </div>
@@ -360,23 +427,112 @@ export function EntityModeratorPanel({
               <button
                 type="button"
                 disabled={saving || deleting}
-                onClick={() => void onDelete()}
-                className={`mt-3 rounded-lg border px-4 py-2.5 text-sm ${
+                onClick={() => void onDeleteEntity()}
+                className={`mt-3 w-full rounded-lg border px-4 py-2.5 text-sm ${
                   confirmDelete
                     ? 'border-verdict-yes bg-verdict-yes/20 font-semibold text-verdict-yes'
                     : 'border-fupe-border text-verdict-yes hover:border-verdict-yes'
                 } disabled:opacity-40`}
               >
-                {deleting
+                {deleting && !chainOpen
                   ? 'Deleting…'
                   : confirmDelete
-                    ? 'Click again to confirm delete + block re-import'
+                    ? 'Click again to confirm delete entity'
                     : 'Delete entity'}
               </button>
+
+              {isAdmin && (
+                <>
+                  <p className="mt-4 text-xs text-fupe-muted">
+                    Ownership-chain delete removes this entity and every parent
+                    and child connected through OWNED_BY (the full connected
+                    component), each added to the blocklist.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={saving || deleting || chainLoading}
+                    onClick={() => void openChainConfirm()}
+                    className="mt-2 w-full rounded-lg border border-verdict-yes/60 bg-verdict-yes/10 px-4 py-2.5 text-sm font-semibold text-verdict-yes hover:bg-verdict-yes/20 disabled:opacity-40"
+                  >
+                    {chainLoading ? 'Loading chain…' : 'Delete ownership chain…'}
+                  </button>
+                </>
+              )}
             </div>
           </form>
         )}
       </aside>
+
+      {chainOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          onClick={() => !deleting && setChainOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl border border-verdict-yes/50 bg-fupe-bg p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="chain-delete-title"
+          >
+            <h3
+              id="chain-delete-title"
+              className="text-lg font-bold text-verdict-yes"
+            >
+              Delete ownership chain?
+            </h3>
+            <p className="mt-3 text-sm text-fupe-muted">
+              Are you really sure you want to delete{' '}
+              <span className="text-fupe-text">{chainLabel}</span>? This cannot
+              be undone. Type <span className="font-mono text-fupe-text">yes</span>{' '}
+              to confirm.
+            </p>
+            <ul className="mt-3 max-h-40 overflow-y-auto rounded-lg border border-fupe-border bg-fupe-elevated p-3 text-xs text-fupe-muted">
+              {chainEntities.map((e) => (
+                <li key={e.id} className="py-0.5">
+                  {e.name}
+                </li>
+              ))}
+            </ul>
+            <label className="mt-4 block text-sm">
+              <span className="text-fupe-muted">Confirmation</span>
+              <input
+                value={chainConfirm}
+                onChange={(e) => setChainConfirm(e.target.value)}
+                placeholder="yes"
+                autoFocus
+                disabled={deleting}
+                className="mt-1 w-full rounded-lg border border-fupe-border bg-fupe-elevated px-3 py-2 font-mono text-fupe-text outline-none focus:border-verdict-yes"
+              />
+            </label>
+            {error && (
+              <p className="mt-2 text-sm text-verdict-yes" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setChainOpen(false)}
+                className="rounded-lg border border-fupe-border px-4 py-2 text-sm text-fupe-muted hover:text-fupe-text disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={
+                  deleting || chainConfirm.trim().toLowerCase() !== 'yes'
+                }
+                onClick={() => void onDeleteChain()}
+                className="rounded-lg border border-verdict-yes bg-verdict-yes/20 px-4 py-2 text-sm font-semibold text-verdict-yes disabled:opacity-40"
+              >
+                {deleting ? 'Deleting…' : 'Delete chain'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

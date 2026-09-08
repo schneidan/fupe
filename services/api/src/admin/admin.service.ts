@@ -11,7 +11,10 @@ import { DATABASE_POOL } from '../database/database.constants';
 import { UserRole } from '../auth/users.repository';
 import { TIER_LIMITS } from '../api-keys/api-keys.service';
 import { MailService } from '../mail/mail.service';
+import { AuthUser } from '../auth/auth.service';
+import { EntitiesService } from '../entities/entities.service';
 import { writeAdminAudit } from './audit-log';
+import { AdminJwtUser } from './admin.guard';
 
 const WEBHOOK_STALE_MS = 48 * 60 * 60 * 1000;
 
@@ -103,6 +106,7 @@ export class AdminService {
     @Inject(DATABASE_POOL) private readonly pool: Pool,
     private readonly config: ConfigService,
     private readonly mail: MailService,
+    private readonly entitiesService: EntitiesService,
   ) {}
 
   // ─── Users ────────────────────────────────────────────────────────────────
@@ -813,6 +817,28 @@ export class AdminService {
       failed,
       failures: failures.slice(0, 25),
     };
+  }
+
+  // ─── Entities (bulk delete) ───────────────────────────────────────────────
+
+  listEntities(params: {
+    prefix?: string;
+    letter?: string;
+    page: number;
+    limit: number;
+  }) {
+    return this.entitiesService.listForAdmin(params);
+  }
+
+  bulkDeleteEntities(actor: AdminJwtUser, ids: string[]) {
+    const authUser: AuthUser = {
+      id: actor.id,
+      email: actor.email,
+      role: 'admin',
+      trust_score: 0,
+      email_verified: true,
+    };
+    return this.entitiesService.bulkDeleteAsAdmin(authUser, ids);
   }
 }
 

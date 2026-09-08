@@ -295,3 +295,46 @@ export function sendProductUpdate(params: {
     body: JSON.stringify(params),
   });
 }
+
+export interface AdminEntityListItem {
+  id: string;
+  slug: string;
+  name: string;
+  type: string;
+  sector?: string;
+  country_codes?: string[];
+  is_pe_backed: boolean;
+  children_count: number;
+  parents_count: number;
+}
+
+export function fetchAdminEntities(params?: {
+  prefix?: string;
+  letter?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const qs = new URLSearchParams();
+  if (params?.prefix) qs.set('prefix', params.prefix);
+  if (params?.letter) qs.set('letter', params.letter);
+  if (params?.page) qs.set('page', String(params.page));
+  if (params?.limit) qs.set('limit', String(params.limit));
+  return adminFetch<{
+    items: AdminEntityListItem[];
+    total: number;
+    page: number;
+    limit: number;
+  }>(`/entities?${qs}`);
+}
+
+export function bulkDeleteAdminEntities(ids: string[]) {
+  return adminFetch<{
+    deleted: boolean;
+    count: number;
+    entities: Array<{ id: string; name: string }>;
+    missing: string[];
+  }>('/entities/bulk-delete', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+}

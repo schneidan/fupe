@@ -202,6 +202,10 @@ export class AuthService {
     return user.role === 'moderator' || user.role === 'admin';
   }
 
+  isAdmin(user: AuthUser): boolean {
+    return user.role === 'admin';
+  }
+
   private async sendVerification(email: string, rawToken: string) {
     const site =
       this.config.get<string>('NEXT_PUBLIC_SITE_URL') ??

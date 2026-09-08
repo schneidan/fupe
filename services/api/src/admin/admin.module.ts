@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { DatabaseModule } from '../database/database.module';
 import { AuthModule } from '../auth/auth.module';
 import { MailModule } from '../mail/mail.module';
+import { EntitiesModule } from '../entities/entities.module';
 import { resolveJwtSecret } from '../common/security';
 import { AdminController } from './admin.controller';
 import { AdminGuard } from './admin.guard';
@@ -14,6 +15,7 @@ import { AdminService } from './admin.service';
     DatabaseModule,
     AuthModule,
     MailModule,
+    EntitiesModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

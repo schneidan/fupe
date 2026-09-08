@@ -8,6 +8,8 @@ import {
   Max,
   MaxLength,
   Min,
+  ArrayMaxSize,
+  ArrayMinSize,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
@@ -86,4 +88,69 @@ export class UpdateEntityDto {
   @IsArray()
   @IsString({ each: true })
   aliases?: string[];
+}
+
+export class DeleteEntityQueryDto {
+  @ApiPropertyOptional({
+    enum: ['entity', 'chain'],
+    default: 'entity',
+    description:
+      '`entity` deletes one node. `chain` deletes the full OWNED_BY connected component (admin only; requires body.confirm = yes).',
+  })
+  @IsOptional()
+  @IsEnum(['entity', 'chain'])
+  mode?: 'entity' | 'chain' = 'entity';
+}
+
+export class DeleteEntityBodyDto {
+  @ApiPropertyOptional({
+    example: 'yes',
+    description: 'Required for mode=chain; must be exactly "yes".',
+  })
+  @IsOptional()
+  @IsString()
+  confirm?: string;
+}
+
+export class AdminListEntitiesDto {
+  @ApiPropertyOptional({
+    example: 'Pan',
+    description: 'Name prefix typeahead (ILIKE prefix%)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  prefix?: string;
+
+  @ApiPropertyOptional({
+    example: 'P',
+    description: 'A–Z letter filter, or # for non-letter names',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1)
+  letter?: string;
+
+  @ApiPropertyOptional({ example: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ example: 50, default: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 50;
+}
+
+export class BulkDeleteEntitiesDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  ids!: string[];
 }

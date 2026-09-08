@@ -285,6 +285,10 @@ export class GraphRepository {
 
   async listEntities(options: {
     q?: string;
+    /** Always name prefix match (admin typeahead). */
+    prefix?: string;
+    /** Single letter A–Z, or `#` for names not starting with A–Z. */
+    letter?: string;
     type?: string;
     country?: string;
     peOnly?: boolean;
@@ -304,7 +308,12 @@ export class GraphRepository {
     const params: unknown[] = [];
     let paramIndex = 1;
 
-    if (options.q?.trim()) {
+    if (options.prefix?.trim()) {
+      const prefix = options.prefix.trim();
+      conditions.push(`properties::jsonb->>'name' ILIKE $${paramIndex}`);
+      params.push(`${prefix}%`);
+      paramIndex++;
+    } else if (options.q?.trim()) {
       const q = options.q.trim();
       // Short tokens: prefix / alias prefix only — avoid "utz" → Schutzstaffel
       if (q.length <= 3) {
@@ -319,6 +328,21 @@ export class GraphRepository {
         params.push(`%${q}%`);
       }
       paramIndex++;
+    }
+
+    if (options.letter?.trim()) {
+      const letter = options.letter.trim().toUpperCase();
+      if (letter === '#') {
+        conditions.push(
+          `LEFT(UPPER(COALESCE(properties::jsonb->>'name', '')), 1) !~ '^[A-Z]$'`,
+        );
+      } else if (/^[A-Z]$/.test(letter)) {
+        conditions.push(
+          `LEFT(UPPER(COALESCE(properties::jsonb->>'name', '')), 1) = $${paramIndex}`,
+        );
+        params.push(letter);
+        paramIndex++;
+      }
     }
 
     if (options.type) {
@@ -646,6 +670,25 @@ export class GraphRepository {
       { entityId },
     );
     return true;
+  }
+
+  /**
+   * Immediate OWNED_BY neighbor counts for a page of entities (admin list labels).
+   */
+  async getRelationCounts(
+    entityIds: string[],
+  ): Promise<Map<string, { children: number; parents: number }>> {
+    const out = new Map<string, { children: number; parents: number }>();
+    await Promise.all(
+      entityIds.map(async (id) => {
+        const deps = await this.getEntityDependencies(id);
+        out.set(id, {
+          children: deps.children.length,
+          parents: deps.parents.length,
+        });
+      }),
+    );
+    return out;
   }
 
   /**

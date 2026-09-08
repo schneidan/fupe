@@ -8,5 +8,6 @@ import { EntitiesService } from './entities.service';
   imports: [GraphModule, AuthModule],
   controllers: [EntitiesController],
   providers: [EntitiesService],
+  exports: [EntitiesService],
 })
 export class EntitiesModule {}

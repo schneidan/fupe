@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -39,6 +40,35 @@ export class EntitiesService {
     });
   }
 
+  /** Admin directory list with parent/child counts for bulk delete UI. */
+  async listForAdmin(query: {
+    prefix?: string;
+    letter?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const listed = await this.graphRepo.listEntities({
+      prefix: query.prefix,
+      letter: query.letter,
+      page: query.page,
+      limit: query.limit ?? 50,
+    });
+    const counts = await this.graphRepo.getRelationCounts(
+      listed.items.map((i) => i.id),
+    );
+    return {
+      ...listed,
+      items: listed.items.map((item) => {
+        const c = counts.get(item.id) ?? { children: 0, parents: 0 };
+        return {
+          ...item,
+          children_count: c.children,
+          parents_count: c.parents,
+        };
+      }),
+    };
+  }
+
   async getBySlug(slug: string) {
     const entity = await this.graphRepo.getEntityDetail(slug);
     if (!entity) {
@@ -76,6 +106,28 @@ export class EntitiesService {
         deps.children.length > 0 ||
         deps.parents.length > 0 ||
         deps.products.length > 0,
+    };
+  }
+
+  async previewOwnershipChain(actor: AuthUser, idOrSlug: string) {
+    if (!this.authService.isAdmin(actor)) {
+      throw new ForbiddenException('Admin role required');
+    }
+    const entity = await this.resolveEntity(idOrSlug);
+    if (!entity) {
+      throw new NotFoundException(`Entity "${idOrSlug}" not found`);
+    }
+    const chain = await this.collectOwnershipChain(entity.id);
+    return {
+      root_id: entity.id,
+      root_name: entity.name,
+      entities: chain.map((e) => ({
+        id: e.id,
+        name: e.name,
+        slug: e.slug ?? e.id,
+        type: e.type,
+      })),
+      count: chain.length,
     };
   }
 
@@ -138,11 +190,139 @@ export class EntitiesService {
     return this.graphRepo.getEntityDetail(updated.slug ?? updated.id);
   }
 
-  async deleteAsModerator(actor: AuthUser, idOrSlug: string) {
+  async deleteAsModerator(
+    actor: AuthUser,
+    idOrSlug: string,
+    options: { mode?: 'entity' | 'chain'; confirm?: string } = {},
+  ) {
     if (!this.authService.isModerator(actor)) {
       throw new ForbiddenException('Moderator role required');
     }
 
+    const mode = options.mode ?? 'entity';
+    if (mode === 'chain') {
+      return this.deleteOwnershipChain(actor, idOrSlug, options.confirm);
+    }
+    return this.deleteSingleEntity(actor, idOrSlug, 'entity_delete');
+  }
+
+  /** Admin bulk: individual entity deletes only (no ownership chain). */
+  async bulkDeleteAsAdmin(actor: AuthUser, ids: string[]) {
+    if (!this.authService.isAdmin(actor)) {
+      throw new ForbiddenException('Admin role required');
+    }
+    const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+    if (!unique.length) {
+      throw new BadRequestException('No entity ids provided');
+    }
+
+    const deleted: Array<{ id: string; name: string }> = [];
+    const missing: string[] = [];
+
+    for (const id of unique) {
+      const entity =
+        (await this.graphRepo.findEntityById(id)) ??
+        (await this.graphRepo.findEntityBySlug(id));
+      if (!entity) {
+        missing.push(id);
+        continue;
+      }
+      const result = await this.deleteSingleEntity(
+        actor,
+        entity.id,
+        'entity_bulk_delete',
+      );
+      deleted.push({ id: result.id, name: result.name });
+    }
+
+    await writeAdminAudit(this.pool, {
+      actorId: actor.id,
+      action: 'entity_bulk_delete',
+      targetType: 'entity',
+      targetId: 'bulk',
+      previousState: { requested_ids: unique },
+      newState: {
+        deleted_ids: deleted.map((d) => d.id),
+        missing,
+        count: deleted.length,
+      },
+      note: `Bulk deleted ${deleted.length} entities`,
+    });
+
+    return {
+      deleted: true,
+      count: deleted.length,
+      entities: deleted,
+      missing,
+    };
+  }
+
+  private async deleteOwnershipChain(
+    actor: AuthUser,
+    idOrSlug: string,
+    confirm?: string,
+  ) {
+    if (!this.authService.isAdmin(actor)) {
+      throw new ForbiddenException(
+        'Admin role required to delete an ownership chain',
+      );
+    }
+    if (confirm?.trim().toLowerCase() !== 'yes') {
+      throw new BadRequestException(
+        'Ownership-chain delete requires confirm: "yes"',
+      );
+    }
+
+    const root = await this.resolveEntity(idOrSlug);
+    if (!root) {
+      throw new NotFoundException(`Entity "${idOrSlug}" not found`);
+    }
+
+    const chain = await this.collectOwnershipChain(root.id);
+    const deleted: Array<{ id: string; name: string; slug: string }> = [];
+
+    for (const entity of chain) {
+      await this.addToBlocklist(entity, actor.id);
+      await this.cleanupRelationalRefs(entity.id);
+      const ok = await this.graphRepo.deleteEntity(entity.id);
+      if (ok) {
+        deleted.push({
+          id: entity.id,
+          name: entity.name,
+          slug: entity.slug ?? entity.id,
+        });
+      }
+    }
+
+    await writeAdminAudit(this.pool, {
+      actorId: actor.id,
+      action: 'entity_delete_chain',
+      targetType: 'entity',
+      targetId: root.id,
+      previousState: {
+        root: this.auditSnapshot(root),
+        chain: chain.map((e) => this.auditSnapshot(e)),
+      },
+      newState: { blocked: true, deleted_ids: deleted.map((d) => d.id) },
+      note: `Deleted ownership chain (${deleted.length} entities) and added to entity_blocklist`,
+    });
+
+    return {
+      deleted: true,
+      blocked: true,
+      mode: 'chain' as const,
+      root_id: root.id,
+      root_name: root.name,
+      count: deleted.length,
+      entities: deleted,
+    };
+  }
+
+  private async deleteSingleEntity(
+    actor: AuthUser,
+    idOrSlug: string,
+    auditAction: string,
+  ) {
     const previous = await this.resolveEntity(idOrSlug);
     if (!previous) {
       throw new NotFoundException(`Entity "${idOrSlug}" not found`);
@@ -162,7 +342,7 @@ export class EntitiesService {
 
     await writeAdminAudit(this.pool, {
       actorId: actor.id,
-      action: 'entity_delete',
+      action: auditAction,
       targetType: 'entity',
       targetId: previous.id,
       previousState: {
@@ -176,10 +356,44 @@ export class EntitiesService {
     return {
       deleted: true,
       blocked: true,
+      mode: 'entity' as const,
       id: previous.id,
       name: previous.name,
       dependencies,
     };
+  }
+
+  /**
+   * Full OWNED_BY connected component: self + all recursive parents and children.
+   * Products are not included (they are unlinked via DETACH DELETE).
+   */
+  private async collectOwnershipChain(
+    rootId: string,
+  ): Promise<EntityProperties[]> {
+    const seen = new Set<string>();
+    const queue = [rootId];
+    const entities: EntityProperties[] = [];
+
+    while (queue.length) {
+      const id = queue.shift()!;
+      if (seen.has(id)) continue;
+      seen.add(id);
+
+      const entity = await this.graphRepo.findEntityById(id);
+      if (!entity) continue;
+      entities.push(entity);
+
+      const deps = await this.graphRepo.getEntityDependencies(id);
+      for (const child of deps.children) {
+        if (!seen.has(child.id)) queue.push(child.id);
+      }
+      for (const parent of deps.parents) {
+        if (!seen.has(parent.id)) queue.push(parent.id);
+      }
+    }
+
+    entities.sort((a, b) => a.name.localeCompare(b.name));
+    return entities;
   }
 
   private async addToBlocklist(
@@ -249,12 +463,12 @@ export class EntitiesService {
     return {
       id: entity.id,
       name: entity.name,
+      slug: entity.slug ?? null,
       type: entity.type,
-      slug: entity.slug,
-      sector: entity.sector,
-      country_codes: entity.country_codes,
-      aliases: entity.aliases,
-      external_ids: entity.external_ids,
+      sector: entity.sector ?? null,
+      country_codes: entity.country_codes ?? [],
+      aliases: entity.aliases ?? [],
+      source: entity.source ?? null,
     };
   }
 }

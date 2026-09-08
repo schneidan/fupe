@@ -19,6 +19,7 @@ import {
   ApiProduces,
 } from '@nestjs/swagger';
 import {
+  IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
@@ -111,6 +112,19 @@ class SendProductUpdateBody {
   @Transform(({ value }) => value === true || value === 'true')
   @IsBoolean()
   dry_run?: boolean;
+}
+
+class AdminEntitiesListQuery {
+  @IsOptional() @IsString() prefix?: string;
+  @IsOptional() @IsString() letter?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number = 1;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number = 50;
+}
+
+class BulkDeleteEntitiesBody {
+  @IsArray()
+  @IsString({ each: true })
+  ids!: string[];
 }
 
 @ApiTags('Admin')
@@ -290,5 +304,31 @@ export class AdminController {
     @Req() req: { adminUser: AdminJwtUser },
   ) {
     return this.adminService.resolveIngestMatch(req.adminUser.id, id, decision);
+  }
+
+  // ── Entities ──────────────────────────────────────────────────────────────
+
+  @Get('entities')
+  @ApiOperation({
+    summary: 'List entities for admin bulk delete (prefix + letter + counts)',
+  })
+  listEntities(@Query() query: AdminEntitiesListQuery) {
+    return this.adminService.listEntities({
+      prefix: query.prefix,
+      letter: query.letter,
+      page: query.page ?? 1,
+      limit: query.limit ?? 50,
+    });
+  }
+
+  @Post('entities/bulk-delete')
+  @ApiOperation({
+    summary: 'Bulk delete individual entities (no ownership chain)',
+  })
+  bulkDeleteEntities(
+    @Body() body: BulkDeleteEntitiesBody,
+    @Req() req: { adminUser: AdminJwtUser },
+  ) {
+    return this.adminService.bulkDeleteEntities(req.adminUser, body.ids ?? []);
   }
 }

@@ -20,7 +20,12 @@ import {
 import { SkipApiKey } from '../api-keys/api-key.decorators';
 import { AuthUser } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { ListEntitiesDto, UpdateEntityDto } from './entities.dto';
+import {
+  DeleteEntityBodyDto,
+  DeleteEntityQueryDto,
+  ListEntitiesDto,
+  UpdateEntityDto,
+} from './entities.dto';
 import { EntitiesService } from './entities.service';
 
 @ApiTags('Entities')
@@ -62,6 +67,22 @@ export class EntitiesController {
     return this.entitiesService.getDependenciesAsModerator(req.user, idOrSlug);
   }
 
+  @Get(':idOrSlug/ownership-chain')
+  @SkipApiKey()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Preview ownership-chain delete (admin)',
+    description:
+      'Lists every entity in the OWNED_BY connected component that would be deleted.',
+  })
+  ownershipChain(
+    @Req() req: { user: AuthUser },
+    @Param('idOrSlug') idOrSlug: string,
+  ) {
+    return this.entitiesService.previewOwnershipChain(req.user, idOrSlug);
+  }
+
   @Get(':slug')
   @ApiOperation({ summary: 'Entity detail by slug' })
   @ApiOkResponse({ description: 'Entity with ownership chain and citations' })
@@ -91,14 +112,19 @@ export class EntitiesController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Delete entity (moderator/admin)',
+    summary: 'Delete entity or ownership chain (moderator/admin)',
     description:
-      'DETACH DELETE, add to entity_blocklist (blocks re-ingest), reject pending edits targeting it.',
+      'mode=entity (default): DETACH DELETE one node + blocklist. mode=chain (admin): delete full OWNED_BY component; requires body.confirm="yes".',
   })
   remove(
     @Req() req: { user: AuthUser },
     @Param('idOrSlug') idOrSlug: string,
+    @Query() query: DeleteEntityQueryDto,
+    @Body() body: DeleteEntityBodyDto = {},
   ) {
-    return this.entitiesService.deleteAsModerator(req.user, idOrSlug);
+    return this.entitiesService.deleteAsModerator(req.user, idOrSlug, {
+      mode: query.mode ?? 'entity',
+      confirm: body?.confirm,
+    });
   }
 }
