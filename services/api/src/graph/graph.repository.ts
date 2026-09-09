@@ -274,12 +274,15 @@ export class GraphRepository {
 
     if (!validNodes.length) {
       const entity = await this.findEntityById(entityId);
-      return entity ? [{ name: entity.name, type: entity.type }] : [];
+      return entity
+        ? [{ name: entity.name, type: entity.type, slug: entity.slug }]
+        : [];
     }
 
     return validNodes.map((n) => ({
       name: n.properties.name,
       type: n.properties.type,
+      slug: n.properties.slug,
     }));
   }
 
@@ -873,6 +876,10 @@ export class GraphRepository {
     };
 
     if (entityId) {
+      const entity = await this.findEntityById(entityId);
+      if (entity?.updated_at) {
+        result.updated_at = entity.updated_at;
+      }
       result.related = await this.getRelatedEntities(entityId);
     }
 

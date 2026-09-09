@@ -73,6 +73,8 @@ export type CitationDto = {
 export interface ChainNode {
   name: string;
   type: EntityType | string;
+  /** Present when the node is a graph Entity with a slug. */
+  slug?: string;
 }
 
 export interface LookupResult {
@@ -83,6 +85,8 @@ export interface LookupResult {
   ownership_chain: ChainNode[];
   citations: CitationDto[];
   related?: RelatedEntities;
+  /** Graph entity last-updated timestamp when available. */
+  updated_at?: string;
   /** Present on IMAGE lookups — what the photo appears to show. */
   interpretation?: string;
   /** Present on IMAGE lookups — all resolved ownership hits (may be empty). */

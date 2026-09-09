@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { PeSearchForm } from '@/components/PeSearchForm';
 import { VerdictHero } from '@/components/VerdictHero';
 import { OwnershipChain } from '@/components/OwnershipChain';
-import { CitationsList } from '@/components/CitationsList';
+import { CitationsList, isWeakEvidence } from '@/components/CitationsList';
 import { DidYouKnow } from '@/components/DidYouKnow';
 import { SuggestEditLink } from '@/components/SuggestEditLink';
 import { EntityModeratorPanel } from '@/components/EntityModeratorPanel';
@@ -20,6 +20,8 @@ import { entityPath, slugToQuery, toSlug } from '@/lib/slug';
 
 interface EntityViewProps {
   slug: string;
+  /** Server-fetched result for SSR / crawlers + fast first paint */
+  initialResult?: LookupResult | null;
 }
 
 /**
@@ -27,11 +29,11 @@ interface EntityViewProps {
  * Resolves via TEXT lookup so fuzzy/search-origin slugs still work, then
  * canonicalizes the URL to the matched entity slug.
  */
-export function EntityView({ slug }: EntityViewProps) {
+export function EntityView({ slug, initialResult = null }: EntityViewProps) {
   const router = useRouter();
   const query = slugToQuery(slug);
-  const [result, setResult] = useState<LookupResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [result, setResult] = useState<LookupResult | null>(initialResult);
+  const [loading, setLoading] = useState(!initialResult);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [modPanelOpen, setModPanelOpen] = useState(false);
@@ -49,6 +51,24 @@ export function EntityView({ slug }: EntityViewProps) {
     if (!query) {
       setLoading(false);
       setError('No search query provided.');
+      return;
+    }
+
+    // Already have SSR data for this slug — just canonicalize URL if needed.
+    if (initialResult && toSlug(initialResult.matched_item) === slug) {
+      setResult(initialResult);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    if (initialResult && toSlug(initialResult.matched_item) !== slug) {
+      const canonical = toSlug(initialResult.matched_item);
+      if (canonical) {
+        router.replace(entityPath(initialResult.matched_item));
+      }
+      setResult(initialResult);
+      setLoading(false);
       return;
     }
 
@@ -76,7 +96,7 @@ export function EntityView({ slug }: EntityViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [query, slug, router]);
+  }, [query, slug, router, initialResult]);
 
   if (!query) {
     return (
@@ -124,11 +144,12 @@ export function EntityView({ slug }: EntityViewProps) {
   }
 
   const showModEdit = isModerator(user) && Boolean(result.entity_id);
+  const weak = isWeakEvidence(result.citations);
 
   return (
     <div className="space-y-8">
-      <VerdictHero result={result} />
-      <OwnershipChain chain={result.ownership_chain} />
+      <VerdictHero result={result} weakEvidence={weak} />
+      <OwnershipChain chain={result.ownership_chain} currentSlug={slug} />
       <CitationsList citations={result.citations} />
       <SuggestEditLink
         entityId={result.entity_id}

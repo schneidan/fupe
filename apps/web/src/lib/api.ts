@@ -1,6 +1,7 @@
 export interface ChainNode {
   name: string;
   type: string;
+  slug?: string;
 }
 
 export interface RelatedEntitySummary {
@@ -30,6 +31,8 @@ export interface LookupResult {
   ownership_chain: ChainNode[];
   citations: CitationDto[];
   related?: RelatedEntities;
+  /** Graph entity last-updated when available. */
+  updated_at?: string;
   /** IMAGE: short description of what the photo appears to show. */
   interpretation?: string;
   /** IMAGE: all ownership matches (top-level fields mirror the first hit when present). */

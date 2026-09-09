@@ -9,11 +9,26 @@ interface CitationsListProps {
   citations: Citation[];
 }
 
-function isWeakEvidence(citations: Citation[]): boolean {
+export function isWeakEvidence(citations: Citation[]): boolean {
   if (citations.length === 0) return true;
   if (citations.length === 1) return true;
   if (citations.every((c) => c.stale)) return true;
   return false;
+}
+
+function formatRetrieved(iso?: string): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    // Allow bare YYYY-MM-DD from some sources
+    if (/^\d{4}-\d{2}-\d{2}/.test(iso)) return iso.slice(0, 10);
+    return null;
+  }
+  return d.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 export function CitationsList({ citations }: CitationsListProps) {
@@ -52,22 +67,27 @@ export function CitationsList({ citations }: CitationsListProps) {
             : 'Limited evidence — available citations may be outdated. Confirm with primary sources before relying on it.'}
         </p>
       ) : null}
-      <ul className="mt-3 space-y-2">
-        {citations.map((c) => (
-          <li key={c.url} className="text-sm">
-            <a
-              href={c.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-fupe-text underline-offset-2 hover:underline"
-            >
-              {c.title}
-            </a>
-            {c.stale ? (
-              <span className="ml-2 text-fupe-muted">(may be outdated)</span>
-            ) : null}
-          </li>
-        ))}
+      <ul className="mt-3 space-y-3">
+        {citations.map((c) => {
+          const retrieved = formatRetrieved(c.retrieved_at);
+          return (
+            <li key={c.url} className="text-sm">
+              <a
+                href={c.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-fupe-text underline-offset-2 hover:underline"
+              >
+                {c.title}
+              </a>
+              <div className="mt-0.5 text-xs text-fupe-muted">
+                {retrieved ? <>Retrieved {retrieved}</> : null}
+                {retrieved && c.stale ? ' · ' : null}
+                {c.stale ? <span>(may be outdated)</span> : null}
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

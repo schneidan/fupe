@@ -81,6 +81,9 @@ export class ChainNodeDto {
 
   @ApiProperty({ example: 'BRAND' })
   type!: string;
+
+  @ApiPropertyOptional({ example: 'panera-bread' })
+  slug?: string;
 }
 
 export class CitationDto {
@@ -143,6 +146,12 @@ export class LookupResultDto {
 
   @ApiPropertyOptional({ type: RelatedEntitiesDto })
   related?: RelatedEntitiesDto;
+
+  @ApiPropertyOptional({
+    example: '2026-03-01T12:00:00.000Z',
+    description: 'Entity last-updated timestamp when available.',
+  })
+  updated_at?: string;
 
   @ApiPropertyOptional({
     example: 'a Panera storefront',
