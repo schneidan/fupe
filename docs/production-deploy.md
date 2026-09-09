@@ -789,11 +789,18 @@ IMAGE may call OpenRouter vision unless the client sends `use_ai=false` (OCR-onl
 Optional Cloudflare hardening (dashboard → Security → **Rate limiting rules**):
 
 1. **Web IMAGE proxy (recommended):**
-   - If matching: URI Path equals `/api/image-lookup` AND Method equals `POST`
-   - Rate: **10 requests per 1 hour** per IP (align with app default)
+   - Rule name: `Limit image-lookup`
+   - Prefer **Edit expression** with:
+     ```
+     (http.request.uri.path eq "/api/image-lookup" and http.request.method eq "POST")
+     ```
+     (Simple field picker may only offer URI Path — path-only is fine too; expression above is better when available.)
+   - Rate: whatever the UI allows for a tight burst — e.g. **1 request per 10 seconds**
+     (Free/simple CF plans often only offer a 10s window; that’s fine for edge burst
+     control. The Next app still enforces ~10 IMAGE / IP / hour.)
    - Action: **Block** or **Managed Challenge**
    - Zone: `fupe.app` (optionally mirror on `staging.fupe.app` with a higher limit)
-2. **API lookup (optional extra):** rate limit `api.fupe.app/api/v1/lookup*` (e.g. 60–120 / min per IP)
+2. **API lookup (optional extra):** rate limit path prefix `/api/v1/lookup` on `api.fupe.app` (e.g. 60–120 / min per IP)
 3. Keep `api.fupe.app` **cache bypass** (API responses must not be cached)
 
 Smoke after deploy: one IMAGE from the site works; hammering `/api/image-lookup` returns 429 (app) and/or CF challenge/block.

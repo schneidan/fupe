@@ -428,19 +428,27 @@ export class UsersRepository {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
+      // Anonymize contribution attribution (keep public graph history).
+      await client.query(
+        `UPDATE public.wiki_revisions SET edited_by = NULL WHERE edited_by = $1`,
+        [userId],
+      );
+      await client.query(
+        `UPDATE public.audit_logs SET edited_by = NULL WHERE edited_by = $1`,
+        [userId],
+      );
+      await client.query(
+        `UPDATE public.edits_queue
+         SET user_id = NULL
+         WHERE user_id = $1`,
+        [userId],
+      );
       await client.query(
         `UPDATE public.edits_queue SET reviewer_id = NULL WHERE reviewer_id = $1`,
         [userId],
       );
       await client.query(
         `UPDATE public.admin_audit_log SET actor_id = NULL WHERE actor_id = $1`,
-        [userId],
-      );
-      await client.query(`DELETE FROM public.audit_logs WHERE edited_by = $1`, [
-        userId,
-      ]);
-      await client.query(
-        `DELETE FROM public.wiki_revisions WHERE edited_by = $1`,
         [userId],
       );
       await client.query(`DELETE FROM public.users WHERE id = $1`, [userId]);

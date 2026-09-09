@@ -13,6 +13,9 @@ export interface AuthUser {
   location?: string | null;
   pending_email?: string | null;
   email_updates_opt_in?: boolean;
+  subscription_tier?: 'free' | 'developer' | 'business';
+  subscription_status?: string | null;
+  subscription_current_period_end?: string | null;
 }
 
 export interface AuthSession {
@@ -258,10 +261,17 @@ export async function exportMyData(token: string): Promise<unknown> {
   return body;
 }
 
-export async function deleteMyAccount(token: string): Promise<void> {
+export async function deleteMyAccount(
+  token: string,
+  password: string,
+): Promise<void> {
   const res = await fetch('/api/v1/auth/me', {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ password }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

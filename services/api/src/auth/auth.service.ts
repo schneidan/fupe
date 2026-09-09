@@ -1,13 +1,16 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   UnauthorizedException,
+  forwardRef,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { MailService } from '../mail/mail.service';
+import { BillingService } from '../billing/billing.service';
 import {
   hashOpaqueToken,
   newOpaqueToken,
@@ -29,6 +32,9 @@ export interface AuthUser {
   location?: string | null;
   pending_email?: string | null;
   email_updates_opt_in?: boolean;
+  subscription_tier?: 'free' | 'developer' | 'business';
+  subscription_status?: string | null;
+  subscription_current_period_end?: string | null;
 }
 
 @Injectable()
@@ -40,6 +46,8 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    @Inject(forwardRef(() => BillingService))
+    private readonly billing: BillingService,
   ) {}
 
   async register(
@@ -193,7 +201,23 @@ export class AuthService {
     return data;
   }
 
-  async deleteMyAccount(user: AuthUser): Promise<{ deleted: true }> {
+  async deleteMyAccount(
+    user: AuthUser,
+    password: string,
+  ): Promise<{ deleted: true }> {
+    if (!password?.trim()) {
+      throw new BadRequestException('Password is required to delete your account');
+    }
+    const row = await this.usersRepo.findById(user.id);
+    if (!row) {
+      throw new UnauthorizedException('Account not found');
+    }
+    const valid = await bcrypt.compare(password, row.password_hash);
+    if (!valid) {
+      throw new UnauthorizedException('Incorrect password');
+    }
+
+    await this.billing.tearDownForAccountDeletion(row);
     await this.usersRepo.deleteAccount(user.id);
     return { deleted: true };
   }
@@ -291,6 +315,11 @@ export class AuthService {
       location: user.location ?? null,
       pending_email: user.pending_email ?? null,
       email_updates_opt_in: Boolean(user.email_updates_opt_in),
+      subscription_tier: user.subscription_tier ?? 'free',
+      subscription_status: user.subscription_status ?? null,
+      subscription_current_period_end: user.subscription_current_period_end
+        ? new Date(user.subscription_current_period_end).toISOString()
+        : null,
     };
   }
 

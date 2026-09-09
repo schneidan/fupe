@@ -436,6 +436,48 @@ export class BillingService {
     this.logger.log(`User ${userId} → tier=${tier} status=${status}`);
   }
 
+  /**
+   * Cancel active subscription and delete Stripe customer before account erase.
+   * Best-effort: logs and continues if Stripe is unset or objects are already gone.
+   */
+  async tearDownForAccountDeletion(user: UserRow): Promise<void> {
+    if (!this.stripe) {
+      this.logger.warn(
+        `Account delete ${user.id}: Stripe not configured — skipping billing teardown`,
+      );
+      return;
+    }
+
+    if (user.stripe_subscription_id) {
+      try {
+        await this.stripe.subscriptions.cancel(user.stripe_subscription_id);
+        this.logger.log(
+          `Canceled Stripe subscription ${user.stripe_subscription_id} for ${user.id}`,
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        // Already canceled / missing is OK
+        this.logger.warn(
+          `Cancel subscription ${user.stripe_subscription_id}: ${msg}`,
+        );
+      }
+    }
+
+    if (user.stripe_customer_id) {
+      try {
+        await this.stripe.customers.del(user.stripe_customer_id);
+        this.logger.log(
+          `Deleted Stripe customer ${user.stripe_customer_id} for ${user.id}`,
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Delete Stripe customer ${user.stripe_customer_id}: ${msg}`,
+        );
+      }
+    }
+  }
+
   private parseTier(raw?: string | null): ApiKeyTier | null {
     if (raw === 'free' || raw === 'developer' || raw === 'business') return raw;
     return null;

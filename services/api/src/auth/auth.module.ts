@@ -1,8 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailModule } from '../mail/mail.module';
+import { BillingModule } from '../billing/billing.module';
 import { resolveJwtSecret } from '../common/security';
 import { AuthController } from './auth.controller';
 import { AuthIpThrottleGuard } from './auth-ip-throttle.guard';
@@ -13,6 +14,7 @@ import { UsersRepository } from './users.repository';
 @Module({
   imports: [
     MailModule,
+    forwardRef(() => BillingModule),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

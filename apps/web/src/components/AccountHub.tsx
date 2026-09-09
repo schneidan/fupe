@@ -363,7 +363,10 @@ export function AccountHub() {
         </Link>
       </div>
 
-      <AccountPrivacyPanel onDeleted={() => setUser(null)} />
+      <AccountPrivacyPanel
+        user={user}
+        onDeleted={() => setUser(null)}
+      />
     </div>
   );
 }

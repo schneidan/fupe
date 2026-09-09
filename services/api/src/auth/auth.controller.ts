@@ -96,6 +96,12 @@ class ConfirmEmailChangeDto {
   token!: string;
 }
 
+class DeleteAccountDto {
+  @IsString()
+  @MinLength(1)
+  password!: string;
+}
+
 @Controller('auth')
 @SkipApiKey()
 @UseGuards(AuthIpThrottleGuard)
@@ -186,7 +192,10 @@ export class AuthController {
 
   @Delete('me')
   @UseGuards(JwtAuthGuard)
-  deleteAccount(@Req() req: { user: AuthUser }) {
-    return this.authService.deleteMyAccount(req.user);
+  deleteAccount(
+    @Req() req: { user: AuthUser },
+    @Body() body: DeleteAccountDto,
+  ) {
+    return this.authService.deleteMyAccount(req.user, body.password);
   }
 }
