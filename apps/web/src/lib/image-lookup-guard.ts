@@ -67,7 +67,7 @@ export function assertImageLookupOrigin(
   if (!origin && !isProdLike()) return null;
 
   return NextResponse.json(
-    { message: 'IMAGE lookup blocked: invalid origin' },
+    { message: 'Image lookup blocked: invalid origin' },
     { status: 403 },
   );
 }
@@ -83,7 +83,7 @@ export function assertImageLookupRateLimit(
   if (recent.length >= LIMIT) {
     return NextResponse.json(
       {
-        message: `IMAGE lookup rate limit exceeded (${LIMIT} per hour). Try again later.`,
+        message: `Image lookup rate limit exceeded (${LIMIT} per hour). Try again later.`,
       },
       {
         status: 429,

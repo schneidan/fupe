@@ -29,7 +29,7 @@ export function AdminUsagePanel() {
       <div>
         <h1 className="text-2xl font-bold text-fupe-text">API usage</h1>
         <p className="mt-1 text-sm text-fupe-muted">
-          Today&apos;s requests per active key, including IMAGE 403s and rate-limit 429s.
+          Today&apos;s requests per active key, including image 403s and rate-limit 429s.
         </p>
       </div>
 
@@ -44,7 +44,7 @@ export function AdminUsagePanel() {
               <th className="px-4 py-3 text-left">Owner</th>
               <th className="px-4 py-3 text-left">Tier</th>
               <th className="px-4 py-3 text-right">Requests today</th>
-              <th className="px-4 py-3 text-right">IMAGE blocks</th>
+              <th className="px-4 py-3 text-right">Image blocks</th>
               <th className="px-4 py-3 text-right">Rate-limit hits</th>
             </tr>
           </thead>

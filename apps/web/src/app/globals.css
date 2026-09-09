@@ -46,6 +46,13 @@ input::placeholder {
   outline-offset: 2px;
 }
 
+/* Form fields use their own border/underline focus — skip the global ring */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
 .skip-link {
   position: absolute;
   left: 1rem;

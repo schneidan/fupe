@@ -17,7 +17,7 @@ export default function ApiTermsPage() {
       <LegalH2>1. Keys &amp; tiers</LegalH2>
       <p>
         Keys are personal to your account. Free, Developer, and Business tiers
-        have different daily rate limits and feature access (for example, IMAGE
+        have different daily rate limits and feature access (for example, image
         lookup requires a paid tier). Do not share keys publicly.
       </p>
       <LegalH2>2. Fair use</LegalH2>
@@ -28,11 +28,11 @@ export default function ApiTermsPage() {
         results in your product is fine; republishing the entire directory is not
         without written permission.
       </p>
-      <LegalH2>3. IMAGE &amp; VOICE media</LegalH2>
+      <LegalH2>3. Image &amp; voice media</LegalH2>
       <p>
-        IMAGE lookups may send a resized image to a third-party vision model via
+        Image lookups may send a resized image to a third-party vision model via
         OpenRouter unless you pass <code className="text-fupe-text">use_ai=false</code>{' '}
-        (on-server OCR only). VOICE multipart audio may be transcribed via
+        (on-server OCR only). Voice multipart audio may be transcribed via
         OpenRouter. We request zero data retention (ZDR) on those calls; see the{' '}
         <a href="/legal/privacy" className="text-fupe-text hover:underline">
           Privacy Policy

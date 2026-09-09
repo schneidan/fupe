@@ -8,6 +8,10 @@ export default function HomePage() {
       <div className="mb-16 text-center">
         <h1 className="sr-only">FUPE — Is it owned by Private Equity?</h1>
         <FupeLogo size="hero" />
+        <p className="mx-auto mt-5 max-w-md text-sm text-fupe-muted">
+          Look up a brand, product, or company. See if private equity (or VC)
+          sits in the ownership chain — with sources.
+        </p>
       </div>
 
       <div className="w-full max-w-2xl text-center">

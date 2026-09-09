@@ -157,7 +157,7 @@ export function DevelopersBilling() {
           </h2>
           <p className="text-sm text-fupe-muted">
             {paidActive
-              ? `Your account is on the ${tier} tier. Create an API key below to use higher limits and IMAGE lookup.`
+              ? `Your account is on the ${tier} tier. Create an API key below to use higher limits and image lookup.`
               : 'Stripe is confirming your subscription — usually a few seconds. This page will show your new tier when the webhook lands; you can also refresh.'}
           </p>
           <div className="flex flex-wrap gap-3 pt-1">
@@ -255,7 +255,7 @@ export function DevelopersBilling() {
               <ul className="mt-3 space-y-1 text-sm text-fupe-muted">
                 <li>{t?.rate_limit_daily?.toLocaleString() ?? '—'} req/day</li>
                 <li>
-                  {t?.image_lookup ? 'IMAGE lookup included' : 'No IMAGE lookup'}
+                  {t?.image_lookup ? 'Image lookup included' : 'No image lookup'}
                 </li>
                 {t?.note ? <li>{t.note}</li> : null}
               </ul>

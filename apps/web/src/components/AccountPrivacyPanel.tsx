@@ -104,7 +104,10 @@ export function AccountPrivacyPanel({
   }
 
   return (
-    <div className="rounded-xl border border-fupe-border bg-fupe-surface p-5">
+    <div
+      id="privacy"
+      className="scroll-mt-8 rounded-xl border border-fupe-border bg-fupe-surface p-5"
+    >
       <h2 className="font-semibold text-fupe-text">Your data</h2>
       <p className="mt-2 text-sm text-fupe-muted">
         GDPR access &amp; erasure — see the{' '}

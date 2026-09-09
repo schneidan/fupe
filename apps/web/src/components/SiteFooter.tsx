@@ -19,26 +19,26 @@ export function SiteFooter() {
           !
         </p>
       ) : null}
-      <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-        <Link href="/browse" className="text-fupe-text transition hover:text-fupe-muted">
-          Browse
-        </Link>
-        <Link href="/contribute" className="text-fupe-text transition hover:text-fupe-muted">
-          Contribute
-        </Link>
-        <Link href="/developers" className="text-fupe-text transition hover:text-fupe-muted">
-          Developers
-        </Link>
-        <Link href="/legal" className="text-fupe-text transition hover:text-fupe-muted">
-          Legal
-        </Link>
-        <Link href="/legal/privacy" className="text-fupe-text transition hover:text-fupe-muted">
+      <nav
+        aria-label="Legal"
+        className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2"
+      >
+        <Link
+          href="/legal/privacy"
+          className="text-fupe-text transition hover:text-fupe-muted"
+        >
           Privacy
         </Link>
-        <Link href="/legal/terms" className="text-fupe-text transition hover:text-fupe-muted">
+        <Link
+          href="/legal/terms"
+          className="text-fupe-text transition hover:text-fupe-muted"
+        >
           Terms
         </Link>
-        <Link href="/legal/contact" className="text-fupe-text transition hover:text-fupe-muted">
+        <Link
+          href="/legal/contact"
+          className="text-fupe-text transition hover:text-fupe-muted"
+        >
           Contact
         </Link>
       </nav>

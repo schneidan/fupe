@@ -140,7 +140,7 @@ export function AdminDashboard() {
           { href: '/admin/users', label: 'Manage users', desc: 'Edit roles, trust, verification.' },
           { href: '/admin/contributions', label: 'Contributions', desc: 'Approve or reject pending edits.' },
           { href: '/admin/subscriptions', label: 'Subscriptions', desc: 'View and override billing tiers.' },
-          { href: '/admin/usage', label: 'API usage', desc: "Today's requests, IMAGE blocks, rate-limit hits." },
+          { href: '/admin/usage', label: 'API usage', desc: "Today's requests, image blocks, rate-limit hits." },
           { href: '/admin/audit', label: 'Audit log', desc: 'Staff actions across the console.' },
         ].map(({ href, label, desc }) => (
           <Link

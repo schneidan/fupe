@@ -58,7 +58,7 @@ export default function PrivacyPage() {
       </p>
       <ul className="list-disc space-y-2 pl-5">
         <li>
-          <span className="text-fupe-text">IMAGE (default):</span> a resized
+          <span className="text-fupe-text">Image (default):</span> a resized
           copy of your photo is sent through{' '}
           <span className="text-fupe-text">OpenRouter</span> to a vision model
           (for example Google Gemini Flash Lite) so we can guess brand or
@@ -68,12 +68,12 @@ export default function PrivacyPage() {
           third-party model; it is weaker for logos and storefronts.
         </li>
         <li>
-          <span className="text-fupe-text">VOICE on the website:</span> speech
+          <span className="text-fupe-text">Voice on the website:</span> speech
           recognition uses your browser&apos;s Web Speech API. Audio is not
           uploaded to FUPE or OpenRouter for that flow.
         </li>
         <li>
-          <span className="text-fupe-text">VOICE via the API:</span> if you
+          <span className="text-fupe-text">Voice via the API:</span> if you
           upload an audio file to our lookup endpoint, we may send it through
           OpenRouter to a speech-to-text model (for example open-weights Whisper
           hosted by an OpenRouter provider). Multipart uploads are size-capped.
@@ -100,7 +100,7 @@ export default function PrivacyPage() {
         These are best-effort contractual and technical controls based on
         OpenRouter&apos;s published policies and routing. We cannot
         independently audit every upstream GPU host. If you need the photo never
-        to leave FUPE, use OCR-only IMAGE mode (or avoid IMAGE). Prefer typed
+        to leave FUPE, use OCR-only image mode (or avoid image lookup). Prefer typed
         text or barcode when possible.
       </p>
       <LegalH2>4. Legal bases (GDPR)</LegalH2>
@@ -109,14 +109,14 @@ export default function PrivacyPage() {
         (security, abuse prevention, product improvement), and consent where
         required (optional product-update email — off by default; transactional
         mail about your account and edit reviews is sent as part of the service).
-        Optional AI vision on IMAGE is disclosed in-product; you can decline it
+        Optional AI vision on image lookup is disclosed in-product; you can decline it
         via the OCR-only control.
       </p>
       <LegalH2>5. Sharing</LegalH2>
       <p>
         We use processors such as email delivery (SMTP / Resend), hosting,
         Stripe for payments, Open Food Facts for barcode product metadata, and —
-        when you use AI IMAGE or API VOICE — OpenRouter and the model providers
+        when you use AI image lookup or API voice — OpenRouter and the model providers
         it routes to under ZDR constraints described above. We do not sell
         personal information. Public directory content (entity names, ownership
         claims, citations) is intentionally public.

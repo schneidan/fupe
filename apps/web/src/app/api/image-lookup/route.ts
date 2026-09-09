@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
   if (!secret && prodLike) {
     return NextResponse.json(
-      { message: 'IMAGE lookup is not configured (missing first-party secret)' },
+      { message: 'Image lookup is not configured (missing first-party secret)' },
       { status: 503 },
     );
   }

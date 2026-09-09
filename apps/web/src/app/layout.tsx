@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteAccountLink } from '@/components/SiteAccountLink';
+import { SiteNavMenu } from '@/components/SiteNavMenu';
 import { CookieConsentBanner } from '@/components/CookieConsentBanner';
 import { defaultOgImages, resolveSiteUrl } from '@/lib/site-url';
 import './globals.css';
@@ -47,6 +48,7 @@ export default function RootLayout({
           Skip to content
         </a>
         <div id="main-content" className="flex-1" tabIndex={-1}>
+          <SiteNavMenu />
           <SiteAccountLink />
           {children}
         </div>
