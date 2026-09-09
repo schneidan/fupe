@@ -4,6 +4,7 @@ import { FupeLogo } from '@/components/FupeLogo';
 
 export const metadata = {
   title: 'Verify email',
+  robots: { index: false, follow: false },
 };
 
 export default function VerifyEmailPage() {

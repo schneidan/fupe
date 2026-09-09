@@ -4,6 +4,7 @@ import { ThanksRedirect } from '@/components/ThanksRedirect';
 
 export const metadata = {
   title: 'Thank you',
+  robots: { index: false, follow: false },
 };
 
 export default function ThanksPage() {

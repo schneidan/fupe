@@ -4,6 +4,7 @@ import { EntityView } from '@/components/EntityView';
 import { lookupServer } from '@/lib/lookup-server';
 import { slugToQuery } from '@/lib/slug';
 import { FupeLogo } from '@/components/FupeLogo';
+import { defaultOgImages } from '@/lib/site-url';
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -29,11 +30,13 @@ function buildEntityMetadata(
       title,
       description,
       type: 'website',
+      images: [...defaultOgImages],
     },
     twitter: {
-      card: 'summary',
+      card: 'summary_large_image',
       title,
       description,
+      images: [defaultOgImages[0].url],
     },
   };
 }

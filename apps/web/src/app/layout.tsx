@@ -3,15 +3,13 @@ import { Inter } from 'next/font/google';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteAccountLink } from '@/components/SiteAccountLink';
 import { CookieConsentBanner } from '@/components/CookieConsentBanner';
+import { defaultOgImages, resolveSiteUrl } from '@/lib/site-url';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3001';
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(resolveSiteUrl()),
   title: {
     default: 'FUPE — Is it owned by Private Equity?',
     template: '%s | FUPE',
@@ -24,12 +22,14 @@ export const metadata: Metadata = {
     title: 'FUPE — Is it owned by Private Equity?',
     description:
       'Find out if a brand, product, or company is backed by Private Equity. Trace ownership chains with citations.',
+    images: [...defaultOgImages],
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: 'FUPE — Is it owned by Private Equity?',
     description:
       'Find out if a brand, product, or company is backed by Private Equity. Trace ownership chains with citations.',
+    images: [defaultOgImages[0].url],
   },
 };
 

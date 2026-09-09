@@ -6,6 +6,7 @@ export const metadata = {
     default: 'Admin — FUPE',
     template: '%s | Admin — FUPE',
   },
+  robots: { index: false, follow: false },
 };
 
 export default function AdminLayout({

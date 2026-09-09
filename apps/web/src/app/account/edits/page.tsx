@@ -3,6 +3,7 @@ import { MyEditsList } from '@/components/MyEditsList';
 
 export const metadata = {
   title: 'My edits',
+  robots: { index: false, follow: false },
 };
 
 export default function AccountEditsPage() {
