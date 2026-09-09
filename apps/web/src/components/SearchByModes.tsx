@@ -668,7 +668,7 @@ export function SearchByModes() {
               )}
 
               {error && (
-                <p className="text-center text-sm text-verdict-yes" role="alert">
+                <p className="text-center text-sm text-status-error" role="alert">
                   {error}
                 </p>
               )}

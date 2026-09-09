@@ -120,7 +120,7 @@ export function AdminAuditPanel() {
         </select>
       </label>
 
-      {error && <p className="text-sm text-verdict-yes">{error}</p>}
+      {error && <p className="text-sm text-status-error">{error}</p>}
 
       <div className="overflow-x-auto rounded-xl border border-fupe-border">
         <table className="w-full text-sm">

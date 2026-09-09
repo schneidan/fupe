@@ -349,7 +349,7 @@ export function ProposeEntityForm() {
         />
       </label>
 
-      {error ? <p className="text-sm text-verdict-yes">{error}</p> : null}
+      {error ? <p className="text-sm text-status-error">{error}</p> : null}
       {success ? <p className="text-sm text-fupe-text">{success}</p> : null}
 
       {!signedIn ? (

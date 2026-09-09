@@ -177,7 +177,7 @@ export function AdminEntitiesPanel() {
       </label>
 
       {error && (
-        <p className="text-sm text-verdict-yes" role="alert">
+        <p className="text-sm text-status-error" role="alert">
           {error}
         </p>
       )}

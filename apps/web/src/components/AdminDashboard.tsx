@@ -71,7 +71,7 @@ export function AdminDashboard() {
   if (error) {
     return (
       <div className="rounded-xl border border-fupe-border bg-fupe-surface p-6">
-        <p className="text-sm text-verdict-yes">{error}</p>
+        <p className="text-sm text-status-error">{error}</p>
         <Link href="/login?next=/admin" className="mt-4 inline-block text-sm text-fupe-text hover:underline">
           Sign in
         </Link>

@@ -1,8 +1,8 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { listEntities, type EntitySummary } from '@/lib/api';
 import { entityPath } from '@/lib/slug';
 
@@ -25,24 +25,65 @@ const COUNTRIES = [
 
 export function BrowseDirectory() {
   const searchParams = useSearchParams();
-  const [q, setQ] = useState('');
-  const [type, setType] = useState('');
-  const [country, setCountry] = useState('');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchId = useId();
+  const typeId = useId();
+  const countryId = useId();
+
+  const [qInput, setQInput] = useState(searchParams.get('q') ?? '');
+  const [q, setQ] = useState(searchParams.get('q') ?? '');
+  const [type, setType] = useState(searchParams.get('type') ?? '');
+  const [country, setCountry] = useState(searchParams.get('country') ?? '');
   const [peOnly, setPeOnly] = useState(searchParams.get('pe_only') === 'true');
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(
+    Math.max(1, Number(searchParams.get('page') || '1') || 1),
+  );
   const [items, setItems] = useState<EntitySummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const qReady = useRef(false);
 
   const limit = 20;
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setQ(qInput.trim());
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [qInput]);
+
+  useEffect(() => {
+    if (!qReady.current) {
+      qReady.current = true;
+      return;
+    }
+    setPage(1);
+  }, [q]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (type) params.set('type', type);
+    if (country) params.set('country', country);
+    if (peOnly) params.set('pe_only', 'true');
+    if (page > 1) params.set('page', String(page));
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next !== current) {
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+    }
+    // Outward URL sync only — don't re-run when searchParams echo our replace.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [q, type, country, peOnly, page, pathname, router]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await listEntities({
-        q: q.trim() || undefined,
+        q: q || undefined,
         type: type || undefined,
         country: country || undefined,
         pe_only: peOnly || undefined,
@@ -67,47 +108,62 @@ export function BrowseDirectory() {
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setPage(1);
-          }}
-          placeholder="Search by name…"
-          className="w-full rounded-lg border border-fupe-border bg-fupe-elevated px-4 py-2.5 text-fupe-text outline-none placeholder:text-fupe-accentDim focus:border-fupe-muted"
-        />
+        <div>
+          <label htmlFor={searchId} className="sr-only">
+            Search by name
+          </label>
+          <input
+            id={searchId}
+            type="search"
+            value={qInput}
+            onChange={(e) => setQInput(e.target.value)}
+            placeholder="Search by name…"
+            className="w-full rounded-lg border border-fupe-border bg-fupe-elevated px-4 py-2.5 text-fupe-text outline-none placeholder:text-fupe-accentDim focus:border-fupe-muted"
+          />
+        </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <select
-            value={type}
-            onChange={(e) => {
-              setType(e.target.value);
-              setPage(1);
-            }}
-            className="rounded-lg border border-fupe-border bg-fupe-elevated px-3 py-2 text-sm text-fupe-text outline-none focus:border-fupe-muted"
-          >
-            {ENTITY_TYPES.map((opt) => (
-              <option key={opt.value || 'all'} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <div>
+            <label htmlFor={typeId} className="sr-only">
+              Entity type
+            </label>
+            <select
+              id={typeId}
+              value={type}
+              onChange={(e) => {
+                setType(e.target.value);
+                setPage(1);
+              }}
+              className="rounded-lg border border-fupe-border bg-fupe-elevated px-3 py-2 text-sm text-fupe-text outline-none focus:border-fupe-muted"
+            >
+              {ENTITY_TYPES.map((opt) => (
+                <option key={opt.value || 'all'} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <select
-            value={country}
-            onChange={(e) => {
-              setCountry(e.target.value);
-              setPage(1);
-            }}
-            className="rounded-lg border border-fupe-border bg-fupe-elevated px-3 py-2 text-sm text-fupe-text outline-none focus:border-fupe-muted"
-          >
-            {COUNTRIES.map((opt) => (
-              <option key={opt.value || 'all'} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <div>
+            <label htmlFor={countryId} className="sr-only">
+              Country
+            </label>
+            <select
+              id={countryId}
+              value={country}
+              onChange={(e) => {
+                setCountry(e.target.value);
+                setPage(1);
+              }}
+              className="rounded-lg border border-fupe-border bg-fupe-elevated px-3 py-2 text-sm text-fupe-text outline-none focus:border-fupe-muted"
+            >
+              {COUNTRIES.map((opt) => (
+                <option key={opt.value || 'all'} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <label className="flex items-center gap-2 text-sm text-fupe-muted">
             <input
@@ -125,16 +181,20 @@ export function BrowseDirectory() {
       </div>
 
       {loading && (
-        <p className="text-center text-fupe-muted">Loading directory…</p>
+        <p className="text-center text-fupe-muted" aria-live="polite">
+          Loading directory…
+        </p>
       )}
 
       {error && (
-        <p className="text-center text-verdict-yes">{error}</p>
+        <p className="text-center text-status-error" role="alert">
+          {error}
+        </p>
       )}
 
       {!loading && !error && (
         <>
-          <p className="text-sm text-fupe-muted">
+          <p className="text-sm text-fupe-muted" aria-live="polite">
             {total} {total === 1 ? 'entity' : 'entities'}
           </p>
 

@@ -43,7 +43,10 @@ export default function RootLayout({
       <body
         className={`${inter.className} ${inter.variable} flex min-h-screen flex-col antialiased`}
       >
-        <div className="flex-1">
+        <a href="#main-content" className="skip-link">
+          Skip to content
+        </a>
+        <div id="main-content" className="flex-1" tabIndex={-1}>
           <SiteAccountLink />
           {children}
         </div>

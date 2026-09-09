@@ -215,7 +215,7 @@ export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
             </label>
           </>
         ) : null}
-        {error ? <p className="text-sm text-verdict-yes">{error}</p> : null}
+        {error ? <p className="text-sm text-status-error">{error}</p> : null}
         <button
           type="submit"
           disabled={busy || (mode === 'register' && !acceptedTerms)}

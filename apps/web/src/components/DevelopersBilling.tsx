@@ -344,7 +344,7 @@ export function DevelopersBilling() {
             ) : null}
           </>
         )}
-        {error ? <p className="text-sm text-verdict-yes">{error}</p> : null}
+        {error ? <p className="text-sm text-status-error">{error}</p> : null}
       </section>
     </div>
   );

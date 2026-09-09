@@ -107,7 +107,7 @@ export function AdminEditsQueue() {
   }
 
   if (!allowed && !loading) {
-    return <p className="text-sm text-verdict-yes">{error}</p>;
+    return <p className="text-sm text-status-error">{error}</p>;
   }
 
   const pages = Math.max(1, Math.ceil(total / 50));
@@ -194,7 +194,7 @@ export function AdminEditsQueue() {
       </div>
 
       <p className="text-xs text-fupe-muted">{total} matching</p>
-      {error ? <p className="text-sm text-verdict-yes">{error}</p> : null}
+      {error ? <p className="text-sm text-status-error">{error}</p> : null}
 
       {loading ? (
         <p className="text-sm text-fupe-muted">Loading queue…</p>

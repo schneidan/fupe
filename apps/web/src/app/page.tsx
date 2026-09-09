@@ -6,6 +6,7 @@ export default function HomePage() {
   return (
     <main className="flex min-h-[calc(100vh-80px)] flex-col items-center justify-center px-4 py-16">
       <div className="mb-16 text-center">
+        <h1 className="sr-only">FUPE — Is it owned by Private Equity?</h1>
         <FupeLogo size="hero" />
       </div>
 

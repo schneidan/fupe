@@ -88,7 +88,7 @@ function MyEditsInner() {
       {loading ? (
         <p className="text-sm text-fupe-muted">Loading…</p>
       ) : error ? (
-        <p className="text-sm text-verdict-yes">{error}</p>
+        <p className="text-sm text-status-error">{error}</p>
       ) : edits.length === 0 ? (
         <p className="text-sm text-fupe-muted">No edits in this view yet.</p>
       ) : (

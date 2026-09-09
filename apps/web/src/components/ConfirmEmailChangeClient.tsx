@@ -48,7 +48,7 @@ export function ConfirmEmailChangeClient() {
       ) : (
         <p
           className={
-            status === 'ok' ? 'text-fupe-text' : 'text-verdict-yes'
+            status === 'ok' ? 'text-fupe-text' : 'text-status-error'
           }
         >
           {message}

@@ -203,7 +203,7 @@ export function AccountPrivacyPanel({
                 />
               </label>
               {msg ? (
-                <p className="text-sm text-verdict-yes" role="alert">
+                <p className="text-sm text-status-error" role="alert">
                   {msg}
                 </p>
               ) : null}

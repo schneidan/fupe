@@ -42,7 +42,7 @@ export function ResetPasswordForm() {
   if (!token) {
     return (
       <div className="space-y-4 rounded-xl border border-fupe-border bg-fupe-surface p-6">
-        <p className="text-sm text-verdict-yes">
+        <p className="text-sm text-status-error">
           Missing reset token. Request a new link from the forgot-password page.
         </p>
         <Link
@@ -99,7 +99,7 @@ export function ResetPasswordForm() {
           className="mt-1 w-full rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-fupe-text outline-none focus:border-fupe-muted"
         />
       </label>
-      {error ? <p className="text-sm text-verdict-yes">{error}</p> : null}
+      {error ? <p className="text-sm text-status-error">{error}</p> : null}
       <button
         type="submit"
         disabled={busy}

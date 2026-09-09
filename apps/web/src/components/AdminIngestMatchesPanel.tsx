@@ -72,7 +72,7 @@ export function AdminIngestMatchesPanel() {
         </p>
       </div>
 
-      {error ? <p className="text-sm text-verdict-yes">{error}</p> : null}
+      {error ? <p className="text-sm text-status-error">{error}</p> : null}
 
       {loading ? (
         <p className="text-sm text-fupe-muted">Loading…</p>

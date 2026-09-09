@@ -188,7 +188,7 @@ export function AdminUsersPanel() {
         </button>
       </div>
 
-      {error ? <p className="text-sm text-verdict-yes">{error}</p> : null}
+      {error ? <p className="text-sm text-status-error">{error}</p> : null}
 
       <div className="overflow-x-auto rounded-xl border border-fupe-border">
         <table className="w-full text-sm">

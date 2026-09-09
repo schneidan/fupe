@@ -136,9 +136,13 @@ export function PeSearchForm({
               autoFocus={autoFocus}
               autoComplete="off"
               role="combobox"
+              aria-label="Brand, product, or company name"
               aria-expanded={showSuggestions && suggestions.length > 0}
               aria-controls={listId}
               aria-autocomplete="list"
+              aria-activedescendant={
+                activeIndex >= 0 ? `${listId}-opt-${activeIndex}` : undefined
+              }
               className="w-full border-b-2 border-fupe-border bg-transparent px-2 py-1 text-fupe-text outline-none transition focus:border-fupe-muted"
             />
             {showSuggestions && suggestions.length > 0 && (
@@ -151,6 +155,7 @@ export function PeSearchForm({
                   <li key={`${hit.kind}-${hit.id}`}>
                     <button
                       type="button"
+                      id={`${listId}-opt-${i}`}
                       role="option"
                       aria-selected={i === activeIndex}
                       className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition ${
@@ -172,6 +177,17 @@ export function PeSearchForm({
                 ))}
               </ul>
             )}
+            <p className="sr-only" aria-live="polite">
+              {searching
+                ? 'Searching'
+                : showSuggestions && suggestions.length > 0
+                  ? `${suggestions.length} suggestions available`
+                  : didYouMean
+                    ? didYouMean.length > 0
+                      ? `${didYouMean.length} close matches`
+                      : 'No close matches'
+                    : ''}
+            </p>
           </div>
           <span className="text-fupe-text">owned by PE?</span>
         </div>

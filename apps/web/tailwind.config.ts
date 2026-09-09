@@ -22,6 +22,13 @@ const config: Config = {
           no: '#22c55e',
           noGlow: '#14532d',
         },
+        /** UI failures / warnings — not PE YES red */
+        status: {
+          error: '#ea580c',
+          errorGlow: '#7c2d12',
+          warn: '#eab308',
+          warnGlow: '#713f12',
+        },
       },
       fontFamily: {
         display: ['var(--font-inter)', 'system-ui', 'sans-serif'],
@@ -36,6 +43,8 @@ const config: Config = {
         accent: '0 0 40px -8px rgba(255, 255, 255, 0.12)',
         yes: '0 0 60px -10px rgba(239, 68, 68, 0.5)',
         no: '0 0 60px -10px rgba(34, 197, 94, 0.4)',
+        statusError: '0 0 60px -10px rgba(234, 88, 12, 0.5)',
+        statusWarn: '0 0 60px -10px rgba(234, 179, 8, 0.45)',
       },
       spacing: {
         double: '2rem',

@@ -158,7 +158,7 @@ export function AdminSubscriptionsPanel() {
 
       {health && <HealthBanner health={health} />}
 
-      {error && <p className="text-sm text-verdict-yes">{error}</p>}
+      {error && <p className="text-sm text-status-error">{error}</p>}
 
       <div className="space-y-3 rounded-xl border border-fupe-border p-4">
         <p className="text-sm font-semibold text-fupe-text">Complimentary upgrade</p>

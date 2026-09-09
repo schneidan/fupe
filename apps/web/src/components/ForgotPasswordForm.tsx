@@ -63,7 +63,7 @@ export function ForgotPasswordForm() {
           className="mt-1 w-full rounded-lg border border-fupe-border bg-fupe-bg px-3 py-2 text-fupe-text outline-none focus:border-fupe-muted"
         />
       </label>
-      {error ? <p className="text-sm text-verdict-yes">{error}</p> : null}
+      {error ? <p className="text-sm text-status-error">{error}</p> : null}
       <button
         type="submit"
         disabled={busy}

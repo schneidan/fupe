@@ -102,7 +102,7 @@ export function EntityView({ slug }: EntityViewProps) {
     const isNotFound = error?.toLowerCase().includes('no match');
     return (
       <div className="py-12 text-center">
-        <p className="text-lg text-verdict-yes">{error ?? 'Not found'}</p>
+        <p className="text-lg text-status-error">{error ?? 'Not found'}</p>
         {isNotFound && (
           <p className="mt-2 text-sm text-fupe-muted">
             No match in our directory yet. Try a different spelling,{' '}
