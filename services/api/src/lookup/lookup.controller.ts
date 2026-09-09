@@ -30,6 +30,7 @@ import {
 } from './lookup.dto';
 import { LookupIpThrottleGuard } from './lookup-ip-throttle.guard';
 import { LookupService } from './lookup.service';
+import { secretsEqual } from '../common/security';
 
 @ApiTags('Lookup')
 @ApiSecurity('api-key')
@@ -99,11 +100,12 @@ export class LookupController {
   private isFirstPartyImage(req: RequestWithApiKey): boolean {
     const expected = process.env.FIRST_PARTY_LOOKUP_SECRET?.trim();
     if (!expected) {
-      // Local/dev convenience when secret is unset.
+      // Fail closed in production; allow unset secret only for local/dev.
       return process.env.NODE_ENV !== 'production';
     }
-    const header = req.header('x-fupe-first-party')?.trim();
-    return Boolean(header && header === expected);
+    const header = req.header('x-fupe-first-party')?.trim() ?? '';
+    if (!header) return false;
+    return secretsEqual(header, expected);
   }
 
   private toLookupInput(

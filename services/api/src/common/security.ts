@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 
 const WEAK_JWT_SECRETS = new Set([
@@ -16,6 +16,17 @@ export function hashOpaqueToken(raw: string): string {
 
 export function newOpaqueToken(): string {
   return randomBytes(32).toString('hex');
+}
+
+/** Constant-time string compare (e.g. first-party IMAGE secret). */
+export function secretsEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+  if (bufA.length !== bufB.length) {
+    timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return timingSafeEqual(bufA, bufB);
 }
 
 /**

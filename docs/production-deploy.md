@@ -340,6 +340,7 @@ Checklist for this file:
 - [ ] `NODE_ENV=production` (not `development`)
 - [ ] `JWT_SECRET` is a long random string (not `change-me-in-production`)
 - [ ] `FIRST_PARTY_LOOKUP_SECRET` set and mirrored on web (IMAGE gate)
+- [ ] `ENABLE_GRAPHQL` unset/false (do not enable in prod — bypasses lookup throttle)
 - [ ] `EMAIL_PROVIDER` is `resend` or `smtp` (not `console`); `AUTO_VERIFY_EMAIL=false`
 - [ ] `BOOTSTRAP_ADMIN_EMAIL` unset after you have an admin
 - [ ] `CORS_ORIGIN` and `NEXT_PUBLIC_SITE_URL` use `https://fupe.app` (no `localhost:3001`)
@@ -774,14 +775,28 @@ Do **not** reuse the Test destination’s signing secret in Live (or vice versa)
 
 ### Lookup rate limits (API + Cloudflare)
 
-The Nest API applies an in-process IP throttle on `/lookup` (default **60 req/min/IP**, override with `LOOKUP_IP_RATE_LIMIT_PER_MIN`). IMAGE lookups require either a Developer/Business API key **or** header `X-Fupe-First-Party` matching `FIRST_PARTY_LOOKUP_SECRET` (web injects this via `/api/image-lookup`; mobile via `--dart-define`).
+The Nest API applies an in-process IP throttle on `/lookup` (default **60 req/min/IP**, override with `LOOKUP_IP_RATE_LIMIT_PER_MIN`). IMAGE lookups require either a Developer/Business API key **or** header `X-Fupe-First-Party` matching `FIRST_PARTY_LOOKUP_SECRET` (web injects this via `/api/image-lookup`; mobile via `--dart-define`). Comparison is timing-safe; production refuses IMAGE first-party access if the secret is unset.
+
+The **web** proxy (`fupe.app/api/image-lookup`) adds Tier-2 guards before forwarding:
+
+- Origin/Referer allowlist (`https://fupe.app`, staging, localhost for local)
+- Rolling rate limit (default **10 IMAGE POSTs / IP / hour**; override with `IMAGE_LOOKUP_RATE_LIMIT_PER_HOUR` on the web env)
 
 IMAGE may call OpenRouter vision unless the client sends `use_ai=false` (OCR-only). API VOICE audio uploads use OpenRouter STT (`STT_MODEL`). Both paths set `provider.zdr: true`. Keep OpenRouter account privacy/ZDR aligned; see `/legal/privacy`.
 
-Optional Cloudflare hardening (dashboard → Security → WAF / Rate limiting):
+**Keep GraphQL off in production** — leave `ENABLE_GRAPHQL` unset/false. If enabled, GraphQL can expose ownership data without the lookup IP throttle.
 
-- Rate limit rule on `api.fupe.app/api/v1/lookup*` (e.g. 60–120 / min per IP)
-- Keep `api.fupe.app` **cache bypass** (API responses must not be cached)
+Optional Cloudflare hardening (dashboard → Security → **Rate limiting rules**):
+
+1. **Web IMAGE proxy (recommended):**
+   - If matching: URI Path equals `/api/image-lookup` AND Method equals `POST`
+   - Rate: **10 requests per 1 hour** per IP (align with app default)
+   - Action: **Block** or **Managed Challenge**
+   - Zone: `fupe.app` (optionally mirror on `staging.fupe.app` with a higher limit)
+2. **API lookup (optional extra):** rate limit `api.fupe.app/api/v1/lookup*` (e.g. 60–120 / min per IP)
+3. Keep `api.fupe.app` **cache bypass** (API responses must not be cached)
+
+Smoke after deploy: one IMAGE from the site works; hammering `/api/image-lookup` returns 429 (app) and/or CF challenge/block.
 
 ---
 
