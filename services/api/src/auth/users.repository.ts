@@ -386,23 +386,67 @@ export class UsersRepository {
     const user = await this.findById(userId);
     if (!user) return null;
 
-    const edits = await this.pool.query(
-      `SELECT id, target_node_id, proposed_data, citation_url, status,
-              reviewed_at, created_at
-         FROM public.edits_queue WHERE user_id = $1
-         ORDER BY created_at DESC`,
-      [userId],
-    );
-    const keys = await this.pool.query(
-      `SELECT id, name, key_prefix, tier, rate_limit_daily, last_used_at,
-              revoked_at, created_at
-         FROM public.api_keys WHERE user_id = $1
-         ORDER BY created_at DESC`,
-      [userId],
-    );
+    const [edits, keys, wiki, audits, usage, daily] = await Promise.all([
+      this.pool.query(
+        `SELECT id, target_node_id, proposed_data, citation_url, status,
+                review_note, reviewed_at, created_at
+           FROM public.edits_queue WHERE user_id = $1
+           ORDER BY created_at DESC`,
+        [userId],
+      ),
+      this.pool.query(
+        `SELECT id, name, key_prefix, tier, rate_limit_daily, last_used_at,
+                revoked_at, created_at
+           FROM public.api_keys WHERE user_id = $1
+           ORDER BY created_at DESC`,
+        [userId],
+      ),
+      this.pool.query(
+        `SELECT id, entity_id, revision_data, citation_url, created_at
+           FROM public.wiki_revisions WHERE edited_by = $1
+           ORDER BY created_at DESC
+           LIMIT 2000`,
+        [userId],
+      ),
+      this.pool.query(
+        `SELECT id, entity_id, previous_state, new_state, timestamp
+           FROM public.audit_logs WHERE edited_by = $1
+           ORDER BY timestamp DESC
+           LIMIT 2000`,
+        [userId],
+      ),
+      this.pool.query(
+        `SELECT u.id, u.endpoint, u.method, u.status_code, u.created_at,
+                k.name AS api_key_name, k.key_prefix
+           FROM public.api_usage_log u
+           INNER JOIN public.api_keys k ON k.id = u.api_key_id
+          WHERE k.user_id = $1
+            AND u.created_at > now() - interval '90 days'
+           ORDER BY u.created_at DESC
+           LIMIT 5000`,
+        [userId],
+      ),
+      this.pool.query(
+        `SELECT d.usage_date, d.request_count,
+                k.name AS api_key_name, k.key_prefix
+           FROM public.api_key_daily_usage d
+           INNER JOIN public.api_keys k ON k.id = d.api_key_id
+          WHERE k.user_id = $1
+            AND d.usage_date > (CURRENT_DATE - 90)
+           ORDER BY d.usage_date DESC, k.name`,
+        [userId],
+      ),
+    ]);
 
     return {
       exported_at: new Date().toISOString(),
+      notes: {
+        password_hash: 'Not exported (credential secret).',
+        lookup_media:
+          'Photos and audio submitted for lookups are not retained after the request finishes.',
+        api_usage_window: 'Last 90 days (max 5000 request rows).',
+        wiki_and_audit_window: 'Up to 2000 most recent rows each.',
+      },
       account: {
         id: user.id,
         email: user.email,
@@ -417,10 +461,22 @@ export class UsersRepository {
         email_updates_opt_in_at: user.email_updates_opt_in_at ?? null,
         subscription_tier: user.subscription_tier ?? 'free',
         subscription_status: user.subscription_status ?? null,
+        subscription_current_period_end:
+          user.subscription_current_period_end ?? null,
+        stripe_customer_id: user.stripe_customer_id ?? null,
+        stripe_subscription_id: user.stripe_subscription_id ?? null,
         created_at: user.created_at,
       },
-      edits: edits.rows,
+      contributions: {
+        edit_proposals: edits.rows,
+        wiki_revisions: wiki.rows,
+        audit_logs: audits.rows,
+      },
       api_keys: keys.rows,
+      api_usage: {
+        request_log: usage.rows,
+        daily_counts: daily.rows,
+      },
     };
   }
 
