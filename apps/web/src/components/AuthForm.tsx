@@ -10,6 +10,7 @@ import {
   register,
   type AuthUser,
 } from '@/lib/auth';
+import { safeNextPath } from '@/lib/safe-next';
 
 type Mode = 'login' | 'register';
 
@@ -17,9 +18,8 @@ export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const next =
-    searchParams.get('next') ||
-    (pathname.startsWith('/admin') ? '/admin' : '/account');
+  const fallback = pathname.startsWith('/admin') ? '/admin' : '/account';
+  const next = safeNextPath(searchParams.get('next'), fallback);
 
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState('');

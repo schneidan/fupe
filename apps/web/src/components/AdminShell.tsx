@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { getStoredUser, type AuthUser } from '@/lib/auth';
+import { safeNextPath } from '@/lib/safe-next';
 import { AdminNav } from '@/components/AdminNav';
 
 function isAdmin(user: AuthUser | null): boolean {
@@ -30,10 +31,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     if (!ready) return;
     if (isLogin) {
       if (isAdmin(user)) {
-        const next = searchParams.get('next') || '/admin';
+        const candidate = safeNextPath(searchParams.get('next'), '/admin');
         const safe =
-          next.startsWith('/admin') && !next.startsWith('/admin/login')
-            ? next
+          candidate.startsWith('/admin') &&
+          !candidate.startsWith('/admin/login')
+            ? candidate
             : '/admin';
         router.replace(safe);
       }

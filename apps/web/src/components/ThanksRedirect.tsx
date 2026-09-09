@@ -3,19 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { safeNextPath } from '@/lib/safe-next';
 
 const REDIRECT_SECONDS = 6;
-
-function safeNextPath(raw: string | null): string {
-  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/';
-  return raw;
-}
 
 export function ThanksRedirect() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const target = useMemo(
-    () => safeNextPath(searchParams.get('next')),
+    () => safeNextPath(searchParams.get('next'), '/'),
     [searchParams],
   );
   const [left, setLeft] = useState(REDIRECT_SECONDS);
