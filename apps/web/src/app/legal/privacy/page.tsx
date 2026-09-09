@@ -1,4 +1,5 @@
 import { LegalDoc, LegalH2 } from '@/components/LegalDoc';
+import { ObfuscatedEmail } from '@/components/ObfuscatedEmail';
 
 export const metadata = { title: 'Privacy Policy' };
 
@@ -6,9 +7,10 @@ export default function PrivacyPage() {
   return (
     <LegalDoc title="Privacy Policy">
       <p>
-        This Privacy Policy explains how FUPE collects, uses, and shares personal
-        information. It is intended to meet GDPR and CCPA transparency expectations
-        for a pre-launch / early-access product.
+        This Privacy Policy explains how FUPE (&quot;Find Ultimate Parent
+        Entity&quot;), operated by FUPE, LLC, collects, uses, and shares personal
+        information. It is intended to meet GDPR and CCPA transparency
+        expectations for an early-access product.
       </p>
       <LegalH2>1. Data we collect</LegalH2>
       <ul className="list-disc space-y-2 pl-5">
@@ -123,9 +125,10 @@ export default function PrivacyPage() {
       <p>
         Account data is kept while your account is active. You may request
         export or deletion (Art. 15 / 17) via the in-app account controls or by
-        emailing privacy@fupe.app. API usage logs are operational metrics and
-        may be retained for a limited period for abuse analysis. Lookup media is
-        processed in memory for the request and is not stored as user content.
+        emailing <ObfuscatedEmail user="privacy" domain="fupe.app" />. API usage
+        logs are operational metrics and may be retained for a limited period for
+        abuse analysis. Lookup media is processed in memory for the request and
+        is not stored as user content.
       </p>
       <LegalH2>7. Your rights</LegalH2>
       <p>
@@ -142,7 +145,12 @@ export default function PrivacyPage() {
       </p>
       <LegalH2>9. Contact</LegalH2>
       <p>
-        Privacy requests: <span className="text-fupe-text">privacy@fupe.app</span>
+        Privacy requests:{' '}
+        <ObfuscatedEmail user="privacy" domain="fupe.app" />
+      </p>
+      <p>
+        Controller: FUPE, LLC, 6222 E Pine Lane, Suite 6212 #1098, Parker, CO
+        80138, USA.
       </p>
     </LegalDoc>
   );

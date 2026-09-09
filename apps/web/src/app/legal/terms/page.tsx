@@ -8,16 +8,18 @@ export default function TermsPage() {
     <LegalDoc title="Terms of Service">
       <p>
         These Terms govern your use of FUPE (&quot;Find Ultimate Parent Entity&quot;),
-        including the website, mobile apps, and related services operated by FUPE
-        (together, the &quot;Service&quot;). By accessing or using the Service you agree
-        to these Terms.
+        including the website, mobile apps, and related services operated by{' '}
+        <span className="text-fupe-text">FUPE, LLC</span> (together, the
+        &quot;Service&quot;). By accessing or using the Service you agree to these
+        Terms.
       </p>
       <LegalH2>1. What FUPE is</LegalH2>
       <p>
         FUPE helps you look up whether a brand, product, or company appears to be
         connected to private equity or venture ownership in our citation-backed
         directory. Results are informational only. They are not legal, financial,
-        investment, or consumer advice.
+        investment, or consumer advice. The Service is offered in early access;
+        features and coverage may change.
       </p>
       <LegalH2>2. Accounts</LegalH2>
       <p>
@@ -54,9 +56,9 @@ export default function TermsPage() {
       </p>
       <LegalH2>6. Limitation of liability</LegalH2>
       <p>
-        To the fullest extent permitted by law, FUPE is not liable for indirect,
-        incidental, or consequential damages arising from use of the Service, or
-        for reliance on lookup results.
+        To the fullest extent permitted by law, FUPE, LLC is not liable for
+        indirect, incidental, or consequential damages arising from use of the
+        Service, or for reliance on lookup results.
       </p>
       <LegalH2>7. Paid plans &amp; voluntary support</LegalH2>
       <p>
@@ -71,13 +73,25 @@ export default function TermsPage() {
         required by law or if a charge was made in error — contact support and
         we will make it right.
       </p>
-      <LegalH2>8. Changes</LegalH2>
+      <LegalH2>8. Governing law</LegalH2>
+      <p>
+        These Terms are governed by the laws of the State of Colorado, USA,
+        without regard to conflict-of-law rules. Courts located in Colorado
+        shall have exclusive jurisdiction over disputes arising from these Terms
+        or the Service, except where prohibited by applicable consumer-protection
+        law.
+      </p>
+      <LegalH2>9. Changes</LegalH2>
       <p>
         We may update these Terms. Continued use after a change constitutes
         acceptance of the revised Terms. Material changes will be noted by updating
         the date at the top of this page.
       </p>
-      <LegalH2>9. Contact</LegalH2>
+      <LegalH2>10. Contact</LegalH2>
+      <p>
+        Operator: FUPE, LLC, 6222 E Pine Lane, Suite 6212 #1098, Parker, CO
+        80138, USA.
+      </p>
       <p>
         Questions:{' '}
         <ObfuscatedEmail user="support" domain="fupe.app" />{' '}
@@ -85,7 +99,8 @@ export default function TermsPage() {
         <a href="/legal/contact" className="text-fupe-text hover:underline">
           Contact
         </a>
-        .
+        . Legal notices:{' '}
+        <ObfuscatedEmail user="legal" domain="fupe.app" />.
       </p>
     </LegalDoc>
   );

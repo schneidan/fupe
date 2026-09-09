@@ -14,7 +14,7 @@ export function LegalDoc({
         <FupeLogo size="nav" back />
       </div>
       <h1 className="text-2xl font-bold text-fupe-text">{title}</h1>
-      <p className="mt-2 text-xs text-fupe-muted">Last updated: September 3, 2026</p>
+      <p className="mt-2 text-xs text-fupe-muted">Last updated: September 8, 2026</p>
       <div className="prose-legal mt-8 space-y-5 text-sm leading-relaxed text-fupe-muted">
         {children}
       </div>

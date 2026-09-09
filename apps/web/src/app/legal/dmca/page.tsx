@@ -1,4 +1,5 @@
 import { LegalDoc, LegalH2 } from '@/components/LegalDoc';
+import { ObfuscatedEmail } from '@/components/ObfuscatedEmail';
 
 export const metadata = { title: 'DMCA / Takedown' };
 
@@ -10,10 +11,24 @@ export default function DmcaPage() {
         the Service infringes your copyright, send a notice that substantially
         complies with 17 U.S.C. §512(c)(3).
       </p>
+      <LegalH2>Designated agent</LegalH2>
+      <p>
+        DMCA notices for FUPE, LLC may be sent to:
+      </p>
+      <ul className="list-none space-y-1 pl-0 text-fupe-text">
+        <li>FUPE, LLC</li>
+        <li>Attn: DMCA Agent</li>
+        <li>6222 E Pine Lane, Suite 6212 #1098</li>
+        <li>Parker, CO 80138</li>
+        <li>
+          Email:{' '}
+          <ObfuscatedEmail user="dmca" domain="fupe.app" />
+        </li>
+      </ul>
       <LegalH2>How to submit</LegalH2>
       <p>
-        Email <span className="text-fupe-text">dmca@fupe.app</span> (replace
-        with your production address before launch) with:
+        Email{' '}
+        <ObfuscatedEmail user="dmca" domain="fupe.app" /> with:
       </p>
       <ul className="list-disc space-y-2 pl-5">
         <li>Your contact name, address, phone, and email</li>
@@ -34,9 +49,10 @@ export default function DmcaPage() {
       <LegalH2>Other takedown requests</LegalH2>
       <p>
         For privacy, defamation, or inaccurate ownership claims that are not
-        copyright issues, email <span className="text-fupe-text">legal@fupe.app</span>{' '}
-        with the entity URL and supporting evidence. We may correct or annotate
-        entries rather than remove public records wholesale.
+        copyright issues, email{' '}
+        <ObfuscatedEmail user="legal" domain="fupe.app" /> with the entity URL
+        and supporting evidence. We may correct or annotate entries rather than
+        remove public records wholesale.
       </p>
       <LegalH2>Counter-notice</LegalH2>
       <p>
