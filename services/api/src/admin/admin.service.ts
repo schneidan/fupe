@@ -84,6 +84,7 @@ export interface BillingHealth {
   last_event_at: string | null;
   last_event_type: string | null;
   events_last_7d: number;
+  unprocessed_count: number;
   stale: boolean;
 }
 
@@ -412,6 +413,11 @@ export class AdminService {
          FROM public.stripe_webhook_log
         WHERE received_at >= now() - interval '7 days'`,
     );
+    const unprocessed = await this.pool.query<{ n: string }>(
+      `SELECT count(*)::text AS n
+         FROM public.stripe_webhook_log
+        WHERE processed_at IS NULL`,
+    );
 
     const last_event_at = last.rows[0]?.received_at?.toISOString() ?? null;
     const last_event_type = last.rows[0]?.event_type ?? null;
@@ -429,6 +435,7 @@ export class AdminService {
       last_event_at,
       last_event_type,
       events_last_7d: Number(week.rows[0]?.n ?? 0),
+      unprocessed_count: Number(unprocessed.rows[0]?.n ?? 0),
       stale,
     };
   }
@@ -784,6 +791,7 @@ export class AdminService {
           subject: emailSubject,
           bodyText: body,
           bodyHtml,
+          userId: row.id,
         });
         sent++;
       } catch (err) {

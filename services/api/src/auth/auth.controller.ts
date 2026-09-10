@@ -3,8 +3,10 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -197,5 +199,21 @@ export class AuthController {
     @Body() body: DeleteAccountDto,
   ) {
     return this.authService.deleteMyAccount(req.user, body.password);
+  }
+
+  /** Preview signed unsubscribe link (human confirm page). */
+  @Get('email-updates/unsubscribe')
+  previewEmailUpdatesUnsubscribe(@Query('token') token: string) {
+    return this.authService.previewEmailUpdatesUnsubscribe(token);
+  }
+
+  /**
+   * One-click / confirm unsubscribe. Token is always in the query string
+   * (RFC 8058 POSTs may send List-Unsubscribe=One-Click in the body).
+   */
+  @Post('email-updates/unsubscribe')
+  @HttpCode(200)
+  unsubscribeEmailUpdates(@Query('token') token: string) {
+    return this.authService.unsubscribeEmailUpdates(token);
   }
 }

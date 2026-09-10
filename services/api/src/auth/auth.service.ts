@@ -14,7 +14,9 @@ import { BillingService } from '../billing/billing.service';
 import {
   hashOpaqueToken,
   newOpaqueToken,
+  resolveJwtSecret,
 } from '../common/security';
+import { verifyEmailUpdatesUnsubscribeToken } from '../common/email-unsubscribe';
 import { UsersRepository, UserRole, UserRow } from './users.repository';
 
 /** Precomputed bcrypt of a random string — used only to equalize login timing. */
@@ -428,5 +430,62 @@ export class AuthService {
       throw new BadRequestException('Unable to confirm email change');
     }
     return this.toAuthUser(updated);
+  }
+
+  async previewEmailUpdatesUnsubscribe(token: string): Promise<{
+    email_masked: string;
+    already_unsubscribed: boolean;
+  }> {
+    const user = await this.userFromUnsubscribeToken(token);
+    return {
+      email_masked: this.maskEmail(user.email),
+      already_unsubscribed: !user.email_updates_opt_in,
+    };
+  }
+
+  async unsubscribeEmailUpdates(token: string): Promise<{
+    message: string;
+    already_unsubscribed: boolean;
+  }> {
+    const user = await this.userFromUnsubscribeToken(token);
+    if (!user.email_updates_opt_in) {
+      return {
+        message: 'You are already unsubscribed from product updates.',
+        already_unsubscribed: true,
+      };
+    }
+    await this.usersRepo.updateAccountPrefs(user.id, {
+      email_updates_opt_in: false,
+    });
+    return {
+      message: 'You are unsubscribed from occasional FUPE product updates.',
+      already_unsubscribed: false,
+    };
+  }
+
+  private async userFromUnsubscribeToken(token: string): Promise<UserRow> {
+    const raw = token?.trim();
+    if (!raw) {
+      throw new BadRequestException('Missing unsubscribe token');
+    }
+    const parsed = verifyEmailUpdatesUnsubscribeToken(
+      raw,
+      resolveJwtSecret(this.config),
+    );
+    if (!parsed) {
+      throw new BadRequestException('Invalid or expired unsubscribe link');
+    }
+    const user = await this.usersRepo.findById(parsed.userId);
+    if (!user || user.disabled_at) {
+      throw new BadRequestException('Invalid or expired unsubscribe link');
+    }
+    return user;
+  }
+
+  private maskEmail(email: string): string {
+    const [local, domain] = email.split('@');
+    if (!domain) return '***';
+    const keep = local.slice(0, Math.min(2, local.length));
+    return `${keep}***@${domain}`;
   }
 }

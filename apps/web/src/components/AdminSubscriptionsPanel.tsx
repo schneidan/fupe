@@ -43,6 +43,10 @@ function HealthBanner({ health }: { health: BillingHealth }) {
     tone = 'border-verdict-yes/40 bg-verdict-yes/5 text-verdict-yes';
     title = 'Webhook secret missing';
     detail = 'STRIPE_WEBHOOK_SECRET is unset — events will not sync.';
+  } else if (health.unprocessed_count > 0) {
+    tone = 'border-status-warn/40 bg-status-warn/10 text-status-warn';
+    title = 'Unprocessed webhook events';
+    detail = `${health.unprocessed_count} event${health.unprocessed_count === 1 ? '' : 's'} claimed but not marked processed — check API logs.`;
   } else if (health.stale) {
     tone = 'border-verdict-yes/40 bg-verdict-yes/5 text-verdict-yes';
     title = 'Webhook sync stale';
@@ -52,7 +56,7 @@ function HealthBanner({ health }: { health: BillingHealth }) {
   } else {
     tone = 'border-fupe-border bg-fupe-elevated text-fupe-text';
     title = 'Webhooks healthy';
-    detail = `Last: ${health.last_event_type} · ${new Date(health.last_event_at!).toLocaleString()} · ${health.events_last_7d} events in 7d`;
+    detail = `Last: ${health.last_event_type} · ${new Date(health.last_event_at!).toLocaleString()} · ${health.events_last_7d} events in 7d · ${health.unprocessed_count} unprocessed`;
   }
 
   return (

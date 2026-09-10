@@ -7,12 +7,16 @@ import {
   renderBrandedEmail,
   siteBaseUrl,
 } from './email-layout';
+import { resolveJwtSecret } from '../common/security';
+import { signEmailUpdatesUnsubscribeToken } from '../common/email-unsubscribe';
 
 export interface OutboundEmail {
   to: string;
   subject: string;
   text: string;
   html: string;
+  /** Extra SMTP / Resend headers (e.g. List-Unsubscribe). */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -147,9 +151,22 @@ export class MailService {
 
   async sendProductUpdateEmail(
     to: string,
-    params: { subject: string; bodyText: string; bodyHtml: string },
+    params: {
+      subject: string;
+      bodyText: string;
+      bodyHtml: string;
+      userId: string;
+    },
   ): Promise<void> {
     const site = this.siteUrl();
+    const token = signEmailUpdatesUnsubscribeToken(
+      params.userId,
+      resolveJwtSecret(this.config),
+    );
+    const unsubPage = `${site}/unsubscribe?token=${encodeURIComponent(token)}`;
+    // One-click POST target (RFC 8058) — Nest auth route via web rewrite.
+    const unsubApi = `${site}/api/v1/auth/email-updates/unsubscribe?token=${encodeURIComponent(token)}`;
+
     await this.send({
       to,
       subject: params.subject,
@@ -158,6 +175,7 @@ export class MailService {
         '',
         '—',
         'You’re receiving this because you opted in to occasional FUPE updates.',
+        `Unsubscribe: ${unsubPage}`,
         `Manage preferences: ${site}/account`,
         `Support: support@fupe.app`,
       ].join('\n'),
@@ -167,11 +185,14 @@ export class MailService {
           headline: params.subject.replace(/^FUPE:\s*/i, '') || 'FUPE update',
           bodyHtml: params.bodyHtml,
           cta: { label: 'Manage email preferences', url: `${site}/account` },
-          footnoteHtml:
-            'You’re receiving this because you opted in to occasional FUPE product updates. You can turn this off anytime on your account page.',
+          footnoteHtml: `You’re receiving this because you opted in to occasional FUPE product updates. <a href="${escapeHtml(unsubPage)}" style="color:#d4d4d4">Unsubscribe</a> anytime, or manage preferences on your account page.`,
         },
         { siteUrl: site },
       ),
+      headers: {
+        'List-Unsubscribe': `<${unsubApi}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      },
     });
   }
 
@@ -284,7 +305,7 @@ export class MailService {
         {
           preheader: `${tierLabel} subscription is active.`,
           headline: `${tierLabel} is active`,
-          bodyHtml: `<p style="margin:0 0 12px">Thanks for supporting FUPE. Your API keys now use the ${escapeHtml(tierLabel)} rate limits${tier !== 'free' ? ' (including IMAGE lookup where applicable)' : ''}.</p>`,
+          bodyHtml: `<p style="margin:0 0 12px">Thanks for supporting FUPE. Your API keys now use the ${escapeHtml(tierLabel)} rate limits${tier !== 'free' ? ' (including image lookup where applicable)' : ''}.</p>`,
           cta: { label: 'Open Developers', url: `${site}/developers` },
         },
         { siteUrl: site },
@@ -410,6 +431,7 @@ export class MailService {
         subject: message.subject,
         text: message.text,
         html: message.html,
+        headers: message.headers,
       });
       this.logger.log(
         `[email:smtp] to=${message.to} subject=${message.subject} messageId=${info.messageId}`,
@@ -485,6 +507,14 @@ export class MailService {
         subject: message.subject,
         text: message.text,
         html: message.html,
+        ...(message.headers
+          ? {
+              headers: Object.entries(message.headers).map(([name, value]) => ({
+                name,
+                value,
+              })),
+            }
+          : {}),
       }),
     });
 

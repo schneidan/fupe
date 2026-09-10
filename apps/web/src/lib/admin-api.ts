@@ -88,6 +88,7 @@ export interface BillingHealth {
   last_event_at: string | null;
   last_event_type: string | null;
   events_last_7d: number;
+  unprocessed_count: number;
   stale: boolean;
 }
 

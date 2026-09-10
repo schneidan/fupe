@@ -210,30 +210,32 @@ export class BillingService {
   }
 
   /**
-   * Claim an event for processing. Returns false only when already successfully
-   * processed (`processed_at` set). Duplicate deliveries while still unprocessed
-   * are allowed so a failed handler can retry.
+   * Atomically claim an event for processing.
+   * Returns false if already processed or another worker holds a fresh lease.
+   * Stale leases (>5 min) can be reclaimed after a failed attempt.
    */
   private async claimWebhookEvent(event: Stripe.Event): Promise<boolean> {
     try {
-      const inserted = await this.pool.query(
+      await this.pool.query(
         `INSERT INTO public.stripe_webhook_log (stripe_event_id, event_type)
          VALUES ($1, $2)
-         ON CONFLICT (stripe_event_id) DO NOTHING
-         RETURNING id`,
+         ON CONFLICT (stripe_event_id) DO NOTHING`,
         [event.id, event.type],
       );
-      if ((inserted.rowCount ?? 0) > 0) return true;
 
-      const existing = await this.pool.query<{ processed_at: Date | null }>(
-        `SELECT processed_at FROM public.stripe_webhook_log
-          WHERE stripe_event_id = $1`,
+      const claimed = await this.pool.query(
+        `UPDATE public.stripe_webhook_log
+            SET processing_started_at = now()
+          WHERE stripe_event_id = $1
+            AND processed_at IS NULL
+            AND (
+              processing_started_at IS NULL
+              OR processing_started_at < now() - interval '5 minutes'
+            )
+          RETURNING id`,
         [event.id],
       );
-      if (existing.rows[0]?.processed_at) return false;
-
-      // Prior attempt did not finish — allow retry.
-      return true;
+      return (claimed.rowCount ?? 0) > 0;
     } catch (err) {
       this.logger.warn(
         `Failed to claim Stripe event ${event.id}: ${err instanceof Error ? err.message : err}`,
