@@ -111,7 +111,7 @@ Keyed requests are written to `api_usage_log`. Daily tier limits and Stripe Chec
 |------|-------|-------|-------|
 | Free | $0 | 100/day | no |
 | Developer | $9/mo | 10k/day | yes |
-| Business | custom | 100k/day | yes |
+| Pro | $29/mo | 50k/day | yes |
 
 Sign in at [`/developers`](http://localhost:3001/developers) → create a key → Upgrade (Stripe Test mode).
 
@@ -120,7 +120,7 @@ Sign in at [`/developers`](http://localhost:3001/developers) → create a key �
 stripe listen --forward-to localhost:3000/api/v1/billing/webhook
 ```
 
-Env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_DEVELOPER` (see `services/api/.env.example`).
+Env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_DEVELOPER`, `STRIPE_PRICE_PRO` (see `services/api/.env.example`).
 
 ### API docs (Phase 6.3)
 

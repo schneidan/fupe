@@ -15,7 +15,7 @@ export interface UserRow {
   email_verify_expires_at: Date | null;
   password_reset_token?: string | null;
   password_reset_expires_at?: Date | null;
-  subscription_tier?: 'free' | 'developer' | 'business';
+  subscription_tier?: 'free' | 'developer' | 'pro';
   subscription_status?: string | null;
   stripe_customer_id?: string | null;
   stripe_subscription_id?: string | null;
@@ -348,7 +348,7 @@ export class UsersRepository {
 
   async setSubscription(params: {
     userId: string;
-    tier: 'free' | 'developer' | 'business';
+    tier: 'free' | 'developer' | 'pro';
     status: string | null;
     subscriptionId: string | null;
     currentPeriodEnd?: Date | null;

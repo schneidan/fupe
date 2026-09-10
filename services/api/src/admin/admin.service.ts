@@ -40,7 +40,7 @@ export interface AdminUserRow {
   trust_score: number;
   role: UserRole;
   email_verified_at: Date | null;
-  subscription_tier: 'free' | 'developer' | 'business';
+  subscription_tier: 'free' | 'developer' | 'pro';
   subscription_status: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
@@ -345,7 +345,7 @@ export class AdminService {
         (SELECT count(*)::int FROM public.users WHERE email_verified_at IS NOT NULL AND disabled_at IS NULL) AS verified_users,
         (SELECT count(*)::int FROM public.users WHERE created_at >= now() - interval '24 hours') AS new_users_24h,
         (SELECT count(*)::int FROM public.users WHERE created_at >= now() - interval '7 days') AS new_users_7d,
-        (SELECT count(*)::int FROM public.users WHERE subscription_tier IN ('developer','business') AND subscription_status IN ('active', 'trialing', 'admin_override')) AS paid_subscribers,
+        (SELECT count(*)::int FROM public.users WHERE subscription_tier IN ('developer','pro') AND subscription_status IN ('active', 'trialing', 'admin_override')) AS paid_subscribers,
         (SELECT count(*)::int FROM public.edits_queue WHERE status = 'PENDING') AS pending_edits,
         (SELECT count(*)::int FROM public.ingest_match_queue WHERE status = 'pending') AS pending_ingest_matches,
         (SELECT count(*)::int FROM public.api_keys WHERE revoked_at IS NULL) AS total_api_keys,
@@ -486,7 +486,7 @@ export class AdminService {
   async overrideTier(
     actorId: string,
     userId: string,
-    tier: 'free' | 'developer' | 'business',
+    tier: 'free' | 'developer' | 'pro',
     note?: string,
   ): Promise<AdminUserRow> {
     const previous = await this.getUser(userId);

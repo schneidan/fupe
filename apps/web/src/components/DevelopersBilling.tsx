@@ -10,20 +10,30 @@ import {
   type AuthUser,
 } from '@/lib/auth';
 
+interface TierInfo {
+  price_usd: number | null;
+  rate_limit_daily: number;
+  image_lookup: boolean;
+  note?: string;
+}
+
 interface BillingStatus {
   subscription_tier: string;
   subscription_status: string | null;
   stripe_configured: boolean;
-  tiers: Record<
-    string,
-    {
-      price_usd: number | null;
-      rate_limit_daily: number;
-      image_lookup: boolean;
-      note?: string;
-    }
-  >;
+  prices_configured?: {
+    developer?: boolean;
+    pro?: boolean;
+  };
+  tiers: Record<string, TierInfo>;
 }
+
+/** Shown before sign-in / if status hasn’t loaded — keep in sync with API TIER_* constants. */
+const FALLBACK_TIERS: Record<string, TierInfo> = {
+  free: { price_usd: 0, rate_limit_daily: 100, image_lookup: false },
+  developer: { price_usd: 9, rate_limit_daily: 10_000, image_lookup: true },
+  pro: { price_usd: 29, rate_limit_daily: 50_000, image_lookup: true },
+};
 
 async function authJson<T>(path: string, init: RequestInit & { token: string }) {
   const { token, ...rest } = init;
@@ -81,7 +91,7 @@ export function DevelopersBilling() {
       );
   }, [user?.id, checkoutFlash]);
 
-  async function startCheckout(tier: 'developer' | 'business' = 'developer') {
+  async function startCheckout(tier: 'developer' | 'pro' = 'developer') {
     const token = getToken();
     if (!token) {
       window.location.href = '/login?next=/developers';
@@ -143,10 +153,38 @@ export function DevelopersBilling() {
   const tier = status?.subscription_tier ?? 'free';
   const paidActive =
     checkoutFlash === 'success' &&
-    (tier === 'developer' || tier === 'business') &&
+    (tier === 'developer' || tier === 'pro') &&
     (status?.subscription_status === 'active' ||
       status?.subscription_status === 'trialing' ||
       status?.subscription_status === 'admin_override');
+
+  const developerReady =
+    status?.stripe_configured !== false &&
+    status?.prices_configured?.developer !== false;
+  const proReady =
+    status?.stripe_configured !== false &&
+    status?.prices_configured?.pro === true;
+
+  function checkoutDisabled(plan: 'developer' | 'pro') {
+    if (busy) return true;
+    // Not signed in / status not loaded yet — click starts checkout which redirects to login.
+    if (!status) return false;
+    if (status.stripe_configured === false) return true;
+    if (plan === 'developer') return status.prices_configured?.developer === false;
+    return status.prices_configured?.pro !== true;
+  }
+
+  function checkoutLabel(plan: 'developer' | 'pro', fallback: string) {
+    if (!status) return fallback;
+    if (status.stripe_configured === false) return 'Stripe not configured';
+    if (plan === 'developer' && status.prices_configured?.developer === false) {
+      return 'Developer price not set';
+    }
+    if (plan === 'pro' && status.prices_configured?.pro !== true) {
+      return 'Pro price not set';
+    }
+    return fallback;
+  }
 
   return (
     <div className="mt-10 space-y-10">
@@ -206,13 +244,11 @@ export function DevelopersBilling() {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              disabled={busy || status?.stripe_configured === false}
+              disabled={checkoutDisabled('developer')}
               onClick={() => startCheckout('developer')}
               className="rounded-full bg-fupe-text px-5 py-2 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted disabled:opacity-50"
             >
-              {status?.stripe_configured === false
-                ? 'Stripe not configured'
-                : 'Try Developer again'}
+              {checkoutLabel('developer', 'Try Developer again')}
             </button>
             <button
               type="button"
@@ -230,10 +266,10 @@ export function DevelopersBilling() {
           [
             ['free', 'Free'],
             ['developer', 'Developer'],
-            ['business', 'Business'],
+            ['pro', 'Pro'],
           ] as const
         ).map(([id, label]) => {
-          const t = status?.tiers?.[id];
+          const t = status?.tiers?.[id] ?? FALLBACK_TIERS[id];
           const active = tier === id;
           return (
             <div
@@ -247,7 +283,7 @@ export function DevelopersBilling() {
               <h2 className="font-semibold text-fupe-text">{label}</h2>
               <p className="mt-2 text-2xl text-fupe-text">
                 {t?.price_usd == null
-                  ? 'Custom'
+                  ? '—'
                   : t.price_usd === 0
                     ? '$0'
                     : `$${t.price_usd}/mo`}
@@ -262,23 +298,24 @@ export function DevelopersBilling() {
               {id === 'developer' && tier === 'free' ? (
                 <button
                   type="button"
-                  disabled={busy || status?.stripe_configured === false}
+                  disabled={checkoutDisabled('developer')}
                   onClick={() => startCheckout('developer')}
                   className="mt-4 w-full rounded-full bg-fupe-text px-4 py-2 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted disabled:opacity-50"
                 >
-                  {status?.stripe_configured === false
-                    ? 'Stripe not configured'
-                    : 'Upgrade'}
+                  {checkoutLabel('developer', 'Upgrade')}
                 </button>
               ) : null}
-              {id === 'business' && tier !== 'business' ? (
+              {id === 'pro' && tier !== 'pro' ? (
                 <button
                   type="button"
-                  disabled={busy}
-                  onClick={() => startCheckout('business')}
-                  className="mt-4 w-full rounded-full border border-fupe-border px-4 py-2 text-sm text-fupe-text hover:border-fupe-muted disabled:opacity-50"
+                  disabled={checkoutDisabled('pro')}
+                  onClick={() => startCheckout('pro')}
+                  className="mt-4 w-full rounded-full border border-fupe-border px-4 py-2 text-sm font-semibold text-fupe-text hover:border-fupe-muted disabled:opacity-50"
                 >
-                  Upgrade (if priced)
+                  {checkoutLabel(
+                    'pro',
+                    tier === 'developer' ? 'Upgrade to Pro' : 'Upgrade',
+                  )}
                 </button>
               ) : null}
               {active ? (
@@ -290,6 +327,20 @@ export function DevelopersBilling() {
           );
         })}
       </section>
+
+      {!user ? null : !developerReady || !proReady ? (
+        <p className="text-xs text-fupe-muted">
+          Stripe products: set{' '}
+          <code className="text-fupe-text">STRIPE_PRICE_DEVELOPER</code>
+          {!proReady ? (
+            <>
+              {' '}
+              and <code className="text-fupe-text">STRIPE_PRICE_PRO</code>
+            </>
+          ) : null}{' '}
+          on the API to enable checkout.
+        </p>
+      ) : null}
 
       <section
         id="api-keys"

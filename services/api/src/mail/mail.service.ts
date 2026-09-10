@@ -343,7 +343,7 @@ export class MailService {
       subject: 'FUPE payment failed — action needed',
       text: [
         'We could not process a payment for your FUPE subscription.',
-        'Update your payment method to keep Developer/Business access.',
+        'Update your payment method to keep Developer/Pro access.',
         '',
         `Billing portal: ${site}/developers`,
         `Support: support@fupe.app`,

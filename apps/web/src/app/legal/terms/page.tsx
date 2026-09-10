@@ -62,7 +62,7 @@ export default function TermsPage() {
       </p>
       <LegalH2>7. Paid plans &amp; voluntary support</LegalH2>
       <p>
-        Developer and Business API subscriptions are billed through Stripe.
+        Developer and Pro API subscriptions are billed through Stripe.
         You can cancel or manage billing from the{' '}
         <a href="/developers" className="text-fupe-text hover:underline">
           Developers

@@ -49,7 +49,7 @@ export class LookupController {
   @ApiOperation({
     summary: 'Unified ownership lookup',
     description:
-      'Resolve whether a brand/product/company is PE-backed. JSON body for TEXT/BARCODE; multipart for IMAGE/VOICE with a `file` field (≤5MB). IMAGE: optional `use_ai=false` for on-server OCR only. IMAGE requires Developer/Business API key or first-party credential.',
+      'Resolve whether a brand/product/company is PE-backed. JSON body for TEXT/BARCODE; multipart for IMAGE/VOICE with a `file` field (≤5MB). IMAGE: optional `use_ai=false` for on-server OCR only. IMAGE requires Developer/Pro API key or first-party credential.',
   })
   @ApiConsumes('application/json', 'multipart/form-data')
   @ApiBody({ type: UnifiedLookupDto })
@@ -72,12 +72,12 @@ export class LookupController {
       if (req.apiKey) {
         if (!TIER_ALLOWS_IMAGE[req.apiKey.tier]) {
           throw new ForbiddenException(
-            'IMAGE lookup requires Developer or Business tier. Upgrade at /developers.',
+            'IMAGE lookup requires Developer or Pro tier. Upgrade at /developers.',
           );
         }
       } else if (!firstPartyOk) {
         throw new UnauthorizedException(
-          'IMAGE lookup requires a Developer/Business API key, or a first-party client credential.',
+          'IMAGE lookup requires a Developer/Pro API key, or a first-party client credential.',
         );
       }
     }

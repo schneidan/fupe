@@ -70,7 +70,7 @@ class ListPageQuery {
 }
 
 class OverrideTierBody {
-  @IsEnum(['free', 'developer', 'business']) tier!: 'free' | 'developer' | 'business';
+  @IsEnum(['free', 'developer', 'pro']) tier!: 'free' | 'developer' | 'pro';
   @IsOptional() @IsString() @MaxLength(500) note?: string;
 }
 

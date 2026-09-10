@@ -149,6 +149,7 @@ AUTO_VERIFY_EMAIL=false
 # Stripe TEST mode (separate event-destination secret — §8)
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_PRICE_DEVELOPER=price_...
+STRIPE_PRICE_PRO=price_...
 # STRIPE_WEBHOOK_SECRET=whsec_...   # fill after §8b
 
 # OpenRouter — IMAGE vision + API VOICE STT (preferred). Without this, IMAGE is OCR-only.
@@ -325,7 +326,7 @@ UPDATE public.users SET
   stripe_customer_id = NULL,
   stripe_subscription_id = NULL,
   subscription_status = CASE
-    WHEN subscription_tier IN ('developer', 'business') THEN 'admin_override'
+    WHEN subscription_tier IN ('developer', 'pro') THEN 'admin_override'
     ELSE subscription_status
   END,
   token_version = COALESCE(token_version, 0) + 1;
@@ -635,6 +636,7 @@ No new products required if prod Test mode already has a Developer price:
 
 - [x] `STRIPE_SECRET_KEY=sk_test_...` in staging API `.env` (same test secret as prod is OK)
 - [x] `STRIPE_PRICE_DEVELOPER=price_...` (same Test price id is OK)
+- [x] `STRIPE_PRICE_PRO=price_...`
 - [x] Footer link optional: `NEXT_PUBLIC_SUPPORT_URL=https://buy.stripe.com/test_...` in staging web `.env.production` (can reuse the Test Payment Link)
 
 To create/find a price: Dashboard → **Product catalog** → product → copy `price_…`.  

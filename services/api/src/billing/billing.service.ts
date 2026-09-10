@@ -11,6 +11,9 @@ import Stripe = require('stripe');
 import {
   ApiKeyTier,
   ApiKeysService,
+  TIER_ALLOWS_IMAGE,
+  TIER_LIMITS,
+  TIER_PRICE_USD,
 } from '../api-keys/api-keys.service';
 import { UsersRepository, UserRow } from '../auth/users.repository';
 import { DATABASE_POOL } from '../database/database.constants';
@@ -70,22 +73,27 @@ export class BillingService {
       current_period_end:
         user.subscription_current_period_end?.toISOString() ?? null,
       stripe_configured: this.isConfigured(),
+      prices_configured: {
+        developer: Boolean(
+          this.config.get<string>('STRIPE_PRICE_DEVELOPER')?.trim(),
+        ),
+        pro: Boolean(this.config.get<string>('STRIPE_PRICE_PRO')?.trim()),
+      },
       tiers: {
         free: {
-          price_usd: 0,
-          rate_limit_daily: 100,
-          image_lookup: false,
+          price_usd: TIER_PRICE_USD.free,
+          rate_limit_daily: TIER_LIMITS.free,
+          image_lookup: TIER_ALLOWS_IMAGE.free,
         },
         developer: {
-          price_usd: 9,
-          rate_limit_daily: 10_000,
-          image_lookup: true,
+          price_usd: TIER_PRICE_USD.developer,
+          rate_limit_daily: TIER_LIMITS.developer,
+          image_lookup: TIER_ALLOWS_IMAGE.developer,
         },
-        business: {
-          price_usd: null,
-          rate_limit_daily: 100_000,
-          image_lookup: true,
-          note: 'Custom SLA — contact us or use STRIPE_PRICE_BUSINESS',
+        pro: {
+          price_usd: TIER_PRICE_USD.pro,
+          rate_limit_daily: TIER_LIMITS.pro,
+          image_lookup: TIER_ALLOWS_IMAGE.pro,
         },
       },
     };
@@ -93,18 +101,18 @@ export class BillingService {
 
   async createCheckoutSession(
     user: UserRow,
-    tier: 'developer' | 'business' = 'developer',
+    tier: 'developer' | 'pro' = 'developer',
   ): Promise<{ url: string }> {
     const stripe = this.requireStripe();
     const priceId =
-      tier === 'business'
-        ? this.config.get<string>('STRIPE_PRICE_BUSINESS')
+      tier === 'pro'
+        ? this.config.get<string>('STRIPE_PRICE_PRO')
         : this.config.get<string>('STRIPE_PRICE_DEVELOPER');
 
     if (!priceId) {
       throw new BadRequestException(
-        tier === 'business'
-          ? 'Business tier is not configured (STRIPE_PRICE_BUSINESS). Contact support for custom pricing.'
+        tier === 'pro'
+          ? 'Pro tier is not configured (STRIPE_PRICE_PRO).'
           : 'STRIPE_PRICE_DEVELOPER is not set',
       );
     }
@@ -481,15 +489,19 @@ export class BillingService {
   }
 
   private parseTier(raw?: string | null): ApiKeyTier | null {
-    if (raw === 'free' || raw === 'developer' || raw === 'business') return raw;
+    if (raw === 'free' || raw === 'developer' || raw === 'pro') return raw;
+    // Legacy Stripe metadata / webhooks from pre-launch Business tier
+    if (raw === 'business') return 'pro';
     return null;
   }
 
   private tierFromPrice(sub: Stripe.Subscription): ApiKeyTier | null {
     const priceId = sub.items.data[0]?.price?.id;
     if (!priceId) return null;
-    if (priceId === this.config.get('STRIPE_PRICE_BUSINESS')) return 'business';
+    if (priceId === this.config.get('STRIPE_PRICE_PRO')) return 'pro';
     if (priceId === this.config.get('STRIPE_PRICE_DEVELOPER')) return 'developer';
+    // Legacy env name if still set in some deploys
+    if (priceId === this.config.get('STRIPE_PRICE_BUSINESS')) return 'pro';
     return null;
   }
 }

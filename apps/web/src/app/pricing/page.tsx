@@ -56,16 +56,16 @@ export default function PricingPage() {
       <p>Billed monthly via Stripe; cancel anytime.</p>
       <ul className="list-disc space-y-2 pl-5">
         <li>
-          <span className="font-medium text-fupe-text">Free</span> —
-          Experimentation limits; good for trying the API.
+          <span className="font-medium text-fupe-text">Free — $0</span> — 100
+          requests/day; no image lookup. Good for trying the API.
         </li>
         <li>
           <span className="font-medium text-fupe-text">Developer — $9/mo</span>{' '}
-          — Higher limits and image lookup.
+          — 10,000 requests/day and image lookup.
         </li>
         <li>
-          <span className="font-medium text-fupe-text">Business</span> — Custom
-          / contact us (when configured).
+          <span className="font-medium text-fupe-text">Pro — $29/mo</span> —
+          50,000 requests/day and image lookup.
         </li>
       </ul>
       <p>

@@ -62,7 +62,7 @@ async function bootstrap() {
           '**Auth:** pass `X-API-Key: fupe_…` (create keys on the Developers page).',
           'First-party web/mobile may omit a key unless `REQUIRE_API_KEY=true`.',
           '',
-          '**Tiers (keyed requests):** Free 100/day (no IMAGE); Developer 10k/day + IMAGE; Business custom.',
+          '**Tiers (keyed requests):** Free 100/day (no IMAGE); Developer $9 · 10k/day + IMAGE; Pro $29 · 50k/day + IMAGE.',
         ].join('\n'),
       )
       .setVersion('0.1')

@@ -16,9 +16,10 @@ export default function ApiTermsPage() {
       </p>
       <LegalH2>1. Keys &amp; tiers</LegalH2>
       <p>
-        Keys are personal to your account. Free, Developer, and Business tiers
-        have different daily rate limits and feature access (for example, image
-        lookup requires a paid tier). Do not share keys publicly.
+        Keys are personal to your account. Free, Developer, and Pro tiers have
+        different daily rate limits and feature access (for example, image
+        lookup requires a paid tier). Do not share keys publicly. Anonymous
+        directory browsing is also subject to per-IP daily and burst limits.
       </p>
       <LegalH2>2. Fair use</LegalH2>
       <p>

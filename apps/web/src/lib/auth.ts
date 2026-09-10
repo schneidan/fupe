@@ -13,7 +13,7 @@ export interface AuthUser {
   location?: string | null;
   pending_email?: string | null;
   email_updates_opt_in?: boolean;
-  subscription_tier?: 'free' | 'developer' | 'business';
+  subscription_tier?: 'free' | 'developer' | 'pro';
   subscription_status?: string | null;
   subscription_current_period_end?: string | null;
 }

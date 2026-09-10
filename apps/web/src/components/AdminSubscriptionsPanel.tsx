@@ -12,7 +12,7 @@ import {
   type BillingHealth,
 } from '@/lib/admin-api';
 
-const TIERS = ['free', 'developer', 'business'] as const;
+const TIERS = ['free', 'developer', 'pro'] as const;
 
 function stripeCustomerUrl(customerId: string, mode: BillingHealth['stripe_mode']) {
   const prefix = mode === 'live' ? '' : 'test/';
@@ -76,7 +76,7 @@ export function AdminSubscriptionsPanel() {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [compEmail, setCompEmail] = useState('');
-  const [compTier, setCompTier] = useState<'developer' | 'business'>('developer');
+  const [compTier, setCompTier] = useState<'developer' | 'pro'>('developer');
   const [health, setHealth] = useState<BillingHealth | null>(null);
   const [audit, setAudit] = useState<AdminAuditEntry[]>([]);
 
@@ -102,7 +102,7 @@ export function AdminSubscriptionsPanel() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function setTier(userId: string, tier: 'free' | 'developer' | 'business') {
+  async function setTier(userId: string, tier: 'free' | 'developer' | 'pro') {
     setBusy(userId);
     try {
       await overrideTier(userId, tier, note.trim() || undefined);
@@ -167,7 +167,7 @@ export function AdminSubscriptionsPanel() {
       <div className="space-y-3 rounded-xl border border-fupe-border p-4">
         <p className="text-sm font-semibold text-fupe-text">Complimentary upgrade</p>
         <p className="text-xs text-fupe-muted">
-          Grants Developer/Business without Stripe. Status becomes admin_override and
+          Grants Developer/Pro without Stripe. Status becomes admin_override and
           later Stripe events will not overwrite it (a new checkout still will).
         </p>
         <div className="flex flex-wrap items-end gap-2">
@@ -185,11 +185,11 @@ export function AdminSubscriptionsPanel() {
             Tier
             <select
               value={compTier}
-              onChange={(e) => setCompTier(e.target.value as 'developer' | 'business')}
+              onChange={(e) => setCompTier(e.target.value as 'developer' | 'pro')}
               className="mt-1 block rounded border border-fupe-border bg-fupe-bg px-2 py-1.5 text-sm text-fupe-text"
             >
               <option value="developer">developer</option>
-              <option value="business">business</option>
+              <option value="pro">pro</option>
             </select>
           </label>
           <label className="min-w-[12rem] flex-1 text-sm text-fupe-muted">
@@ -254,7 +254,7 @@ export function AdminSubscriptionsPanel() {
                   <select
                     value={s.subscription_tier}
                     disabled={busy === s.id}
-                    onChange={(e) => setTier(s.id, e.target.value as 'free' | 'developer' | 'business')}
+                    onChange={(e) => setTier(s.id, e.target.value as 'free' | 'developer' | 'pro')}
                     className="rounded border border-fupe-border bg-fupe-bg px-1.5 py-0.5 text-xs text-fupe-text"
                   >
                     {TIERS.map((t) => <option key={t} value={t}>{t}</option>)}

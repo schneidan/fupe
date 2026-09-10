@@ -34,7 +34,7 @@ export interface AdminUser {
   role: 'user' | 'moderator' | 'admin';
   trust_score: number;
   email_verified_at: string | null;
-  subscription_tier: 'free' | 'developer' | 'business';
+  subscription_tier: 'free' | 'developer' | 'pro';
   subscription_status: string | null;
   stripe_customer_id: string | null;
   disabled_at: string | null;
@@ -186,7 +186,7 @@ export function fetchAdminAudit(params?: {
 
 export function overrideTier(
   userId: string,
-  tier: 'free' | 'developer' | 'business',
+  tier: 'free' | 'developer' | 'pro',
   note?: string,
 ) {
   return adminFetch<AdminUser>(`/users/${userId}/tier`, {

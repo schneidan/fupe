@@ -65,8 +65,8 @@ export default function FaqPage() {
 
       <FaqItem question="Can I use FUPE in my own app?">
         <p>
-          Yes — via the API. Free tier for experimentation; paid Developer tier
-          for higher limits and image.{' '}
+          Yes — via the API. Free tier for experimentation; paid Developer and
+          Pro tiers for higher limits and image.{' '}
           <ContentLink href="/developers">Developers</ContentLink>
           {' · '}
           <ContentLink href="/legal/api">API Terms</ContentLink>.

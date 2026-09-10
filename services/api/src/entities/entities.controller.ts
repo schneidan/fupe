@@ -26,6 +26,8 @@ import {
   ListEntitiesDto,
   UpdateEntityDto,
 } from './entities.dto';
+import { EntitiesIpQuota } from './entities-ip.decorators';
+import { EntitiesIpThrottleGuard } from './entities-ip-throttle.guard';
 import { EntitiesService } from './entities.service';
 
 @ApiTags('Entities')
@@ -40,12 +42,16 @@ export class EntitiesController {
   constructor(private readonly entitiesService: EntitiesService) {}
 
   @Get()
+  @EntitiesIpQuota('entities_list')
+  @UseGuards(EntitiesIpThrottleGuard)
   @ApiOperation({ summary: 'List / search directory entities' })
   list(@Query() query: ListEntitiesDto) {
     return this.entitiesService.list(query);
   }
 
   @Get(':slug/related')
+  @EntitiesIpQuota('entities_detail')
+  @UseGuards(EntitiesIpThrottleGuard)
   @ApiOperation({ summary: 'Related entities (“Did you know?”)' })
   related(@Param('slug') slug: string) {
     return this.entitiesService.getRelated(slug);
@@ -84,6 +90,8 @@ export class EntitiesController {
   }
 
   @Get(':slug')
+  @EntitiesIpQuota('entities_detail')
+  @UseGuards(EntitiesIpThrottleGuard)
   @ApiOperation({ summary: 'Entity detail by slug' })
   @ApiOkResponse({ description: 'Entity with ownership chain and citations' })
   detail(@Param('slug') slug: string) {

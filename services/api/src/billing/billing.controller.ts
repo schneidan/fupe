@@ -18,8 +18,8 @@ import { BillingService } from './billing.service';
 
 class CheckoutBody {
   @IsOptional()
-  @IsIn(['developer', 'business'])
-  tier?: 'developer' | 'business';
+  @IsIn(['developer', 'pro'])
+  tier?: 'developer' | 'pro';
 }
 
 @Controller('billing')

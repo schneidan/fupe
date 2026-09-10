@@ -15,7 +15,13 @@ async function fetchEntitySlugs(): Promise<string[]> {
     try {
       const res = await fetch(
         `${api}/api/v1/entities?page=${page}&limit=${limit}`,
-        { next: { revalidate: 3600 } },
+        {
+          next: { revalidate: 3600 },
+          headers: (() => {
+            const secret = process.env.FIRST_PARTY_LOOKUP_SECRET?.trim();
+            return secret ? { 'X-Fupe-First-Party': secret } : undefined;
+          })(),
+        },
       );
       if (!res.ok) break;
       const body = (await res.json()) as {

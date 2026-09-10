@@ -294,7 +294,7 @@ NEXT_PUBLIC_SITE_URL=https://fupe.app
 # --- Stripe Test mode (live keys later) ---
 STRIPE_SECRET_KEY=sk_test_CHANGE_ME
 STRIPE_PRICE_DEVELOPER=price_CHANGE_ME
-# STRIPE_PRICE_BUSINESS=price_CHANGE_ME
+STRIPE_PRICE_PRO=price_CHANGE_ME
 # Add after §12c event destination is created:
 # STRIPE_WEBHOOK_SECRET=whsec_CHANGE_ME
 
@@ -712,14 +712,16 @@ You can process **test** payments on the real hostname while Stripe account acti
 
 Keep the Dashboard toggle on **Test mode** for every step until you go live.
 
-### 12a. Product catalog (Developers subscription price)
+### 12a. Product catalog (Developers subscription prices)
 
-`/developers` Checkout uses a **Price** id, not a Payment Link.
+`/developers` Checkout uses **Price** ids, not a Payment Link.
 
-1. Dashboard → **Product catalog** → **+ Add product** (or open an existing “FUPE Developer” product).
-2. Name e.g. `FUPE Developer`; recurring monthly price as you prefer.
-3. Copy the **Price** id (`price_…`) → `STRIPE_PRICE_DEVELOPER` in `services/api/.env`.
+1. Dashboard → **Product catalog** → **+ Add product**.
+2. Create **FUPE Developer** — recurring **$9/mo** → copy Price id → `STRIPE_PRICE_DEVELOPER`.
+3. Create **FUPE Pro** — recurring **$29/mo** → copy Price id → `STRIPE_PRICE_PRO`.
 4. Developers → **API keys** → Secret key (`sk_test_…`) → `STRIPE_SECRET_KEY`.
+
+Public marketing copy on `/pricing` and `/developers` must match these amounts (Free $0 · 100/day; Developer $9 · 10k/day; Pro $29 · 50k/day).
 
 ### 12b. Payment Link (footer “keep the lights on”)
 
@@ -775,7 +777,7 @@ Do **not** reuse the Test destination’s signing secret in Live (or vice versa)
 
 ### Lookup rate limits (API + Cloudflare)
 
-The Nest API applies an in-process IP throttle on `/lookup` (default **60 req/min/IP**, override with `LOOKUP_IP_RATE_LIMIT_PER_MIN`). IMAGE lookups require either a Developer/Business API key **or** header `X-Fupe-First-Party` matching `FIRST_PARTY_LOOKUP_SECRET` (web injects this via `/api/image-lookup`; mobile via `--dart-define`). Comparison is timing-safe; production refuses IMAGE first-party access if the secret is unset.
+The Nest API applies an in-process IP throttle on `/lookup` (default **60 req/min/IP**, override with `LOOKUP_IP_RATE_LIMIT_PER_MIN`). Anonymous `GET /entities` traffic also has **list 100/day/IP**, **detail+related 1000/day/IP** (Postgres `ip_daily_usage`), plus **60/min/IP** burst (`ENTITIES_IP_*` env vars). Keyed requests use tier daily quotas instead. IMAGE lookups require either a Developer/Pro API key **or** header `X-Fupe-First-Party` matching `FIRST_PARTY_LOOKUP_SECRET` (web injects this via `/api/image-lookup`; mobile via `--dart-define`; sitemap uses the same header to bypass entities IP caps). Comparison is timing-safe; production refuses IMAGE first-party access if the secret is unset.
 
 The **web** proxy (`fupe.app/api/image-lookup`) adds Tier-2 guards before forwarding:
 

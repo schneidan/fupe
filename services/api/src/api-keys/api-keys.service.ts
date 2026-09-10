@@ -3,18 +3,24 @@ import { createHash, randomBytes } from 'crypto';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.constants';
 
-export type ApiKeyTier = 'free' | 'developer' | 'business';
+export type ApiKeyTier = 'free' | 'developer' | 'pro';
 
 export const TIER_LIMITS: Record<ApiKeyTier, number> = {
   free: 100,
   developer: 10_000,
-  business: 100_000,
+  pro: 50_000,
+};
+
+export const TIER_PRICE_USD: Record<ApiKeyTier, number> = {
+  free: 0,
+  developer: 9,
+  pro: 29,
 };
 
 export const TIER_ALLOWS_IMAGE: Record<ApiKeyTier, boolean> = {
   free: false,
   developer: true,
-  business: true,
+  pro: true,
 };
 
 export interface ApiKeyRow {
