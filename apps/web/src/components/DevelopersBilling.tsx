@@ -1,39 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
 import {
   fetchMe,
   getStoredUser,
   getToken,
   type AuthUser,
 } from '@/lib/auth';
-
-interface TierInfo {
-  price_usd: number | null;
-  rate_limit_daily: number;
-  image_lookup: boolean;
-  note?: string;
-}
-
-interface BillingStatus {
-  subscription_tier: string;
-  subscription_status: string | null;
-  stripe_configured: boolean;
-  prices_configured?: {
-    developer?: boolean;
-    pro?: boolean;
-  };
-  tiers: Record<string, TierInfo>;
-}
-
-/** Shown before sign-in / if status hasn’t loaded — keep in sync with API TIER_* constants. */
-const FALLBACK_TIERS: Record<string, TierInfo> = {
-  free: { price_usd: 0, rate_limit_daily: 100, image_lookup: false },
-  developer: { price_usd: 9, rate_limit_daily: 10_000, image_lookup: true },
-  pro: { price_usd: 29, rate_limit_daily: 50_000, image_lookup: true },
-};
+import { BillingPlansPanel } from '@/components/BillingPlansPanel';
 
 async function authJson<T>(path: string, init: RequestInit & { token: string }) {
   const { token, ...rest } = init;
@@ -55,78 +30,17 @@ async function authJson<T>(path: string, init: RequestInit & { token: string }) 
 }
 
 export function DevelopersBilling() {
-  const searchParams = useSearchParams();
-  const [checkoutFlash, setCheckoutFlash] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [status, setStatus] = useState<BillingStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [newKeySecret, setNewKeySecret] = useState<string | null>(null);
 
   useEffect(() => {
-    const c = searchParams.get('checkout');
-    if (c === 'success' || c === 'cancel') {
-      setCheckoutFlash(c);
-      const url = new URL(window.location.href);
-      url.searchParams.delete('checkout');
-      window.history.replaceState(
-        {},
-        '',
-        `${url.pathname}${url.search}${url.hash}`,
-      );
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
+    const sync = () => setUser(getStoredUser());
     void fetchMe().then((me) => setUser(me ?? getStoredUser()));
+    window.addEventListener('fupe-auth', sync);
+    return () => window.removeEventListener('fupe-auth', sync);
   }, []);
-
-  useEffect(() => {
-    const token = getToken();
-    if (!token) return;
-    authJson<BillingStatus>('/api/v1/billing/status', { method: 'GET', token })
-      .then(setStatus)
-      .catch((e) =>
-        setError(e instanceof Error ? e.message : 'Failed to load billing'),
-      );
-  }, [user?.id, checkoutFlash]);
-
-  async function startCheckout(tier: 'developer' | 'pro' = 'developer') {
-    const token = getToken();
-    if (!token) {
-      window.location.href = '/login?next=/developers';
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const { url } = await authJson<{ url: string }>('/api/v1/billing/checkout', {
-        method: 'POST',
-        token,
-        body: JSON.stringify({ tier }),
-      });
-      window.location.href = url;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Checkout failed');
-      setBusy(false);
-    }
-  }
-
-  async function openPortal() {
-    const token = getToken();
-    if (!token) return;
-    setBusy(true);
-    try {
-      const { url } = await authJson<{ url: string }>('/api/v1/billing/portal', {
-        method: 'POST',
-        token,
-      });
-      window.location.href = url;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Portal failed');
-      setBusy(false);
-    }
-  }
 
   async function createKey() {
     const token = getToken();
@@ -143,6 +57,9 @@ export function DevelopersBilling() {
         body: JSON.stringify({ name: 'Default' }),
       });
       setNewKeySecret(res.secret);
+      void fetchMe().then((me) => {
+        if (me) setUser(me);
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create key');
     } finally {
@@ -150,197 +67,13 @@ export function DevelopersBilling() {
     }
   }
 
-  const tier = status?.subscription_tier ?? 'free';
-  const paidActive =
-    checkoutFlash === 'success' &&
-    (tier === 'developer' || tier === 'pro') &&
-    (status?.subscription_status === 'active' ||
-      status?.subscription_status === 'trialing' ||
-      status?.subscription_status === 'admin_override');
-
-  const developerReady =
-    status?.stripe_configured !== false &&
-    status?.prices_configured?.developer !== false;
-  const proReady =
-    status?.stripe_configured !== false &&
-    status?.prices_configured?.pro === true;
-
-  function checkoutDisabled(plan: 'developer' | 'pro') {
-    if (busy) return true;
-    // Not signed in / status not loaded yet — click starts checkout which redirects to login.
-    if (!status) return false;
-    if (status.stripe_configured === false) return true;
-    if (plan === 'developer') return status.prices_configured?.developer === false;
-    return status.prices_configured?.pro !== true;
-  }
-
-  function checkoutLabel(plan: 'developer' | 'pro', fallback: string) {
-    if (!status) return fallback;
-    if (status.stripe_configured === false) return 'Currently unavailable';
-    if (plan === 'developer' && status.prices_configured?.developer === false) {
-      return 'Currently unavailable';
-    }
-    if (plan === 'pro' && status.prices_configured?.pro !== true) {
-      return 'Currently unavailable';
-    }
-    return fallback;
-  }
+  const tier = user?.subscription_tier ?? 'free';
 
   return (
     <div className="mt-10 space-y-10">
-      {checkoutFlash === 'success' ? (
-        <section className="rounded-xl border border-fupe-text/40 bg-fupe-surface px-5 py-5 space-y-3">
-          <h2 className="text-lg font-semibold text-fupe-text">
-            {paidActive ? 'You’re on a paid plan' : 'Payment received'}
-          </h2>
-          <p className="text-sm text-fupe-muted">
-            {paidActive
-              ? `Your account is on the ${tier} tier. Create an API key below to use higher limits and image lookup.`
-              : 'Stripe is confirming your subscription — usually a few seconds. This page will show your new tier when the webhook lands; you can also refresh.'}
-          </p>
-          <div className="flex flex-wrap gap-3 pt-1">
-            {user ? (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void createKey()}
-                className="rounded-full bg-fupe-text px-5 py-2 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted disabled:opacity-60"
-              >
-                Create API key
-              </button>
-            ) : (
-              <Link
-                href="/login?next=/developers"
-                className="rounded-full bg-fupe-text px-5 py-2 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted"
-              >
-                Sign in to create a key
-              </Link>
-            )}
-            <a
-              href="#api-keys"
-              className="rounded-full border border-fupe-border px-5 py-2 text-sm text-fupe-text hover:border-fupe-muted"
-            >
-              Jump to API keys
-            </a>
-            <button
-              type="button"
-              onClick={() => setCheckoutFlash(null)}
-              className="text-sm text-fupe-muted hover:text-fupe-text"
-            >
-              Dismiss
-            </button>
-          </div>
-        </section>
-      ) : null}
-      {checkoutFlash === 'cancel' ? (
-        <section className="rounded-xl border border-fupe-border bg-fupe-surface px-5 py-5 space-y-3">
-          <h2 className="text-lg font-semibold text-fupe-text">
-            Checkout canceled
-          </h2>
-          <p className="text-sm text-fupe-muted">
-            No charge was made. You can stay on Free or start checkout again
-            whenever you’re ready.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              disabled={checkoutDisabled('developer')}
-              onClick={() => startCheckout('developer')}
-              className="rounded-full bg-fupe-text px-5 py-2 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted disabled:opacity-50"
-            >
-              {checkoutLabel('developer', 'Try Developer again')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setCheckoutFlash(null)}
-              className="text-sm text-fupe-muted hover:text-fupe-text"
-            >
-              Dismiss
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      <section className="grid gap-4 sm:grid-cols-3">
-        {(
-          [
-            ['free', 'Free'],
-            ['developer', 'Developer'],
-            ['pro', 'Pro'],
-          ] as const
-        ).map(([id, label]) => {
-          const t = status?.tiers?.[id] ?? FALLBACK_TIERS[id];
-          const active = tier === id;
-          return (
-            <div
-              key={id}
-              className={`rounded-xl border p-5 ${
-                active
-                  ? 'border-fupe-text bg-fupe-surface'
-                  : 'border-fupe-border bg-fupe-surface/60'
-              }`}
-            >
-              <h2 className="font-semibold text-fupe-text">{label}</h2>
-              <p className="mt-2 text-2xl text-fupe-text">
-                {t?.price_usd == null
-                  ? '—'
-                  : t.price_usd === 0
-                    ? '$0'
-                    : `$${t.price_usd}/mo`}
-              </p>
-              <ul className="mt-3 space-y-1 text-sm text-fupe-muted">
-                <li>{t?.rate_limit_daily?.toLocaleString() ?? '—'} req/day</li>
-                <li>
-                  {t?.image_lookup ? 'Image lookup included' : 'No image lookup'}
-                </li>
-                {t?.note ? <li>{t.note}</li> : null}
-              </ul>
-              {id === 'developer' && tier === 'free' ? (
-                <button
-                  type="button"
-                  disabled={checkoutDisabled('developer')}
-                  onClick={() => startCheckout('developer')}
-                  className="mt-4 w-full rounded-full bg-fupe-text px-4 py-2 text-sm font-semibold text-fupe-bg hover:bg-fupe-muted disabled:opacity-50"
-                >
-                  {checkoutLabel('developer', 'Upgrade')}
-                </button>
-              ) : null}
-              {id === 'pro' && tier !== 'pro' ? (
-                <button
-                  type="button"
-                  disabled={checkoutDisabled('pro')}
-                  onClick={() => startCheckout('pro')}
-                  className="mt-4 w-full rounded-full border border-fupe-border px-4 py-2 text-sm font-semibold text-fupe-text hover:border-fupe-muted disabled:opacity-50"
-                >
-                  {checkoutLabel(
-                    'pro',
-                    tier === 'developer' ? 'Upgrade to Pro' : 'Upgrade',
-                  )}
-                </button>
-              ) : null}
-              {active ? (
-                <p className="mt-3 text-xs uppercase tracking-wider text-fupe-muted">
-                  Current plan
-                </p>
-              ) : null}
-            </div>
-          );
-        })}
-      </section>
-
-      {user?.role === 'admin' && (!developerReady || !proReady) ? (
-        <p className="text-xs text-fupe-muted">
-          Stripe products: set{' '}
-          <code className="text-fupe-text">STRIPE_PRICE_DEVELOPER</code>
-          {!proReady ? (
-            <>
-              {' '}
-              and <code className="text-fupe-text">STRIPE_PRICE_PRO</code>
-            </>
-          ) : null}{' '}
-          on the API to enable checkout.
-        </p>
-      ) : null}
+      <Suspense fallback={<p className="text-fupe-muted">Loading plans…</p>}>
+        <BillingPlansPanel returnTo="/developers" showAdminHint />
+      </Suspense>
 
       <section
         id="api-keys"
@@ -349,7 +82,10 @@ export function DevelopersBilling() {
         <h2 className="font-semibold text-fupe-text">API keys</h2>
         {!user ? (
           <p className="text-sm text-fupe-muted">
-            <Link href="/login?next=/developers" className="text-fupe-text hover:underline">
+            <Link
+              href="/login?next=/developers"
+              className="text-fupe-text hover:underline"
+            >
               Sign in
             </Link>{' '}
             to create a key and manage billing.
@@ -359,8 +95,8 @@ export function DevelopersBilling() {
             <p className="text-sm text-fupe-muted">
               Signed in as {user.email}. Tier:{' '}
               <span className="text-fupe-text">{tier}</span>
-              {status?.subscription_status
-                ? ` (${status.subscription_status})`
+              {user.subscription_status
+                ? ` (${user.subscription_status})`
                 : ''}
             </p>
             <div className="flex flex-wrap gap-3">
@@ -372,16 +108,6 @@ export function DevelopersBilling() {
               >
                 Create API key
               </button>
-              {tier !== 'free' ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void openPortal()}
-                  className="rounded-full border border-fupe-border px-5 py-2 text-sm text-fupe-text hover:border-fupe-muted disabled:opacity-60"
-                >
-                  Manage subscription
-                </button>
-              ) : null}
             </div>
             {newKeySecret ? (
               <div className="rounded-lg border border-fupe-border bg-fupe-bg p-3">

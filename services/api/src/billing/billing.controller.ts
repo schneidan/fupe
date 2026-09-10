@@ -20,6 +20,16 @@ class CheckoutBody {
   @IsOptional()
   @IsIn(['developer', 'pro'])
   tier?: 'developer' | 'pro';
+
+  @IsOptional()
+  @IsIn(['/developers', '/account'])
+  return_to?: '/developers' | '/account';
+}
+
+class PortalBody {
+  @IsOptional()
+  @IsIn(['/developers', '/account'])
+  return_to?: '/developers' | '/account';
 }
 
 @Controller('billing')
@@ -46,15 +56,25 @@ export class BillingController {
   ) {
     const user = await this.users.findById(req.user.id);
     if (!user) throw new NotFoundException('User not found');
-    return this.billing.createCheckoutSession(user, body.tier ?? 'developer');
+    return this.billing.createCheckoutSession(
+      user,
+      body.tier ?? 'developer',
+      body.return_to ?? '/developers',
+    );
   }
 
   @Post('portal')
   @UseGuards(JwtAuthGuard)
-  async portal(@Req() req: { user: AuthUser }) {
+  async portal(
+    @Req() req: { user: AuthUser },
+    @Body() body: PortalBody = {},
+  ) {
     const user = await this.users.findById(req.user.id);
     if (!user) throw new NotFoundException('User not found');
-    return this.billing.createPortalSession(user);
+    return this.billing.createPortalSession(
+      user,
+      body.return_to ?? '/developers',
+    );
   }
 
   /**

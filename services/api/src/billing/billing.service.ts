@@ -102,7 +102,8 @@ export class BillingService {
   async createCheckoutSession(
     user: UserRow,
     tier: 'developer' | 'pro' = 'developer',
-  ): Promise<{ url: string }> {
+    returnTo: '/developers' | '/account' = '/developers',
+  ) {
     const stripe = this.requireStripe();
     const priceId =
       tier === 'pro'
@@ -117,10 +118,16 @@ export class BillingService {
       );
     }
 
+    if (this.canSwitchExistingSubscription(user)) {
+      return this.switchSubscriptionPrice(user, tier, priceId);
+    }
+
     const site =
       this.config.get<string>('NEXT_PUBLIC_SITE_URL') ??
       this.config.get<string>('SITE_URL') ??
       'http://localhost:3001';
+    const base = site.replace(/\/$/, '');
+    const dest = returnTo === '/account' ? '/account' : '/developers';
 
     const customerId = await this.ensureCustomer(user);
 
@@ -128,8 +135,8 @@ export class BillingService {
       mode: 'subscription',
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${site.replace(/\/$/, '')}/developers?checkout=success`,
-      cancel_url: `${site.replace(/\/$/, '')}/developers?checkout=cancel`,
+      success_url: `${base}${dest}?checkout=success`,
+      cancel_url: `${base}${dest}?checkout=cancel`,
       client_reference_id: user.id,
       metadata: {
         user_id: user.id,
@@ -146,10 +153,96 @@ export class BillingService {
     if (!session.url) {
       throw new BadRequestException('Stripe did not return a checkout URL');
     }
-    return { url: session.url };
+    return { mode: 'checkout' as const, url: session.url };
   }
 
-  async createPortalSession(user: UserRow): Promise<{ url: string }> {
+  /** Active Stripe sub → change price in place (upgrade/downgrade) with proration. */
+  private canSwitchExistingSubscription(user: UserRow): boolean {
+    if (!user.stripe_subscription_id?.trim()) return false;
+    const status = (user.subscription_status ?? '').toLowerCase();
+    return (
+      status === 'active' ||
+      status === 'trialing' ||
+      status === 'past_due' ||
+      status === 'admin_override'
+    );
+  }
+
+  private async switchSubscriptionPrice(
+    user: UserRow,
+    tier: 'developer' | 'pro',
+    priceId: string,
+  ) {
+    const stripe = this.requireStripe();
+    const subId = user.stripe_subscription_id!;
+    let sub: Stripe.Subscription;
+    try {
+      sub = await stripe.subscriptions.retrieve(subId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Could not load subscription ${subId}: ${msg}`);
+      throw new BadRequestException(
+        'Could not load your current subscription. Use Manage subscription or try again.',
+      );
+    }
+
+    if (
+      sub.status === 'canceled' ||
+      sub.status === 'incomplete_expired' ||
+      sub.status === 'unpaid'
+    ) {
+      throw new BadRequestException(
+        'Your subscription is no longer active. Subscribe again to start a new plan.',
+      );
+    }
+
+    const item = sub.items.data[0];
+    if (!item?.id) {
+      throw new BadRequestException('Subscription has no billable item to update');
+    }
+
+    const currentTier =
+      this.parseTier(sub.metadata?.tier) ??
+      this.tierFromPrice(sub) ??
+      (user.subscription_tier as ApiKeyTier) ??
+      'free';
+
+    if (currentTier === tier && item.price?.id === priceId) {
+      throw new BadRequestException('You are already on this plan');
+    }
+
+    const updated = await stripe.subscriptions.update(subId, {
+      items: [{ id: item.id, price: priceId }],
+      metadata: {
+        ...(sub.metadata ?? {}),
+        user_id: user.id,
+        tier,
+      },
+      proration_behavior: 'create_prorations',
+      cancel_at_period_end: false,
+    });
+
+    const periodEnd = periodEndFromSubscription(updated);
+    const status =
+      updated.status === 'trialing' ? 'trialing' : 'active';
+    await this.applyTier(user.id, tier, status, updated.id, periodEnd);
+
+    this.logger.log(
+      `User ${user.id} switched subscription ${subId} → tier=${tier}`,
+    );
+
+    const refreshed = await this.users.findById(user.id);
+    if (!refreshed) {
+      throw new BadRequestException('User missing after plan switch');
+    }
+    const statusPayload = await this.getStatus(refreshed);
+    return { mode: 'switched' as const, ...statusPayload };
+  }
+
+  async createPortalSession(
+    user: UserRow,
+    returnTo: '/developers' | '/account' = '/developers',
+  ): Promise<{ url: string }> {
     const stripe = this.requireStripe();
     if (!user.stripe_customer_id) {
       throw new BadRequestException('No Stripe customer on this account yet');
@@ -158,10 +251,11 @@ export class BillingService {
       this.config.get<string>('NEXT_PUBLIC_SITE_URL') ??
       this.config.get<string>('SITE_URL') ??
       'http://localhost:3001';
+    const dest = returnTo === '/account' ? '/account' : '/developers';
 
     const session = await stripe.billingPortal.sessions.create({
       customer: user.stripe_customer_id,
-      return_url: `${site.replace(/\/$/, '')}/developers`,
+      return_url: `${site.replace(/\/$/, '')}${dest}`,
     });
     return { url: session.url };
   }

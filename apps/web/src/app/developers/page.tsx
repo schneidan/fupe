@@ -25,8 +25,9 @@ export default function DevelopersPage() {
       </p>
       <p className="mt-4 text-sm text-fupe-muted">
         <strong className="font-medium text-fupe-text">Billing:</strong> Paid
-        plans renew monthly via Stripe. Cancel anytime from this page (Manage
-        subscription) — you keep paid access until the period ends, then limits
+        plans renew monthly via Stripe. Already subscribed? Upgrade or downgrade
+        in place (prorated) — no second subscription. Cancel anytime via Manage
+        subscription — you keep paid access until the period ends, then limits
         return to Free. Questions or charge issues:{' '}
         <a href="/legal/contact" className="text-fupe-text hover:underline">
           Contact

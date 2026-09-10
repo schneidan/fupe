@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
 import {
   cancelEmailChange,
   clearSession,
@@ -15,6 +15,7 @@ import {
   type AuthUser,
 } from '@/lib/auth';
 import { AccountPrivacyPanel } from '@/components/AccountPrivacyPanel';
+import { BillingPlansPanel } from '@/components/BillingPlansPanel';
 
 export function AccountHub() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -218,6 +219,18 @@ export function AccountHub() {
         >
           Sign out
         </button>
+      </div>
+
+      <div className="rounded-xl border border-fupe-border bg-fupe-surface p-6 space-y-4">
+        <h2 className="font-semibold text-fupe-text">API plan</h2>
+        <p className="text-sm text-fupe-muted">
+          Site lookups stay free. Paid plans raise API daily limits and unlock
+          image lookup. Switching plans updates your existing Stripe
+          subscription (prorated) — it does not stack a second charge.
+        </p>
+        <Suspense fallback={<p className="text-sm text-fupe-muted">Loading plans…</p>}>
+          <BillingPlansPanel returnTo="/account" compact />
+        </Suspense>
       </div>
 
       <form
