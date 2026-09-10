@@ -176,12 +176,12 @@ export function DevelopersBilling() {
 
   function checkoutLabel(plan: 'developer' | 'pro', fallback: string) {
     if (!status) return fallback;
-    if (status.stripe_configured === false) return 'Stripe not configured';
+    if (status.stripe_configured === false) return 'Currently unavailable';
     if (plan === 'developer' && status.prices_configured?.developer === false) {
-      return 'Developer price not set';
+      return 'Currently unavailable';
     }
     if (plan === 'pro' && status.prices_configured?.pro !== true) {
-      return 'Pro price not set';
+      return 'Currently unavailable';
     }
     return fallback;
   }
@@ -328,7 +328,7 @@ export function DevelopersBilling() {
         })}
       </section>
 
-      {!user ? null : !developerReady || !proReady ? (
+      {user?.role === 'admin' && (!developerReady || !proReady) ? (
         <p className="text-xs text-fupe-muted">
           Stripe products: set{' '}
           <code className="text-fupe-text">STRIPE_PRICE_DEVELOPER</code>
