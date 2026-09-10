@@ -6,7 +6,11 @@ import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
 
 @Module({
-  imports: [forwardRef(() => AuthModule), ApiKeysModule, MailModule],
+  imports: [
+    forwardRef(() => AuthModule),
+    forwardRef(() => ApiKeysModule),
+    MailModule,
+  ],
   controllers: [BillingController],
   providers: [BillingService],
   exports: [BillingService],

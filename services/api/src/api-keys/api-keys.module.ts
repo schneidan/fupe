@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuthModule } from '../auth/auth.module';
 import { ApiKeyGuard } from './api-key.guard';
@@ -7,7 +7,7 @@ import { ApiKeysService } from './api-keys.service';
 import { ApiUsageInterceptor } from './api-usage.interceptor';
 
 @Module({
-  imports: [AuthModule],
+  imports: [forwardRef(() => AuthModule)],
   controllers: [ApiKeysController],
   providers: [
     ApiKeysService,
