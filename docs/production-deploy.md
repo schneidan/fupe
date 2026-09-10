@@ -953,3 +953,26 @@ sudo nginx -t && sudo systemctl reload nginx
 ```
 
 When this checklist is green, paste your test Payment Link into `NEXT_PUBLIC_SUPPORT_URL` (if not already), confirm the footer, then move on to store listing URLs (`https://fupe.app/legal/privacy`, etc.).
+
+---
+
+## 15. Launch readiness notes (locked decisions)
+
+Quick prod reminders from the launch checklist — keep these true on **fupe.app**:
+
+| Item | Prod expectation |
+|------|------------------|
+| GraphQL | **Off** — leave `ENABLE_GRAPHQL` unset/false (bypasses lookup IP throttle if enabled) |
+| Site URL | `NEXT_PUBLIC_SITE_URL=https://fupe.app` (baked into the web build) |
+| Exception monitoring | **Skip** for early access (UptimeRobot + logs). Optional later: self-hosted GlitchTip |
+| Stripe | Use **live** keys + live price IDs + live webhook endpoint when charging real customers; keep test mode on staging |
+| Webhook migrate | Ensure DB migrations through **022** (webhook processing lease) are applied |
+| Security contact | `https://fupe.app/.well-known/security.txt` → `security@fupe.app` |
+| Trust / contributions | Ownership edits auto-commit when trust **> 50**; **new entities** and name tips **always** queue for moderators |
+
+Contribute / auth smoke (after deploy):
+
+- [ ] Guest hitting “Suggest an edit” on an entity is nudged to sign in
+- [ ] Login `?next=` only accepts same-origin paths (no open redirect)
+- [ ] `POST /api/v1/lookup` TEXT for a known brand returns a verdict
+- [ ] Product email unsubscribe link opens `/unsubscribe` and opts out

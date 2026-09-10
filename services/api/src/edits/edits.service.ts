@@ -16,6 +16,7 @@ import { AuthService, AuthUser } from '../auth/auth.service';
 import { UsersRepository } from '../auth/users.repository';
 import { writeAdminAudit } from '../admin/audit-log';
 import { MailService } from '../mail/mail.service';
+import { shouldAutoCommitEdit } from './edit-queue-policy';
 
 export type EditStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -51,7 +52,6 @@ export interface SubmitEditDto {
   citation_url?: string;
 }
 
-const TRUST_AUTO_COMMIT_THRESHOLD = 50;
 const MAX_PENDING_EDITS = 5;
 const TRUST_ON_APPROVE = 5;
 const TRUST_ON_REJECT = -10;
@@ -100,10 +100,15 @@ export class EditsService {
     const targetNodeId = this.resolveTargetNodeId(dto);
     const normalized: SubmitEditDto = { ...dto, target_node_id: targetNodeId };
 
-    // Lightweight entity tips always need review (AI / mod enrichment later).
-    // Full create_entity + ownership can auto-commit above the trust threshold.
-    const alwaysQueue = this.isSuggestEntitySubmission(normalized);
-    if (!alwaysQueue && user.trust_score > TRUST_AUTO_COMMIT_THRESHOLD) {
+    // Name tips + new entities always need review (even high trust).
+    // Ownership edits can auto-commit above the trust threshold.
+    if (
+      shouldAutoCommitEdit({
+        trustScore: user.trust_score,
+        isSuggestEntity: this.isSuggestEntitySubmission(normalized),
+        isCreateEntity: this.isNewEntitySubmission(normalized),
+      })
+    ) {
       const result = await this.commitEdit(user.id, normalized);
       await this.notifyEditReceived(user, 'committed');
       return result;

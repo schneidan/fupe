@@ -80,8 +80,8 @@ export function ContributeHub() {
         >
           <h2 className="font-semibold text-fupe-text">Add entity</h2>
           <p className="mt-2 text-sm text-fupe-muted">
-            Full details (type, citation, optional parent). High trust can
-            auto-commit.
+            Full details (type, citation, optional parent). Always queued for
+            moderator review.
           </p>
         </Link>
         {isModerator(user) ? (

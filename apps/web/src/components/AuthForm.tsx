@@ -67,7 +67,7 @@ export function AuthForm({ initialMode = 'login' }: { initialMode?: Mode }) {
         <p className="font-medium text-fupe-text">{user.email}</p>
         <p className="text-xs text-fupe-muted">
           Trust score: {user.trust_score}
-          {user.trust_score > 50 ? ' · edits auto-commit' : ' · edits go to review'}
+          {user.trust_score > 50 ? ' · ownership edits auto-commit' : ' · edits go to review'}
           {user.email_verified ? '' : ' · email unverified'}
           {user.role === 'moderator' || user.role === 'admin'
             ? ` · ${user.role}`

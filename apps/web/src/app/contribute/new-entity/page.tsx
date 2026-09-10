@@ -18,8 +18,8 @@ export default function ProposeEntityPage() {
       <h1 className="text-2xl font-bold text-fupe-text">Add entity</h1>
       <p className="mt-3 mb-8 text-sm text-fupe-muted">
         Full details when you know them: type, optional parent/sector, and a
-        citation. High trust scores can auto-commit; otherwise a moderator
-        reviews. Just have a name?{' '}
+        citation. New entities always go to a moderator for review. Just have a
+        name?{' '}
         <Link
           href="/contribute/suggest-entity"
           className="text-fupe-text hover:underline"

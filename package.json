@@ -14,10 +14,12 @@
     "db:setup": "docker compose up -d postgres && pnpm db:migrate",
     "db:reset": "pnpm --filter @fupe/db reset",
     "ingest": "pnpm --filter @fupe/ingest ingest",
-    "ingest:schedule": "pnpm --filter @fupe/ingest ingest:schedule"
+    "ingest:schedule": "pnpm --filter @fupe/ingest ingest:schedule",
+    "test:smoke": "pnpm --filter @fupe/api test && pnpm exec ts-node --transpile-only --compiler-options '{\"module\":\"commonjs\",\"moduleResolution\":\"node\",\"esModuleInterop\":true}' apps/web/src/lib/safe-next.smoke.ts"
   },
   "devDependencies": {
     "turbo": "^2.3.3",
+    "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
   },
   "packageManager": "pnpm@9.15.0",

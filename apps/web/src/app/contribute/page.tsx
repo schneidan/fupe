@@ -16,7 +16,7 @@ export default function ContributePage() {
         Help fill gaps the ingest pipeline misses. Suggest ownership edits with
         a citation, tip a missing brand name for enrichment, or add a full
         entity when you know the details. High trust can auto-commit ownership
-        and full adds; name-only suggestions always go to review.
+        edits; new entities and name-only tips always go to review.
       </p>
       <ContributeHub />
     </main>

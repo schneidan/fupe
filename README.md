@@ -84,7 +84,7 @@ Traversal walks `OWNED_BY` and `PORTFOLIO_COMPANY_OF` edges up to **10 degrees**
 | `POST /api/v1/auth/register` | — | Create account |
 | `POST /api/v1/auth/login` | — | Get JWT |
 | `POST /api/v1/edits` | Bearer JWT | Submit ownership edit |
-| `GET /api/v1/edits/queue` | Bearer JWT (trust > 50) | List pending edits |
+| `GET /api/v1/edits/queue` | Bearer JWT (moderator) | List pending edits |
 | `PATCH /api/v1/edits/:id/review` | Bearer JWT (moderator) | Approve / reject |
 
 ## Public API keys (Phase 6.1)

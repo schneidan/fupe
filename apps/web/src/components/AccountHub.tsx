@@ -167,9 +167,9 @@ export function AccountHub() {
             </li>
             <li>
               Proposing a full <span className="text-fupe-text">Add entity</span>{' '}
-              can auto-commit above 50 (with citation). Lightweight{' '}
+              always goes to moderator review (even above 50). Lightweight{' '}
               <span className="text-fupe-text">Suggest an entity</span> tips
-              always go to review.
+              also always go to review.
             </li>
             <li>Max 5 pending edits per account at a time.</li>
           </ul>

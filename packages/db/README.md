@@ -77,7 +77,7 @@ pnpm db:reset && pnpm db:migrate
 | id | UUID | Primary key |
 | email | TEXT | Unique login |
 | password_hash | TEXT | bcrypt hash |
-| trust_score | INTEGER | 0–100; >50 auto-commits edits |
+| trust_score | INTEGER | 0–100; >50 auto-commits **ownership** edits (new entities always queue) |
 | created_at | TIMESTAMPTZ | Registration time |
 
 ### `edits_queue`
