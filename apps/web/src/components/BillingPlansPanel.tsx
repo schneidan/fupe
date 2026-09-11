@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
+  clearSession,
   fetchMe,
   getStoredUser,
   getToken,
@@ -122,6 +123,7 @@ export function BillingPlansPanel({
     const token = getToken();
     if (!token) {
       setStatus(null);
+      setError(null);
       return;
     }
     try {
@@ -130,8 +132,18 @@ export function BillingPlansPanel({
         token,
       });
       setStatus(s);
+      setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load billing');
+      const msg = e instanceof Error ? e.message : 'Failed to load billing';
+      // Stale/expired JWT after logout — don't scare anonymous visitors.
+      if (/unauthorized/i.test(msg)) {
+        clearSession();
+        setUser(null);
+        setStatus(null);
+        setError(null);
+        return;
+      }
+      setError(msg);
     }
   }, []);
 
@@ -150,7 +162,18 @@ export function BillingPlansPanel({
   }, [searchParams]);
 
   useEffect(() => {
-    void fetchMe().then((me) => setUser(me ?? getStoredUser()));
+    const sync = () => {
+      const stored = getStoredUser();
+      setUser(stored);
+      if (!getToken()) {
+        setStatus(null);
+        setError(null);
+      }
+    };
+    sync();
+    void fetchMe().then((me) => setUser(me));
+    window.addEventListener('fupe-auth', sync);
+    return () => window.removeEventListener('fupe-auth', sync);
   }, []);
 
   useEffect(() => {
@@ -402,7 +425,9 @@ export function BillingPlansPanel({
         </div>
       ) : null}
 
-      {error ? <p className="text-sm text-status-error">{error}</p> : null}
+      {error && user ? (
+        <p className="text-sm text-status-error">{error}</p>
+      ) : null}
     </div>
   );
 }

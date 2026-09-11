@@ -3,13 +3,23 @@ const nextConfig = {
   async headers() {
     // CSP A (starter): sensible baseline; styles need unsafe-inline for Next.
     // Scripts keep unsafe-inline for App Router inline bootstraps (tighten later with nonces).
+    // Dev-only unsafe-eval: Next Fast Refresh / react-refresh uses eval(); without it
+    // client hydration fails and interactive chrome (hamburger, etc.) appears dead.
+    const isDev = process.env.NODE_ENV === 'development';
+    const scriptSrc = isDev
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+      : "script-src 'self' 'unsafe-inline'";
+    const connectSrc = isDev
+      ? "connect-src 'self' ws: wss:"
+      : "connect-src 'self'";
+
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      scriptSrc,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self'",
+      connectSrc,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

@@ -54,7 +54,7 @@ export function SiteNavMenu() {
   }
 
   return (
-    <div ref={rootRef} className="fixed left-4 top-4 z-50">
+    <div ref={rootRef} className="fixed left-4 top-4 z-[110]">
       <button
         type="button"
         aria-expanded={open}

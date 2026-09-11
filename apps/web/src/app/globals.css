@@ -52,23 +52,3 @@ textarea:focus-visible,
 select:focus-visible {
   outline: none;
 }
-
-.skip-link {
-  position: absolute;
-  left: 1rem;
-  top: 1rem;
-  z-index: 100;
-  transform: translateY(-200%);
-  border-radius: 9999px;
-  background: #ffffff;
-  color: #141414;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.skip-link:focus {
-  transform: translateY(0);
-  outline: 2px solid #d4d4d4;
-  outline-offset: 2px;
-}
