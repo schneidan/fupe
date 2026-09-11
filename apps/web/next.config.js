@@ -81,6 +81,11 @@ const nextConfig = {
         source: '/graphql',
         destination: `${apiUrl}/graphql`,
       },
+      // Pretty child sitemap URLs: /sitemaps/0.xml → /sitemaps/0
+      {
+        source: '/sitemaps/:id.xml',
+        destination: '/sitemaps/:id',
+      },
     ];
   },
 };
