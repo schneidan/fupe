@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { ContentDoc, ContentH2, ContentLink } from '@/components/ContentDoc';
+import { ObfuscatedEmail } from '@/components/ObfuscatedEmail';
 
 export const metadata: Metadata = {
   title: 'FAQ',
@@ -87,6 +88,25 @@ export default function FaqPage() {
       <FaqItem question="Is FUPE finished?">
         <p>
           No, we are in early access. Features and coverage will change.
+        </p>
+      </FaqItem>
+
+      <FaqItem question="Why doesn’t FUPE have active social media accounts?">
+        <p>
+          FUPE is built to be a focused, utility-first SaaS tool. We prioritize
+          product performance, reliability, and direct user support over social
+          media presence.
+        </p>
+        <p>
+          Rather than maintain marketing profiles on third-party networks, FUPE
+          places official communications on our platform (
+          <ContentLink href="https://fupe.app">fupe.app</ContentLink>) or sends
+          them directly to customers.
+        </p>
+        <p>
+          If you need help, have a feature request, or want to reach the team,
+          email <ObfuscatedEmail user="support" domain="fupe.app" /> — you’ll
+          get a response from our core team, not an automated social inbox.
         </p>
       </FaqItem>
     </ContentDoc>

@@ -4,10 +4,13 @@ import { SiteFooter } from '@/components/SiteFooter';
 import { SiteAccountLink } from '@/components/SiteAccountLink';
 import { SiteNavMenu } from '@/components/SiteNavMenu';
 import { CookieConsentBanner } from '@/components/CookieConsentBanner';
+import { isSearchIndexable } from '@/lib/fupe-env';
 import { defaultOgImages, resolveSiteUrl } from '@/lib/site-url';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+
+const indexable = isSearchIndexable();
 
 export const metadata: Metadata = {
   metadataBase: new URL(resolveSiteUrl()),
@@ -17,6 +20,9 @@ export const metadata: Metadata = {
   },
   description:
     'Find out if a brand, product, or company is backed by Private Equity. Trace ownership chains with citations.',
+  robots: indexable
+    ? { index: true, follow: true }
+    : { index: false, follow: false },
   openGraph: {
     siteName: 'FUPE',
     type: 'website',

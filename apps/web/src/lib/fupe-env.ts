@@ -24,6 +24,11 @@ export function resolveFupeEnv(
   return 'production';
 }
 
+/** Only production should appear in search indexes / sitemaps. */
+export function isSearchIndexable(env: FupeEnv = resolveFupeEnv()): boolean {
+  return env === 'production';
+}
+
 /** Diagonal slash color for favicon; null = leave mark alone (prod). */
 export function faviconSlashColor(env: FupeEnv): string | null {
   if (env === 'development') return '#ef4444';
