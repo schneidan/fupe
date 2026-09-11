@@ -727,64 +727,75 @@ Yes for a small team. Cloudflare’s **Zero Trust / Cloudflare One Free** plan i
 ### One-time setup
 
 1. Cloudflare dashboard → **Zero Trust** (may say **Cloudflare One**).
-2. Create / select a team name if prompted (e.g. `fupe`).
+2. Create / select a team name if prompted (e.g. `fupe`) — you already did this.
 3. Stay on the **Free** plan unless you need paid features.
 
-### Login method (email OTP — no Google Workspace required)
+### Login method (email OTP)
 
-1. Zero Trust → **Settings** → **Authentication** (or **Integrations** → identity providers).
-2. Add **One-time PIN** (email OTP) if it isn’t already enabled.
-3. Optional later: Google / GitHub IdP for fewer OTP emails.
+New teams often get a default **Cloudflare** IdP only; OTP is **not** always pre-enabled.
+
+Current path ([docs](https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/one-time-pin/)):
+
+1. Zero Trust → **Integrations** → **Identity providers**
+2. **Add new identity provider** → **One-time PIN** → save (no extra config)
+
+If the nav differs, use Zero Trust search: `Identity providers` or `One-time PIN`.
 
 ### Application: staging web
 
-1. Zero Trust → **Access** → **Applications** → **Add an application**.
-2. Choose **Self-hosted**.
-3. Configure:
-   - **Application name:** `FUPE Staging Web`
-   - **Session duration:** e.g. 24 hours (or 7 days if you hate re-authing)
-   - **Application domain:** `staging.fupe.app` (path `/` or leave path empty / `*`)
-4. **Identity providers:** enable **One-time PIN** (and any others you configured).
-5. **Policy** (Allow):
-   - **Policy name:** `Staging team`
-   - **Action:** Allow
-   - **Include:** `Emails` → your address (e.g. `you@example.com`), **or** `Emails ending in` → `@yourdomain.com` if you want the whole inbox domain
-6. Save / Deploy.
+Current path ([docs](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/)):
 
-### Application: staging API (recommended)
+1. Zero Trust → **Access controls** → **Applications** (search “Applications” if needed)
+2. **Create new application** → **Self-hosted** / **Self-hosted and private**
+3. **Add public hostname:**
+   - Subdomain/host: `staging.fupe.app`
+   - **Path: leave empty** (whole site)
+4. **Allow** policy → Include → **Emails** → your address (or emails ending in your domain)
+5. Enable **One-time PIN** for this app
+6. Session: 24h or 7d → Save
 
-Same flow for `api-staging.fupe.app`:
+### Application: staging API (catch-all)
 
-- **Name:** `FUPE Staging API`
-- **Domain:** `api-staging.fupe.app`
-- Same Allow policy (reuse or duplicate)
+Same as web, but hostname `api-staging.fupe.app`, path **empty**, same Allow emails + OTP.
 
-Without this, people who never hit the web host can still call the public API hostname. Browser lookups from staging web go through the Next rewrite/`API_URL` loopback on the VPS for server-side calls, but **public** `https://api-staging.fupe.app` should still be gated.
+This gates the public API. Server-side Next → Nest on the VPS still uses loopback `API_URL` and does not go through Access.
 
-### Stripe webhooks + Access
+### Stripe webhook Bypass (required if API is behind Access)
 
-Stripe cannot complete an Access OTP login. Options:
+Stripe cannot complete an Access OTP. **Do not** try to put Bypass on the catch-all app’s policy list alone — the reliable pattern is a **second, more-specific Access application** for the webhook path. Cloudflare prefers the more specific hostname+path.
 
-1. **Bypass policy** on the webhook path only (preferred for simplicity):
-   - Edit the **Staging API** Access app → **Add a policy**
-   - **Action:** Bypass (or Service Auth — see #2)
-   - **Include:** everyone / any
-   - **Restrict to:** path ` /api/v1/billing/webhook` (exact path as Cloudflare shows it — often under **Advanced** path rules)
-   - Order policies so Bypass for the webhook is evaluated correctly (Bypass/Service Auth for that path; Allow for the rest)
-2. Or **Service Token** (Access → Service Auth → create token) and configure Stripe… Stripe **cannot** send custom `CF-Access-Client-Id` headers, so **path Bypass** is the practical choice for Stripe.
+1. Zero Trust → **Access controls** → **Applications** → **Create new application** → **Self-hosted**
+2. Name: `FUPE Staging Stripe webhook`
+3. **Add public hostname:**
+   - Host: `api-staging.fupe.app`
+   - **Path:** `/api/v1/billing/webhook`  
+     (exact path Stripe posts to; no trailing slash unless your nginx redirects that way)
+4. Under **Access policies** → create a policy:
+   - **Action:** **Bypass**
+   - **Include:** **Everyone**
+5. Save. Leave your catch-all `api-staging.fupe.app` (empty path) **Allow** app as-is — more specific path wins for Stripe; everything else still needs OTP.
 
-Health checks (`/health`) can use the same Bypass path if an external monitor needs them without eating a seat.
+Optional: another Bypass app for `api-staging.fupe.app` + path `/health` if an external monitor needs it.
+
+**Security note:** Bypass makes that URL publicly reachable. Nest still verifies `Stripe-Signature` with `STRIPE_WEBHOOK_SECRET`, so forged posts without a valid signature fail — don’t skip that secret.
+
+**Not useful for Stripe:** Service Auth / service tokens — Stripe cannot send `CF-Access-Client-Id` / `CF-Access-Client-Secret` headers.
 
 ### Verify
 
-1. Incognito → `https://staging.fupe.app` → Cloudflare Access login → OTP email → site loads.
-2. Another browser / friend without an Allow-listed email → blocked.
-3. `curl -sI https://staging.fupe.app/robots.txt` → `Disallow: /` and `X-Robots-Tag: noindex…` after soft-hide rebuild.
-4. Stripe test Checkout on staging still delivers webhooks (Workbench → staging destination).
+1. Incognito → `https://staging.fupe.app` → Access OTP → site loads.
+2. Unlisted email → blocked.
+3. Webhook Bypass:
+   ```bash
+   curl -sI https://api-staging.fupe.app/api/v1/billing/webhook
+   ```
+   Should **not** redirect to Cloudflare Access login (expect 400/405 from Nest without a Stripe body is fine; Access challenge HTML is bad).
+4. Stripe Workbench → staging destination → send a test event → delivery succeeds.
+5. After soft-hide rebuild: `curl -sI https://staging.fupe.app/robots.txt` shows disallow-all / `X-Robots-Tag`.
 
 ### Don’t lock prod
 
-Only add Access apps for `staging.fupe.app` / `api-staging.fupe.app`. Leave `fupe.app` and `api.fupe.app` **without** Access.
+Only Access apps for `staging.fupe.app` / `api-staging.fupe.app` (+ webhook Bypass path). Leave `fupe.app` and `api.fupe.app` **without** Access.
 
 ---
 
